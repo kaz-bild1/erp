@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      var errText = "ERROR: " + message + " at " + source + ":" + lineno + ":" + colno;
+      fetch('/log?msg=' + encodeURIComponent(errText));
+    };
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KazBildInvest ERP - Панель управления автопарком</title>
+  
+  <!-- Стили Leaflet.js -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Локальные стили -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <div class="app-wrapper">
+    <!-- Левое меню (Швейцарский дизайн) -->
+    <aside class="sidebar">
+      <div class="logo-section">
+        <input type="text" id="companyNameInput" class="logo-title" value="ТОО KazBildInvest" title="Кликните для редактирования" />
+        <span class="logo-subtitle">Enterprise ERP v3.0</span>
+      </div>
+      
+      <nav class="menu-group">
+        <div class="menu-group-title">Операции</div>
+        <button class="menu-item active" onclick="switchTab('dashboard')">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+          Дашборд и Аналитика
+        </button>
+        <button class="menu-item" onclick="switchTab('crm')">
+          <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          CRM и Продажи
+        </button>
+        <button class="menu-item" onclick="switchTab('dispatch')">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Диспетчеризация
+        </button>
+        <button class="menu-item" onclick="switchTab('gps')">
+          <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          GPS-Мониторинг
+        </button>
+      </nav>
+
+      <nav class="menu-group">
+        <div class="menu-group-title">Ресурсы</div>
+        <button class="menu-item" onclick="switchTab('fuel')">
+          <svg viewBox="0 0 24 24"><path d="M3 22V2h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H3z"/><path d="M17 6h4v4h-4z"/><circle cx="10" cy="11" r="3"/></svg>
+          Учет ГСМ
+        </button>
+        <button class="menu-item" onclick="switchTab('warehouse')">
+          <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          Склад и Логистика
+        </button>
+        <button class="menu-item" onclick="switchTab('repairs')">
+          <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          Ремонты и ТО
+        </button>
+        <button class="menu-item" onclick="switchTab('hr')">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          HR и Безопасность
+        </button>
+      </nav>
+
+      <nav class="menu-group">
+        <div class="menu-group-title">Настройки</div>
+        <button class="menu-item" onclick="switchTab('directories')">
+          <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          Справочники
+        </button>
+        <button class="menu-item" onclick="switchTab('settings')">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Настройки системы
+        </button>
+      </nav>
+      
+      <!-- Блок ИИ чат-бота Telegram / WhatsApp внизу меню -->
+      <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-color);">
+        <button class="menu-item" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); color: var(--status-success);" onclick="openChatBotModal()">
+          <svg viewBox="0 0 24 24" style="stroke: var(--status-success);"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          ИИ-Ассистент ТБ
+        </button>
+      </div>
+    </aside>
+
+    <!-- Основной контент -->
+    <main class="main-content">
+      <!-- Верхняя панель (Header) -->
+      <header class="header">
+        <h2 id="pageTitleDisplay" class="page-title">Дашборд и Аналитика</h2>
+        
+        <div class="header-controls">
+          <!-- Выбор активной роли для тестирования прав -->
+          <div class="role-selector-wrapper">
+            <span style="color: var(--text-secondary);">Роль:</span>
+            <select id="roleSelector" class="select-clean" onchange="changeActiveRole()">
+              <option value="Director">Директор (Все права)</option>
+              <option value="Dispatcher">Диспетчер</option>
+              <option value="Warehouse">Заведующий складом</option>
+              <option value="Mechanic">Механик</option>
+              <option value="HR">HR-специалист</option>
+              <option value="Purchaser">Снабженец</option>
+            </select>
+          </div>
+          
+          <!-- Переключатель Тем -->
+          <button id="themeToggleBtn" class="btn-icon" onclick="toggleAppTheme()" title="Сменить тему">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          </button>
+          
+          <!-- Открыть Мобильный Телефон Водителя -->
+          <button class="btn-primary" onclick="togglePhoneSimulator()" style="font-size: 12px; padding: 6px 12px;">
+            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: #FFF;"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            Экран водителя
+          </button>
+        </div>
+      </header>
+
+      <!-- Контейнер для вкладок -->
+      <div class="tab-container">
+        
+        <!-- 1. ТАБ: ДАШБОРД -->
+        <section id="tab-dashboard" class="tab-pane active">
+          <!-- KPI Сводки -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <span class="kpi-label">Выручка за месяц</span>
+              <span class="kpi-value" id="kpiRevenue">7,800,000 ₸</span>
+              <span class="kpi-subtext" style="color: var(--status-success);">План: 10,000,000 ₸ (78%)</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Утилизация парка</span>
+              <span class="kpi-value" id="kpiUtilization">83.3%</span>
+              <span class="kpi-subtext">20 из 24 единиц в работе</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Дебиторская задолженность</span>
+              <span class="kpi-value" id="kpiDebtors" style="color: var(--status-danger);">2,400,000 ₸</span>
+              <span class="kpi-subtext">Требует внимания</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Удержания (ГСМ/ТБ)</span>
+              <span class="kpi-value" id="kpiDeductions">295,000 ₸</span>
+              <span class="kpi-subtext">Штрафы за алкоголь и сливы</span>
+            </div>
+          </div>
+          
+          <!-- Финансовая аналитика: Сплит по объектам и ROI спецтехники -->
+          <div class="grid-container">
+            <div class="col-8 card">
+              <h3 class="card-title">Финансовые показатели (P&L) по Объектам</h3>
+              <div id="objectsPnlGrid" class="grid-container" style="gap: 16px;">
+                <!-- Динамически рендерится из JS -->
+              </div>
+            </div>
+            
+            <div class="col-4 card">
+              <h3 class="card-title">Окупаемость активов (ROI техники)</h3>
+              <div class="table-wrapper" style="max-height: 300px; overflow-y: auto;">
+                <table class="clean-table" id="fleetRoiTable">
+                  <thead>
+                    <tr>
+                      <th>Техника</th>
+                      <th>Затраты</th>
+                      <th>Прибыль</th>
+                      <th>ROI</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Динамически из JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Дебиторская задолженность и старение счетов -->
+          <div class="card">
+            <h3 class="card-title">Контроль дебиторской задолженности (Счета и эскалация)</h3>
+            <div class="table-wrapper">
+              <table class="clean-table" id="debtorsTable">
+                <thead>
+                  <tr>
+                    <th>Клиент</th>
+                    <th>Договор</th>
+                    <th>Сумма</th>
+                    <th>Срок оплаты</th>
+                    <th>Просрочка</th>
+                    <th>Статус</th>
+                    <th>Эскалация / Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Заполняется динамически -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 2. ТАБ: CRM И ПРОДАЖИ -->
+        <section id="tab-crm" class="tab-pane">
+          <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3>Воронка продаж и заказов спецтехники</h3>
+              <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Сквозной процесс от лида до АВР</p>
+            </div>
+            <button class="btn-primary" onclick="openCreateDealModal()">+ Добавить заказ</button>
+          </div>
+
+          <!-- Воронка продаж по стадиям (Канбан) -->
+          <div class="grid-container" id="kanbanBoard" style="margin-bottom: 24px; gap: 12px;">
+            <!-- Будет генерироваться из JS: Колонки (Лид, КП, Договор, Назначение, Выполнение, Оплата) -->
+          </div>
+        </section>
+
+
+        <!-- 3. ТАБ: ДИСпетчеризация (ГАНТ И ПЕРЕМЕЩЕНИЯ) -->
+        <section id="tab-dispatch" class="tab-pane">
+          <div class="card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <div>
+              <h3>Календарь загрузки парка (Диаграмма Ганта)</h3>
+              <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Инструмент контроля двойного бронирования и распределения по 24 машинам</p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-secondary" id="ganttViewDaysBtn" onclick="setGanttView('days')">По дням</button>
+              <button class="btn-secondary" id="ganttViewHoursBtn" onclick="setGanttView('hours')">По часам</button>
+              <button class="btn-primary" onclick="openRelocateVehicleModal()">Зафиксировать перемещение</button>
+            </div>
+          </div>
+
+          <!-- Интерактивный Гант-календарь -->
+          <div class="gantt-chart card" id="ganttChartWrapper" style="padding: 0;">
+            <!-- Генерируется из JS -->
+          </div>
+
+          <!-- История перемещений -->
+          <div class="card" style="margin-top: 24px;">
+            <h3 class="card-title">Журнал перемещений техники между объектами</h3>
+            <div class="table-wrapper">
+              <table class="clean-table" id="movesHistoryTable">
+                <thead>
+                  <tr>
+                    <th>Техника</th>
+                    <th>Откуда</th>
+                    <th>Куда</th>
+                    <th>Дата</th>
+                    <th>Причина перемещения</th>
+                    <th>Ответственный</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Динамически -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 4. ТАБ: GPS-МОНИТОРИНГ -->
+        <section id="tab-gps" class="tab-pane">
+          <div class="grid-container">
+            <!-- Левая колонка: Список авто -->
+            <div class="col-3">
+              <div class="card" style="height: 540px; display: flex; flex-direction: column; gap: 12px; padding: 16px; margin-bottom: 0;">
+                <h3 class="card-title" style="margin-bottom: 0;">Транспортные средства</h3>
+                <input type="text" id="gpsVehicleSearch" class="form-control" placeholder="Поиск техники..." oninput="filterGpsVehicleList()" style="font-size: 12px; padding: 8px 12px;" />
+                <div id="gpsVehicleList" style="flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+                  <!-- Динамически заполняется из JS -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Средняя колонка: Карта -->
+            <div class="col-6">
+              <div class="card" style="padding: 16px; height: 540px; display: flex; flex-direction: column; margin-bottom: 0;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px; align-items: center; flex-shrink: 0;">
+                  <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Карта Атырауской области (Leaflet)</h4>
+                  <div style="font-size: 10px; display: flex; gap: 8px;">
+                    <span>🔵 Собств.</span>
+                    <span>🟣 Субаренда</span>
+                    <span>🔴 Ремонт</span>
+                  </div>
+                </div>
+                <div id="map-container" style="flex-grow: 1; height: 100%;"></div>
+              </div>
+            </div>
+            
+            <!-- Правая колонка: Алерты и Симулятор -->
+            <div class="col-3">
+              <div class="card" style="height: 540px; display: flex; flex-direction: column; gap: 12px; padding: 16px; margin-bottom: 0;">
+                <h3 class="card-title" style="margin-bottom: 0;">Уведомления GPS и Геозоны</h3>
+                
+                <!-- Лог выезда за геозону / простоя -->
+                <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 6px; overflow: hidden;">
+                  <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-secondary);">Критические алерты (Live)</span>
+                  <div class="alert-log-panel" id="gpsAlertsLog" style="flex-grow: 1; overflow-y: auto;">
+                    <!-- Динамически из JS -->
+                  </div>
+                </div>
+
+                <!-- Симулятор событий GPS (для демонстрации!) -->
+                <div style="border-top: 1px solid var(--border-color); padding-top: 12px; flex-shrink: 0;">
+                  <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 8px;">Панель симулятора GPS</span>
+                  <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <button class="btn-secondary" style="font-size: 12px; justify-content: center; padding: 8px;" onclick="simulateGeofenceExit()">Спровоцировать побег из геозоны</button>
+                    <button class="btn-secondary" style="font-size: 12px; justify-content: center; padding: 8px;" onclick="simulateIdling()">Симулировать простой (>3ч)</button>
+                    <button class="btn-primary" style="font-size: 12px; justify-content: center; padding: 8px;" onclick="toggleGpsMovementSimulation()">Вкл/Выкл Движение по карте</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 5. ТАБ: УЧЕТ ГСМ -->
+        <section id="tab-fuel" class="tab-pane">
+          <div class="grid-container">
+            <div class="col-8 card">
+              <h3 class="card-title">Ведомость заправок и закрытых смен (Формула «Умный ГСМ»)</h3>
+              <div class="table-wrapper">
+                <table class="clean-table" id="fuelVerificationTable">
+                  <thead>
+                    <tr>
+                      <th>Техника</th>
+                      <th>Водитель</th>
+                      <th>Бак Нач/Кон</th>
+                      <th>АЗС (Чеки)</th>
+                      <th>Моточасы (GPS)</th>
+                      <th>Норма расхода</th>
+                      <th>Дельта ΔV</th>
+                      <th>Статус / Слив</th>
+                      <th>Действие</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Динамически -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div class="col-4">
+              <!-- Симуляция заправки / Слива -->
+              <div class="card">
+                <h3 class="card-title">Симуляция нарушений ГСМ</h3>
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px;">Используйте для демонстрации алгоритма удержания стоимости слитого топлива из зарплаты водителя.</p>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <button class="btn-primary" style="justify-content: center;" onclick="simulateNormalFuelClose()">Успешное закрытие смены (Дельта <5%)</button>
+                  <button class="btn-secondary" style="color: var(--status-danger); border-color: var(--status-danger); justify-content: center;" onclick="simulateFuelTheftClose()">Подозрение на СЛИВ ГСМ (Дельта >12%)</button>
+                </div>
+              </div>
+
+              <!-- Карточка остатков топлива в компании -->
+              <div class="card">
+                <h3 class="card-title">Баланс лимитов ГСМ</h3>
+                <div class="pnl-row">
+                  <span>Дизельное топливо (База):</span>
+                  <strong>12,450 л</strong>
+                </div>
+                <div class="pnl-row">
+                  <span>Лимит по АЗС (Литраж):</span>
+                  <strong>85,000 л / мес</strong>
+                </div>
+                <div class="pnl-row">
+                  <span>Цена закупки (ДТ):</span>
+                  <strong>295 ₸ / л</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 6. ТАБ: СКЛАД И ЛОГИСТИКА -->
+        <section id="tab-warehouse" class="tab-pane">
+          <!-- Выбор уровня склада -->
+          <div style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 12px;">
+              <button class="btn-secondary active" id="wh-level-central" onclick="switchWarehouseLevel('central')">Центральный склад (Атырау)</button>
+              <button class="btn-secondary" id="wh-level-sites" onclick="switchWarehouseLevel('sites')">Склады объектов</button>
+              <button class="btn-secondary" id="wh-level-board" onclick="switchWarehouseLevel('board')">Бортовой запас (В машинах)</button>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-secondary" onclick="openReceivePartModal()">+ Приход ТМЦ</button>
+              <button class="btn-secondary" onclick="openTransferPartModal()">→ Перемещение</button>
+              <button class="btn-primary" onclick="openRequisitionModal()">Оформить Заявку ТМЦ</button>
+            </div>
+          </div>
+
+          <!-- Сетка ТМЦ -->
+          <div class="card">
+            <h3 class="card-title" id="warehouseTitle">Остатки ТМЦ: Центральный склад</h3>
+            <div class="table-wrapper">
+              <table class="clean-table" id="inventoryTable">
+                <thead>
+                  <tr>
+                    <th>Артикул</th>
+                    <th>Наименование ТМЦ</th>
+                    <th>Категория</th>
+                    <th>Где находится</th>
+                    <th>Остаток</th>
+                    <th>Минимальный лимит</th>
+                    <th>Поставщик / Инфо</th>
+                    <th>Статус</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Заполняется динамически -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Воронка доставки запчастей (Логистика) -->
+          <div class="card">
+            <h3 class="card-title">Логистическая воронка доставки запчастей на объекты</h3>
+            <div class="grid-container" id="logisticsPipeline" style="gap: 12px;">
+              <!-- Карточки доставки по этапам -->
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 7. ТАБ: РЕМОНТЫ И ТО -->
+        <section id="tab-repairs" class="tab-pane">
+          <div class="grid-container">
+            <!-- Журнал поломок и дефектных актов -->
+            <div class="col-8 card">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 class="card-title" style="margin-bottom: 0;">Реестр поломок и Дефектных актов</h3>
+                <button class="btn-primary" onclick="openCreateRepairModal()">Зарегистрировать поломку</button>
+              </div>
+              
+              <div class="table-wrapper">
+                <table class="clean-table" id="repairsTable">
+                  <thead>
+                    <tr>
+                      <th>Техника</th>
+                      <th>Объект</th>
+                      <th>Неисправность</th>
+                      <th>По вине водителя</th>
+                      <th>Стоимость ущерба</th>
+                      <th>Запчасти</th>
+                      <th>Статус ремонта</th>
+                      <th>Действие</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Заполняется динамически -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- График планового ТО -->
+            <div class="col-4 card">
+              <h3 class="card-title">Контроль планового технического обслуживания</h3>
+              <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 16px;">Система автоматически отслеживает моточасы/пробег по данным GPS и блокирует технику на дату ТО при достижении порогов.</p>
+              
+              <div id="maintenanceTracker" style="display: flex; flex-direction: column; gap: 12px;">
+                <!-- Элементы ТО спецтехники -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 8. ТАБ: HR И БЕЗОПАСНОСТЬ (ДОКУМЕНТЫ) -->
+        <section id="tab-hr" class="tab-pane">
+          <div class="card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <div>
+              <h3>Реестр сотрудников и Контроль допусков</h3>
+              <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Отслеживание анкет, договоров МО и сроков действия справок/корочек ТБ с блокировкой рейсов</p>
+            </div>
+            <button class="btn-primary" onclick="openCreateEmployeeModal()">+ Добавить сотрудника</button>
+          </div>
+
+          <div class="table-wrapper card" style="padding: 0; margin-bottom: 24px;">
+            <table class="clean-table" id="employeesTable">
+              <thead>
+                <tr>
+                  <th>ФИО / ИИН</th>
+                  <th>Должность</th>
+                  <th>Категория прав</th>
+                  <th>Договор / МО</th>
+                  <th>Медосмотр</th>
+                  <th>ТБ / ОТ / ПТМ Корочки</th>
+                  <th>Командировки и СИЗ</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Динамически -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Сквозной автоматический расчет ФОТ (ТК РК) -->
+          <div class="card">
+            <h3 class="card-title">Расчет ФОТ водителей за месяц (с учетом ТК РК 50%)</h3>
+            <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 16px;">Система автоматически рассчитывает зарплату: Оклад + Бонус за смены - Списания ГСМ - Штрафы ТБ. Лимит удержаний: не более 50% от дохода. Остаток переносится на след. месяц.</p>
+            <div class="table-wrapper" style="padding: 0;">
+              <table class="clean-table" id="payrollTable">
+                <thead>
+                  <tr>
+                    <th>ФИО водителя</th>
+                    <th>Оклад + Бонусы</th>
+                    <th>Удержания ГСМ</th>
+                    <th>Штрафы ТБ (Алкоголь)</th>
+                    <th>Всего удержаний</th>
+                    <th>Лимит 50% (ТК РК)</th>
+                    <th>Выплачено на руки</th>
+                    <th>Долг (Перенос)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Заполняется динамически -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Учет проживания и питания водителей -->
+          <div class="grid-container" style="margin-top: 24px;">
+            <!-- Левая колонка: Карта расселения -->
+            <div class="col-8 card" style="margin-bottom: 0;">
+              <h3 class="card-title">Размещение водителей в общежитиях и на объектах</h3>
+              <p style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">Контроль условий проживания, свободного фонда мест и привязка к суточным / питания</p>
+              <div class="table-wrapper">
+                <table class="clean-table" id="lodgingTable">
+                  <thead>
+                    <tr>
+                      <th>ФИО водителя</th>
+                      <th>Текущий объект</th>
+                      <th>Место проживания</th>
+                      <th>План питания</th>
+                      <th>Командировочные</th>
+                      <th>Действие</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Динамически заполняется из JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Правая колонка: Статистика общежитий -->
+            <div class="col-4 card" style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 0;">
+              <h3 class="card-title" style="margin-bottom: 0;">Статистика загрузки общежитий</h3>
+              <div id="lodgingStats" style="display: flex; flex-direction: column; gap: 16px; flex-grow: 1; justify-content: center;">
+                <!-- Динамически заполняется из JS -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 9. ТАБ: СПРАВОЧНИКИ -->
+        <section id="tab-directories" class="tab-pane">
+          <div class="grid-container">
+            <div class="col-4 card">
+              <h3 class="card-title">Поставщики ТМЦ (Запчасти, Масла)</h3>
+              <ul class="directory-list" id="dirSuppliersList" style="list-style: none; display: flex; flex-direction: column; gap: 12px;">
+                <!-- Из JS -->
+              </ul>
+            </div>
+            
+            <div class="col-4 card">
+              <h3 class="card-title">Подрядчики по ремонту</h3>
+              <ul class="directory-list" id="dirContractorsList" style="list-style: none; display: flex; flex-direction: column; gap: 12px;">
+                <!-- Из JS -->
+              </ul>
+            </div>
+            
+            <div class="col-4 card">
+              <h3 class="card-title">Страховые и Техосмотр</h3>
+              <ul class="directory-list" id="dirInsurersList" style="list-style: none; display: flex; flex-direction: column; gap: 12px;">
+                <!-- Из JS -->
+              </ul>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- 10. ТАБ: НАСТРОЙКИ СИСТЕМЫ -->
+        <section id="tab-settings" class="tab-pane">
+          <div class="card" style="max-width: 600px;">
+            <h3 class="card-title">Управление базами данных и отладка</h3>
+            <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 24px;">Для ознакомления с логикой вы можете восстановить стандартный демонстрационный пакет ТОО KazBildInvest в памяти вашего браузера.</p>
+            
+            <div style="display: flex; gap: 12px;">
+              <button class="btn-primary" onclick="resetDemoData()">Перезагрузить демо-данные</button>
+              <button class="btn-secondary" onclick="clearSystemCache()" style="color: var(--status-danger); border-color: var(--status-danger);">Очистить кэш (Браузер)</button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- ПРАВАЯ ВСПЛЫВАЮЩАЯ ПАНЕЛЬ: ЭМУЛЯТОР СМАРТФОНА МАШИНИСТА -->
+    <aside class="phone-simulator-panel" id="phoneSimulatorWrapper" style="display: none;">
+      <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary);">Эмулятор смартфона</span>
+        <button class="btn-icon" style="width: 24px; height: 24px;" onclick="togglePhoneSimulator()">&times;</button>
+      </div>
+      
+      <div class="phone-frame">
+        <div class="phone-screen">
+          <!-- Статус бар -->
+          <div class="phone-status-bar">
+            <span>19:39</span>
+            <div class="phone-status-right">
+              <span>5G</span>
+              <svg viewBox="0 0 24 24" style="width: 12px; height: 12px; fill: currentColor;"><rect x="2" y="7" width="16" height="10" rx="2" ry="2"/><line x1="22" y1="11" x2="22" y2="13"/></svg>
+            </div>
+          </div>
+          
+          <!-- Рабочий экран приложения машиниста -->
+          <div class="phone-content">
+            <div class="phone-header">
+              <h4>KazBildInvest Mobile</h4>
+              <p>Кабинет машиниста спецтехники</p>
+            </div>
+            
+            <!-- Выбор водителя в эмуляторе -->
+            <div class="phone-card" style="padding: 10px;">
+              <label style="font-size: 10px; font-weight: 600; color: #666; text-transform: uppercase;">Текущий профиль:</label>
+              <select id="phoneDriverSelect" class="form-control" style="background: #FFF; border: 1px solid #CCC; margin-top: 4px;" onchange="updateDriverPhoneScreen()">
+                <!-- Динамически заполняется водителями -->
+              </select>
+            </div>
+
+            <!-- Данные смены -->
+            <div class="phone-card" id="phoneShiftCard">
+              <h5 style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Активная смена</h5>
+              <div id="phoneShiftDetails" style="font-size: 12px; display: flex; flex-direction: column; gap: 4px;">
+                <!-- Данные -->
+              </div>
+              <div style="margin-top: 12px; display: flex; gap: 8px;">
+                <button class="phone-btn" id="phoneShiftStartBtn" onclick="phoneStartShift()">Начать смену</button>
+                <button class="phone-btn-danger" id="phoneShiftEndBtn" style="display:none;" onclick="phoneEndShift()">Закончить</button>
+              </div>
+            </div>
+
+            <!-- Запрос топлива -->
+            <div class="phone-card">
+              <h5 style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Запросить ГСМ (Заправка)</h5>
+              <div class="form-group" style="margin-bottom: 8px;">
+                <input type="number" id="phoneFuelLiters" class="form-control" style="background: #FFF; border: 1px solid #CCC;" placeholder="Кол-во литров" />
+              </div>
+              <button class="phone-btn" onclick="phoneRequestFuel()">Отправить чек АЗС</button>
+            </div>
+
+            <!-- Сообщить о поломке -->
+            <div class="phone-card">
+              <h5 style="font-size: 13px; font-weight: 600; margin-bottom: 8px;">Сообщить о поломке</h5>
+              <div class="form-group" style="margin-bottom: 8px;">
+                <input type="text" id="phoneBreakdownDesc" class="form-control" style="background: #FFF; border: 1px solid #CCC;" placeholder="Описание поломки" />
+              </div>
+              <div class="form-group" style="margin-bottom: 8px;">
+                <label style="font-size: 10px; color: #666;">Прикрепить фото (сим):</label>
+                <input type="file" class="form-control" style="background: #FFF; border: 1px solid #CCC; font-size: 10px;" />
+              </div>
+              <button class="phone-btn-secondary" style="background: #FCE8E6; color: #C5221F;" onclick="phoneReportBreakdown()">Зафиксировать поломку</button>
+            </div>
+
+            <!-- Подписание АВР -->
+            <div class="phone-card" id="phoneSignatureCard">
+              <h5 style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">Подписать Акт (АВР)</h5>
+              <p style="font-size: 10px; color: #666; margin-bottom: 8px;">Распишитесь пальцем/мышкой ниже для закрытия смены:</p>
+              <canvas class="signature-pad" id="phoneSignatureCanvas"></canvas>
+              <button class="phone-btn" style="margin-top: 8px;" onclick="phoneSubmitSignature()">Подписать АВР</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ИИ ЧАТ-БОТ (TELEGRAM/WHATSAPP ЭМУЛЯТОР) -->
+  <div class="modal-overlay" id="chatBotModal">
+    <div class="modal-box" style="max-width: 450px;">
+      <div class="modal-header">
+        <span class="modal-title">🤖 Чат-группа Telegram (ИИ-Контроль ТБ)</span>
+        <button class="modal-close-btn" onclick="closeChatBotModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 0;">
+        <div class="chat-widget">
+          <div class="chat-header">
+            <div class="chat-header-dot"></div>
+            <span>ИИ-Мониторинг KazBildInvest</span>
+          </div>
+          <div class="chat-history" id="chatLogContainer">
+            <!-- Сообщения чата -->
+          </div>
+          <div class="chat-input-area">
+            <input type="text" id="chatInputField" class="form-control" placeholder="Напишите @bot Штраф ТБ..." onkeydown="if(event.key==='Enter') sendChatMessage()" />
+            <button class="btn-primary" onclick="sendChatMessage()">Отправить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: СОЗДАНИЕ СДЕЛКИ (CRM) -->
+  <div class="modal-overlay" id="createDealModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title">Создание нового заказа спехтехники</span>
+        <button class="modal-close-btn" onclick="closeModal('createDealModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="dealForm">
+          <div class="form-group">
+            <label class="form-label">Заказчик (Компания)</label>
+            <input type="text" id="dealCompany" class="form-control" required placeholder="Напр. ТОО АтырауНефть" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Контактное лицо</label>
+            <input type="text" id="dealContact" class="form-control" required placeholder="ФИО, телефон" />
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Объект работы</label>
+              <select id="dealSiteSelect" class="form-control" required></select>
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Точный адрес/Координаты</label>
+              <input type="text" id="dealAddress" class="form-control" required placeholder="Напр. Карабатан, сектор 2" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Вид работ</label>
+            <input type="text" id="dealJobType" class="form-control" required placeholder="Напр. монтажные работы" />
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Дата начала</label>
+              <input type="date" id="dealStart" class="form-control" required />
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Дата окончания</label>
+              <input type="date" id="dealEnd" class="form-control" required />
+            </div>
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Необходимое число техники</label>
+              <input type="number" id="dealCount" class="form-control" min="1" max="10" value="1" required />
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Вариант оплаты</label>
+              <select id="dealPaymentOption" class="form-control">
+                <option value="предоплата">Предоплата</option>
+                <option value="постоплата">Постоплата</option>
+              </select>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('createDealModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitCreateDeal()">Создать запрос</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ДЕТАЛИ СДЕЛКИ (CRM КАРТОЧКА + КП) -->
+  <div class="modal-overlay" id="dealDetailsModal">
+    <div class="modal-box" style="max-width: 680px;">
+      <div class="modal-header">
+        <span class="modal-title" id="dealDetailsTitle">Карточка заказа</span>
+        <button class="modal-close-btn" onclick="closeModal('dealDetailsModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="dealDetailsBody">
+        <!-- Генерируется из JS -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('dealDetailsModal')">Закрыть</button>
+        <button class="btn-primary" id="dealActionBtn">Действие</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ГЕНЕРАЦИЯ КП (ПЕЧАТНАЯ ФОРМА) -->
+  <div class="modal-overlay" id="kpPrintModal">
+    <div class="modal-box" style="max-width: 850px;">
+      <div class="modal-header">
+        <span class="modal-title">Коммерческое предложение (Печатная версия)</span>
+        <button class="modal-close-btn" onclick="closeModal('kpPrintModal')">&times;</button>
+      </div>
+      <div class="modal-body" style="background-color: #555; padding: 20px;">
+        <div class="kp-print-container" id="kpPrintView">
+          <!-- Генерируется из JS -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('kpPrintModal')">Закрыть</button>
+        <button class="btn-primary" onclick="printKp()">Печать / Экспорт PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ПЕРЕМЕЩЕНИЕ ТЕХНИКИ -->
+  <div class="modal-overlay" id="relocateVehicleModal">
+    <div class="modal-box" style="max-width: 480px;">
+      <div class="modal-header">
+        <span class="modal-title">Зафиксировать перемещение спецтехники</span>
+        <button class="modal-close-btn" onclick="closeModal('relocateVehicleModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Выберите спецтехнику</label>
+          <select id="relocateVehicleSelect" class="form-control" onchange="updateRelocateOldSite()"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Текущее местоположение</label>
+          <input type="text" id="relocateOldSite" class="form-control" readonly />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Новое назначение (Объект)</label>
+          <select id="relocateNewSiteSelect" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Причина перемещения / Номер путевого листа</label>
+          <input type="text" id="relocateReason" class="form-control" placeholder="Напр. Путевой лист №112" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('relocateVehicleModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitRelocateVehicle()">Зафиксировать</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: РЕГИСТРАЦИЯ ПОЛОМКИ (РЕМОНТ) -->
+  <div class="modal-overlay" id="createRepairModal">
+    <div class="modal-box" style="max-width: 480px;">
+      <div class="modal-header">
+        <span class="modal-title">Регистрация поломки / Дефект-акт</span>
+        <button class="modal-close-btn" onclick="closeModal('createRepairModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Спецтехника</label>
+          <select id="repairVehicleSelect" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Описание поломки</label>
+          <textarea id="repairDescription" class="form-control" style="height: 80px;" placeholder="Детали повреждения"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="repairFaultByDriver" onchange="toggleRepairFaultDetails()" />
+            Поломка по вине водителя (МО)
+          </label>
+        </div>
+        <div id="repairFaultDetails" style="display: none; background: var(--bg-secondary); padding: 12px; border-radius: 6px; margin-bottom: 16px;">
+          <div class="form-group">
+            <label class="form-label">Сумма ущерба для удержания (₸)</label>
+            <input type="number" id="repairDamageCost" class="form-control" placeholder="Сумма" />
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="repairExplanatoryAttached" />
+              Объяснительная записка прикреплена
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('createRepairModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitCreateRepair()">Зарегистрировать</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ДОБАВЛЕНИЕ ТМЦ (ПРИХОД СКЛАД) -->
+  <div class="modal-overlay" id="receivePartModal">
+    <div class="modal-box" style="max-width: 480px;">
+      <div class="modal-header">
+        <span class="modal-title">Приход ТМЦ на Центральный склад</span>
+        <button class="modal-close-btn" onclick="closeModal('receivePartModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Запчасть / Расходник</label>
+          <select id="receivePartSelect" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Количество прихода (шт)</label>
+          <input type="number" id="receiveQty" class="form-control" min="1" value="10" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('receivePartModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitReceivePart()">Оформить приход</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ПЕРЕМЕЩЕНИЕ ТМЦ -->
+  <div class="modal-overlay" id="transferPartModal">
+    <div class="modal-box" style="max-width: 480px;">
+      <div class="modal-header">
+        <span class="modal-title">Перемещение ТМЦ между складами</span>
+        <button class="modal-close-btn" onclick="closeModal('transferPartModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Выберите ТМЦ</label>
+          <select id="transferPartSelect" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Откуда (Склад-источник)</label>
+          <select id="transferFromSelect" class="form-control" onchange="updateTransferQtyLimit()">
+            <option value="central">Центральный склад (Атырау)</option>
+            <option value="karabatan">Склад: Карабатан</option>
+            <option value="makat">Склад: Макат</option>
+            <option value="inder">Склад: Индер</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Куда (Склад-получатель)</label>
+          <select id="transferToSelect" class="form-control">
+            <option value="karabatan">Склад: Карабатан</option>
+            <option value="makat">Склад: Макат</option>
+            <option value="inder">Склад: Индер</option>
+            <option value="board">Бортовой запас (В технику)</option>
+          </select>
+        </div>
+        <div id="transferBoardVehicleGroup" style="display: none;" class="form-group">
+          <label class="form-label">Выберите единицу спецтехники</label>
+          <select id="transferBoardVehicleSelect" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Количество перемещения (<span id="transferPartMax">0</span> шт доступно)</label>
+          <input type="number" id="transferQty" class="form-control" min="1" value="1" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('transferPartModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitTransferPart()">Переместить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ЗАЯВКА НА ТМЦ / СНАБЖЕНИЕ -->
+  <div class="modal-overlay" id="requisitionModal">
+    <div class="modal-box" style="max-width: 480px;">
+      <div class="modal-header">
+        <span class="modal-title">Создание Заявки на ТМЦ (Бланк снабжения)</span>
+        <button class="modal-close-btn" onclick="closeModal('requisitionModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Выберите ТМЦ из каталога</label>
+          <select id="reqPartSelect" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Склад назначения</label>
+          <select id="reqSiteSelect" class="form-control">
+            <option value="central">Центральный склад (Атырау)</option>
+            <option value="karabatan">Склад: Карабатан</option>
+            <option value="makat">Склад: Макат</option>
+            <option value="inder">Склад: Индер</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Требуемое количество (шт)</label>
+          <input type="number" id="reqQty" class="form-control" min="1" value="5" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Срок отработки (дней)</label>
+          <input type="number" id="reqLeadTime" class="form-control" min="1" max="15" value="3" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('requisitionModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitRequisition()">Создать заявку</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: РЕМОНТНЫЕ ДЕЙСТВИЯ (ПОДБОР ЗАПЧАСТЕЙ + ЭТАПЫ) -->
+  <div class="modal-overlay" id="repairManageModal">
+    <div class="modal-box" style="max-width: 520px;">
+      <div class="modal-header">
+        <span class="modal-title">Управление ремонтом спецтехники</span>
+        <button class="modal-close-btn" onclick="closeModal('repairManageModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="repairManageBody">
+        <!-- Из JS -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('repairManageModal')">Закрыть</button>
+        <button class="btn-primary" id="repairUpdateBtn">Обновить ремонт</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: СОЗДАНИЕ СОТРУДНИКА (HR) -->
+  <div class="modal-overlay" id="createEmployeeModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title">Добавление нового сотрудника</span>
+        <button class="modal-close-btn" onclick="closeModal('createEmployeeModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">ФИО сотрудника</label>
+          <input type="text" id="hrName" class="form-control" placeholder="Напр. Иманбаев Серик" required />
+        </div>
+        <div class="grid-container" style="gap: 16px;">
+          <div class="col-6 form-group">
+            <label class="form-label">ИИН</label>
+            <input type="text" id="hrIin" class="form-control" placeholder="12 цифр" required />
+          </div>
+          <div class="col-6 form-group">
+            <label class="form-label">Телефон</label>
+            <input type="text" id="hrPhone" class="form-control" placeholder="+7..." required />
+          </div>
+        </div>
+        <div class="grid-container" style="gap: 16px;">
+          <div class="col-6 form-group">
+            <label class="form-label">Должность</label>
+            <input type="text" id="hrPosition" class="form-control" value="Машинист спецтехники" required />
+          </div>
+          <div class="col-6 form-group">
+            <label class="form-label">Категория прав</label>
+            <input type="text" id="hrLicense" class="form-control" placeholder="Напр. C, D, Тракторист" required />
+          </div>
+        </div>
+        <div class="grid-container" style="gap: 16px;">
+          <div class="col-4 form-group">
+            <label class="form-label">Срок медосмотра</label>
+            <input type="date" id="hrMedExpiry" class="form-control" required />
+          </div>
+          <div class="col-4 form-group">
+            <label class="form-label">Срок справки ТБ</label>
+            <input type="date" id="hrTbExpiry" class="form-control" required />
+          </div>
+          <div class="col-4 form-group">
+            <label class="form-label">Оклад (KZT)</label>
+            <input type="number" id="hrSalary" class="form-control" value="350000" required />
+          </div>
+        </div>
+        <div class="grid-container" style="gap: 16px;">
+          <div class="col-6 form-group">
+            <label class="form-label">Тип договора</label>
+            <select id="hrContractType" class="form-control">
+              <option value="TD">Трудовой договор (ТД)</option>
+              <option value="GPH">ГПХ</option>
+            </select>
+          </div>
+          <div class="col-6 form-group">
+            <label class="form-label">Договор мат. ответственности</label>
+            <select id="hrMo" class="form-control">
+              <option value="true">Подписан (МО)</option>
+              <option value="false">Не подписан</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('createEmployeeModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitCreateEmployee()">Создать сотрудника</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: РЕДАКТИРОВАНИЕ БЫТОВЫХ УСЛОВИЙ (HR) -->
+  <div class="modal-overlay" id="editLodgingModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-title" id="editLodgingTitle">Редактирование условий проживания</span>
+        <button class="modal-close-btn" onclick="closeModal('editLodgingModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editLodgingDriverId" />
+        <div class="form-group">
+          <label class="form-label">Место проживания</label>
+          <select id="editLodgingSelect" class="form-control">
+            <option value="Общежитие Карабатан (Ак Патер)">Общежитие Карабатан (Ак Патер)</option>
+            <option value="Вагон-городок Макат">Вагон-городок Макат</option>
+            <option value="Съемное жилье Индер">Съемное жилье Индер</option>
+            <option value="Гостевой дом Жангала">Гостевой дом Жангала</option>
+            <option value="Общежитие Атырау (База)">Общежитие Атырау (База)</option>
+            <option value="Не требуется / Местный">Не требуется / Местный</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">План питания</label>
+          <select id="editMealPlanSelect" class="form-control">
+            <option value="Трехразовое на объекте">Трехразовое на объекте</option>
+            <option value="Двухразовое в столовой">Двухразовое в столовой</option>
+            <option value="Суточные (выплата)">Суточные (выплата)</option>
+            <option value="Без питания">Без питания</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Командировочные расходы в месяц (₸)</label>
+          <input type="number" id="editTravelCosts" class="form-control" placeholder="Сумма" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('editLodgingModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitEditLodging()">Сохранить изменения</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Базовые скрипты -->
+  <script src="mockData.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
