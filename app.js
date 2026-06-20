@@ -3058,6 +3058,8 @@ function renderTasksKanban() {
     card.draggable = true;
     card.id = `task-card-${t.id}`;
     card.style.borderLeft = `3px solid ${taskStages[t.status].color}`;
+    card.style.cursor = "pointer";
+    card.onclick = () => openTaskDetails(t.id);
     
     // Установка перетаскивания
     card.addEventListener("dragstart", (e) => handleTaskDragStart(e, t.id));
@@ -3339,6 +3341,133 @@ function openSignedDocument(taskId) {
   `;
   
   openModal("viewDocumentModal");
+}
+
+function openTaskDetails(taskId) {
+  const t = db.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  
+  const body = document.getElementById("taskDetailsModalBody");
+  const footer = document.getElementById("taskDetailsModalFooter");
+  if (!body || !footer) return;
+  
+  // Status name mapping
+  const statusNames = {
+    todo: "К выполнению",
+    in_progress: "В работе",
+    safety_review: "Проверка ТБ",
+    completed: "Выполнено"
+  };
+  
+  const statusColors = {
+    todo: "#64748B",
+    in_progress: "#2563EB",
+    safety_review: "#D97706",
+    completed: "#16A34A"
+  };
+  
+  const vehicleName = t.vehicleId ? `${getVehicleName(t.vehicleId)} (Инв: ${getVehicleInvNumber(t.vehicleId)})` : "Не привязана";
+  const siteName = t.siteId ? getSiteName(t.siteId) : "Не привязан";
+  const assigneeName = getDriverName(t.assignee) || t.assignee;
+  
+  let docStatusText = "";
+  let viewDocBtn = "";
+  if (t.signedDocument) {
+    docStatusText = `<span style="color:var(--status-success); font-weight:700;">🟢 Документ подписан (${t.signedDate || '2026-06-20'})</span>`;
+    viewDocBtn = `<button class="btn-secondary" style="font-size:11px; padding:6px 12px; margin-top:8px; width:100%; text-align:center;" onclick="closeModal('taskDetailsModal'); openSignedDocument('${t.id}')">📄 Посмотреть документ (${t.documentType})</button>`;
+  } else {
+    docStatusText = `<span style="color:var(--status-danger); font-weight:700;">🔴 Документ не подписан (требуется: ${t.documentType})</span>`;
+  }
+  
+  body.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      <!-- Заголовок и статус -->
+      <div style="background: var(--bg-secondary); padding: 16px; border-radius: 10px; border-left: 4px solid ${statusColors[t.status]};">
+        <h4 style="font-size:15px; font-weight:700; color: var(--text-primary); margin:0;">${t.title}</h4>
+        <div style="margin-top: 8px; display:flex; gap:8px; align-items:center;">
+          <span class="badge" style="background:${statusColors[t.status]}20; color:${statusColors[t.status]}; font-size:10px; padding:2px 6px; font-weight:700;">
+            ${statusNames[t.status]}
+          </span>
+          <span style="font-size:11px; color:var(--text-secondary);">ID: ${t.id}</span>
+        </div>
+      </div>
+      
+      <!-- Описание -->
+      <div style="border-bottom: 1px dashed var(--border-color); padding-bottom: 12px;">
+        <span style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); display:block; margin-bottom:4px;">Описание задачи:</span>
+        <div style="font-size:12.5px; line-height:1.5; color: var(--text-primary);">${t.description}</div>
+      </div>
+      
+      <!-- Параметры -->
+      <div class="grid-container" style="gap:12px; border-bottom: 1px dashed var(--border-color); padding-bottom: 12px;">
+        <div class="col-6" style="font-size:12px;">
+          <span style="color:var(--text-secondary); display:block; margin-bottom:2px;">Исполнитель:</span>
+          <strong>${assigneeName}</strong>
+        </div>
+        <div class="col-6" style="font-size:12px;">
+          <span style="color:var(--text-secondary); display:block; margin-bottom:2px;">Контролер:</span>
+          <strong>${t.controller}</strong>
+        </div>
+        <div class="col-6" style="font-size:12px; margin-top:6px;">
+          <span style="color:var(--text-secondary); display:block; margin-bottom:2px;">Спецтехника:</span>
+          <strong>${vehicleName}</strong>
+        </div>
+        <div class="col-6" style="font-size:12px; margin-top:6px;">
+          <span style="color:var(--text-secondary); display:block; margin-bottom:2px;">Строительный объект:</span>
+          <strong>${siteName}</strong>
+        </div>
+        <div class="col-6" style="font-size:12px; margin-top:6px;">
+          <span style="color:var(--text-secondary); display:block; margin-bottom:2px;">Срок выполнения (Дедлайн):</span>
+          <strong style="color:${t.status !== 'completed' && t.dueDate < '2026-06-20' ? 'var(--status-danger)' : 'inherit'}">${t.dueDate}</strong>
+        </div>
+        <div class="col-6" style="font-size:12px; margin-top:6px;">
+          <span style="color:var(--text-secondary); display:block; margin-bottom:2px;">Инициатор:</span>
+          <strong>${t.initiator}</strong>
+        </div>
+      </div>
+      
+      <!-- Отчетность и подписи -->
+      <div>
+        <span style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); display:block; margin-bottom:4px;">Отчетность и закрывающий документ:</span>
+        <div style="font-size:12px;">${docStatusText}</div>
+        ${viewDocBtn}
+      </div>
+    </div>
+  `;
+  
+  // Status change options in footer
+  let statusButtonsHtml = "";
+  if (t.status === "todo") {
+    statusButtonsHtml = `<button class="btn-primary" style="font-size:11px; padding:6px 12px; margin:0;" onclick="changeTaskStatus('${t.id}', 'in_progress'); closeModal('taskDetailsModal'); openTaskDetails('${t.id}');">▶ Начать работу</button>`;
+  } else if (t.status === "in_progress") {
+    statusButtonsHtml = `<button class="btn-primary" style="font-size:11px; padding:6px 12px; margin:0; background-color:var(--status-warning); border-color:var(--status-warning);" onclick="changeTaskStatus('${t.id}', 'safety_review'); closeModal('taskDetailsModal'); openTaskDetails('${t.id}');">⏳ Отправить на ТБ</button>`;
+  } else if (t.status === "safety_review") {
+    statusButtonsHtml = `<button class="btn-primary" style="font-size:11px; padding:6px 12px; margin:0; background-color:var(--status-success); border-color:var(--status-success);" onclick="changeTaskStatus('${t.id}', 'completed'); closeModal('taskDetailsModal'); openTaskDetails('${t.id}');">✅ Завершить задачу</button>`;
+  } else if (t.status === "completed") {
+    statusButtonsHtml = `<button class="btn-secondary" style="font-size:11px; padding:6px 12px; margin:0; color:var(--status-danger); border-color:var(--status-danger);" onclick="changeTaskStatus('${t.id}', 'in_progress'); closeModal('taskDetailsModal'); openTaskDetails('${t.id}');">🔄 Вернуть в работу</button>`;
+  }
+  
+  footer.innerHTML = `
+    <div style="display:flex; gap:8px;">
+      <button class="btn-secondary" style="color:var(--status-danger); border-color:var(--status-danger); font-size:11px; padding:6px 12px;" onclick="deleteTask('${t.id}')">
+        🗑️ Удалить
+      </button>
+      ${statusButtonsHtml}
+    </div>
+    <button class="btn-primary" style="font-size: 13px; padding: 8px 20px; border-radius: 30px;" onclick="closeModal('taskDetailsModal')">Закрыть</button>
+  `;
+  
+  openModal("taskDetailsModal");
+}
+
+function deleteTask(taskId) {
+  if (confirm("Вы действительно хотите удалить эту задачу?")) {
+    db.tasks = db.tasks.filter(t => t.id !== taskId);
+    saveState();
+    renderTasksKanban();
+    closeModal("taskDetailsModal");
+    showSystemNotification("Задача удалена успешно.");
+  }
 }
 
 function checkOverdueTasks() {

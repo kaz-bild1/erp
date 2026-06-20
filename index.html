@@ -1635,6 +1635,22 @@
     </div>
   </div>
 
+  <!-- МОДАЛЬНОЕ ОКНО: ДЕТАЛИ ЗАДАЧИ -->
+  <div class="modal-overlay" id="taskDetailsModal">
+    <div class="modal-box" style="max-width: 550px;">
+      <div class="modal-header">
+        <span class="modal-title">Карточка задачи и наряда</span>
+        <button class="modal-close-btn" onclick="closeModal('taskDetailsModal')">&times;</button>
+      </div>
+      <div class="modal-body" id="taskDetailsModalBody">
+        <!-- Содержимое генерируется динамически из JS -->
+      </div>
+      <div class="modal-footer" id="taskDetailsModalFooter" style="display:flex; justify-content:space-between; align-items:center;">
+        <!-- Кнопки управления -->
+      </div>
+    </div>
+  </div>
+
   <!-- ВСПЛЫВАЮЩЕЕ ОКНО: КАРТОЧКА ПАРТНЕРА (С плавным Cubic-Bezier переходом) -->
   <div class="company-modal-overlay" id="companyDetailsModal">
     <div class="company-modal-box">
