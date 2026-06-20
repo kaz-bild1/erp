@@ -5,7 +5,7 @@ try {
     $listener.Start()
     Write-Host "Server started at http://localhost:8080/"
     
-    $baseDir = "C:\Users\SenetUser\.gemini\antigravity\scratch\kaz_bild_invest"
+    $baseDir = $PSScriptRoot
     
     while ($listener.IsListening) {
         $context = $listener.GetContext()

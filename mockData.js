@@ -111,6 +111,7 @@ const initialData = {
       ctoDate: "2026-08-12", // ЧТО
       insuranceDate: "2026-12-01",
       insuranceCost: 180000,
+      insuranceProvider: "АО «СК Евразия»",
       taxDate: "2026-07-15",
       taxCost: 120000,
       tempMove: null
@@ -135,6 +136,7 @@ const initialData = {
       ctoDate: "2026-09-01",
       insuranceDate: "2026-11-15",
       insuranceCost: 280000,
+      insuranceProvider: "АО «СК Евразия»",
       taxDate: "2026-07-15",
       taxCost: 240000,
       tempMove: null
@@ -159,6 +161,7 @@ const initialData = {
       ctoDate: "2027-01-10",
       insuranceDate: "2027-01-05",
       insuranceCost: 150000,
+      insuranceProvider: "АО «СК Евразия»",
       taxDate: "2026-07-15",
       taxCost: 95000,
       tempMove: null
@@ -183,6 +186,7 @@ const initialData = {
       ctoDate: "2026-06-30",
       insuranceDate: "2026-08-20",
       insuranceCost: 165000,
+      insuranceProvider: "АО «СК Евразия»",
       taxDate: "2026-07-15",
       taxCost: 95000,
       tempMove: null
@@ -207,6 +211,7 @@ const initialData = {
       ctoDate: "2026-10-11",
       insuranceDate: "2026-10-10",
       insuranceCost: 140000,
+      insuranceProvider: "АО «СК Евразия»",
       taxDate: "2026-07-15",
       taxCost: 90000,
       tempMove: null
@@ -343,7 +348,7 @@ const initialData = {
       type: "Автокран",
       ownerType: "subrent", // субарендная
       subrentRate: 350000, // Стоимость аренды в день (KZT)
-      subrentProvider: "ИП СпецКранПартнер",
+      subrentProvider: "ТОО «Каспий Спец Техника»",
       driverId: "d111",
       status: "Работает",
       currentSiteId: "karabatan",
@@ -369,7 +374,7 @@ const initialData = {
       type: "Самосвал",
       ownerType: "subrent",
       subrentRate: 85000,
-      subrentProvider: "ТОО АтырауТрансЛогистик",
+      subrentProvider: "ТОО «Каспий Спец Техника»",
       driverId: "d112",
       status: "Работает",
       currentSiteId: "makat",
@@ -379,6 +384,58 @@ const initialData = {
       ptoDate: "2026-08-20",
       ctoDate: "2026-08-20",
       insuranceDate: "2026-08-10",
+      insuranceCost: 0,
+      taxDate: "2026-07-15",
+      taxCost: 0,
+      tempMove: null
+    },
+    {
+      id: "v113",
+      name: "[Субаренда] Гусеничный экскаватор Hyundai 300",
+      model: "R300LC",
+      plate: "9814 AT 06",
+      vin: "HNDR300LC89217342",
+      invNumber: "SUB-EX-01",
+      year: 2019,
+      type: "Экскаватор",
+      ownerType: "subrent",
+      subrentRate: 150000,
+      subrentProvider: "ТОО «Каспий Спец Техника»",
+      driverId: null,
+      status: "Работает",
+      currentSiteId: "karabatan",
+      mileage: 120000,
+      engineHours: 8500,
+      fuelRate: 28.0,
+      ptoDate: "2026-10-10",
+      ctoDate: "2026-10-10",
+      insuranceDate: "2026-10-01",
+      insuranceCost: 0,
+      taxDate: "2026-07-15",
+      taxCost: 0,
+      tempMove: null
+    },
+    {
+      id: "v114",
+      name: "[Субаренда] Фронтальный погрузчик SDLG 956",
+      model: "LG956L",
+      plate: "437 TTA 06",
+      vin: "SDLGLG95689127391",
+      invNumber: "SUB-PL-01",
+      year: 2020,
+      type: "Погрузчик",
+      ownerType: "subrent",
+      subrentRate: 95000,
+      subrentProvider: "ТОО «Каспий Спец Техника»",
+      driverId: null,
+      status: "Работает",
+      currentSiteId: "karabatan2",
+      mileage: 82000,
+      engineHours: 5400,
+      fuelRate: 18.0,
+      ptoDate: "2026-09-20",
+      ctoDate: "2026-09-20",
+      insuranceDate: "2026-09-10",
       insuranceCost: 0,
       taxDate: "2026-07-15",
       taxCost: 0,
@@ -742,7 +799,7 @@ const initialData = {
   deals: [
     {
       id: "deal_1",
-      companyName: "ТОО АтырауСтройПуть",
+      companyName: "ТОО «АтырауНефть»",
       contactPerson: "Бахтияров Нургали",
       siteId: "karabatan",
       address: "Промучасток Карабатан, сектор 4",
@@ -761,7 +818,7 @@ const initialData = {
     },
     {
       id: "deal_2",
-      companyName: "ТОО МакатТрансГаз",
+      companyName: "ТОО «NCOC»",
       contactPerson: "Утегенов Самат",
       siteId: "makat",
       address: "Компрессорная станция Макат-3",
@@ -780,7 +837,7 @@ const initialData = {
     },
     {
       id: "deal_3",
-      companyName: "ТОО КазХимМонтаж",
+      companyName: "ТОО «АтырауНефть»",
       contactPerson: "Асылбеков Канат",
       siteId: "karabatan2",
       address: "Строительная площадка завода KPI",
@@ -795,6 +852,44 @@ const initialData = {
       contractSigned: false,
       invoiceStatus: "Не выставлен счет",
       invoiceDueDate: "",
+      paymentStageDays: 0
+    },
+    {
+      id: "deal_4",
+      companyName: "ТОО «NCOC»",
+      contactPerson: "Рахимжанов Е.",
+      siteId: "karabatan",
+      address: "Завод Болашак, Карабатан",
+      jobType: "Аренда погрузчиков и планировка площадки",
+      startDate: "2026-06-18",
+      endDate: "2026-07-05",
+      vehicleCount: 1,
+      vehicleIds: ["v106"],
+      price: 1500000,
+      stage: "Выполнение работ",
+      contractNumber: "Д-06/2026-30",
+      contractSigned: true,
+      invoiceStatus: "Выставлен счет",
+      invoiceDueDate: "2026-06-25",
+      paymentStageDays: 10
+    },
+    {
+      id: "deal_5",
+      companyName: "ТОО «NCOC»",
+      contactPerson: "Ахметов А.",
+      siteId: "zhangala",
+      address: "НПС Жангала",
+      jobType: "Аренда автовышки и обслуживание освещения",
+      startDate: "2026-06-15",
+      endDate: "2026-06-22",
+      vehicleCount: 1,
+      vehicleIds: ["v110"],
+      price: 900000,
+      stage: "Выполнение работ",
+      contractNumber: "Д-06/2026-31",
+      contractSigned: true,
+      invoiceStatus: "Не выставлен счет",
+      invoiceDueDate: "2026-06-30",
       paymentStageDays: 0
     }
   ],
@@ -822,7 +917,40 @@ const initialData = {
       partsRequested: [
         { sku: "HOS-HYD-002", name: "РВД 1.5м", qty: 2, status: "Списано" }
       ],
-      laborCost: 45000
+      laborCost: 45000,
+      contractorName: "ТОО «АтырауСпецТехРемонт»"
+    },
+    {
+      id: "rep_2",
+      vehicleId: "v102",
+      siteId: "makat",
+      driverId: "d102",
+      description: "Течь гидравлического масла из гидроцилиндра подъема.",
+      status: "Запчасти",
+      createdAt: "2026-06-19",
+      faultByDriver: false,
+      damageCost: 0,
+      explanatoryAttached: false,
+      partsRequested: [
+        { sku: "OIL-HYD-10W", name: "Гидравлическое масло Shell 20л", qty: 3, status: "Запрошено" }
+      ],
+      laborCost: 0,
+      contractorName: "ТОО «АтырауСпецТехРемонт»"
+    },
+    {
+      id: "rep_3",
+      vehicleId: "v101",
+      siteId: "karabatan",
+      driverId: "d101",
+      description: "Замена уплотнений гидрораспределителя автокрана Zoomlion.",
+      status: "Диагностика",
+      createdAt: "2026-06-20",
+      faultByDriver: false,
+      damageCost: 0,
+      explanatoryAttached: false,
+      partsRequested: [],
+      laborCost: 35000,
+      contractorName: "ТОО «АтырауСпецТехРемонт»"
     }
   ],
 
@@ -840,6 +968,25 @@ const initialData = {
   // Удержания и штрафы за текущий месяц (накапливаемые логи)
   payrollDeductions: [
     { id: "pd_1", driverId: "d104", type: "Поломка спецтехники (виновность)", amount: 95000, date: "2026-06-17", reference: "Дефект-акт rep_1", approved: true }
+  ],
+
+  // Реестр контрагентов (Компании)
+  companies: [
+    { id: "comp_1", name: "ТОО «Каспий Спец Техника»", bin: "120440012934", type: "Арендодатель", city: "Атырау", vehicleTypes: "Автокраны, Самосвалы", activeContracts: 4, debt: 1200000, safetyIndex: 98, status: "Активен" },
+    { id: "comp_2", name: "ТОО «Борусан Машинери»", bin: "010840003291", type: "Поставщик", city: "Атырау", vehicleTypes: "Запчасти CAT, Расходники", activeContracts: 2, debt: 0, safetyIndex: 100, status: "Активен" },
+    { id: "comp_3", name: "ТОО «Helios OIL»", bin: "990940001234", type: "Поставщик", city: "Атырау", vehicleTypes: "ГСМ (Дизель, Масла)", activeContracts: 1, debt: -450000, safetyIndex: 95, status: "Активен" },
+    { id: "comp_4", name: "ТОО «АтырауСпецТехРемонт»", bin: "150340029381", type: "Подрядчик по ремонту", city: "Атырау", vehicleTypes: "Ремонт гидравлики и ДВС", activeContracts: 3, debt: 850000, safetyIndex: 88, status: "На проверке ТБ" },
+    { id: "comp_5", name: "АО «СК Евразия»", bin: "950740000123", type: "Страховая", city: "Алматы", vehicleTypes: "ОСГПО, КАСКО спецтехники", activeContracts: 5, debt: 0, safetyIndex: 99, status: "Активен" },
+    { id: "comp_6", name: "ТОО «АтырауНефть»", bin: "180240019283", type: "Заказчик", city: "Атырау", vehicleTypes: "Аренда кранов и экскаваторов", activeContracts: 2, debt: 2400000, safetyIndex: 90, status: "Заблокирован за долги" },
+    { id: "comp_7", name: "ТОО «NCOC»", bin: "090140029102", type: "Заказчик", city: "Атырау", vehicleTypes: "Аренда самосвалов и погрузчиков", activeContracts: 3, debt: 0, safetyIndex: 97, status: "Активен" }
+  ],
+
+  // Реестр задач и поручений
+  tasks: [
+    { id: "task_1", title: "Пройти ТО-2 на Самосвале 01", description: "Проверить ходовую часть, заменить фильтры и масло в двигателе.", vehicleId: "v107", siteId: "karabatan", dueDate: "2026-06-18", initiator: "Аманжолов Б.", assignee: "d107", controller: "Механик", status: "in_progress", signedDocument: false, signedDate: null, documentType: "Акт приемки ТО" },
+    { id: "task_2", title: "Инструктаж по ТБ (Летний регламент)", description: "Провести повторный инструктаж по технике безопасности при работе при экстремальных температурах (+40C).", vehicleId: null, siteId: "karabatan2", dueDate: "2026-06-19", initiator: "Каримов Р.", assignee: "d108", controller: "Служба ТБ", status: "safety_review", signedDocument: false, signedDate: null, documentType: "Сертификат инструктажа" },
+    { id: "task_3", title: "Проверить гидравлику на CAT 320", description: "Жалобы на медленный подъем стрелы. Диагностика гидроцилиндров.", vehicleId: "v103", siteId: "karabatan", dueDate: "2026-06-22", initiator: "Аманжолов Б.", assignee: "d103", controller: "Механик", status: "todo", signedDocument: false, signedDate: null, documentType: "Наряд-допуск на ремонт" },
+    { id: "task_4", title: "Сдать отчет по ГСМ", description: "Подписать путевые листы и чеки за первую половину июня.", vehicleId: null, siteId: "makat", dueDate: "2026-06-15", initiator: "Искаков Т.", assignee: "d102", controller: "Служба ТБ", status: "completed", signedDocument: true, signedDate: "2026-06-15", documentType: "Акт выполненных работ", signatureData: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" }
   ],
 
   // Списки подрядчиков и поставщиков
@@ -862,7 +1009,23 @@ const initialData = {
 
   // ИИ Чат-лог (эмулятор мессенджера)
   chatLog: [
-    { sender: "System", time: "07:00", message: "🤖 Инструктаж ТБ ТОО KazBildInvest:\nНапоминаем, что появление на объектах Карабатан, Макат, Индер в нетрезвом виде влечет за собой штраф от Заказчика в размере 200 000 KZT. На основании договоров МО данная сумма будет автоматически удержана из заработной платы виновного лица. Пожалуйста, соблюдайте правила безопасности!" }
+    { sender: "ИИ-Агент", time: "07:00", message: "🤖 ИИ-Логист KazBildInvest приветствует участников!\nВ этой группе WhatsApp фиксируются отчеты водителей по сменам, заправкам и неисправностям. ИИ-Агент автоматически парсит сообщения и переносит данные в ERP." },
+    { sender: "Сериков А. С. (Водитель)", time: "08:15", message: "Запустил смену на автокране Zoomlion 25t, госномер 714 ADE. Выехал на Карабатан-2." },
+    { sender: "ИИ-Агент", time: "08:16", message: "🤖 ИИ-Логист: Смена зафиксирована!\n- Водитель: Сериков А. С.\n- Машина: KBI-AC-01 (Автокран Zoomlion 25t)\n- Объект: Карабатан-2 (Ак Патер)\nДанные внесены в ERP. Техника в статусе 'Работает'." }
+  ],
+
+  // Канал связи с водителями (сообщения)
+  driverMessages: [
+    { id: "msg_1", driverId: "d107", sender: "Диспетчер", time: "09:00", message: "У тебя простой больше 3 часов на Карабатане. В чем причина?", reply: "Ждем автокран для выгрузки металлоконструкций." },
+    { id: "msg_2", driverId: "d101", sender: "Диспетчер", time: "10:15", message: "Выезжай на Карабатан-2 для усиления смены.", reply: "Принял, выезжаю." }
+  ],
+
+  // Заказы снабжения (запчасти)
+  supplyOrders: [
+    { id: "so_1", partSku: "HOS-HYD-002", partName: "РВД 1.5м (2 шт)", qty: 1, price: 30000, total: 30000, supplier: "ТОО Борусан Машинери", status: "Оформлен", date: "2026-06-19" },
+    { id: "so_2", partSku: "OIL-ENG-5W40", partName: "Моторное масло 20л", qty: 5, price: 45000, total: 225000, supplier: "ТОО Helios OIL", status: "Доставлен", date: "2026-06-18" },
+    { id: "so_3", partSku: "FIL-OIL-201", partName: "Фильтр масляный CAT (x5)", qty: 5, price: 18500, total: 92500, supplier: "ТОО Борусан Машинери", status: "В пути", date: "2026-06-20" },
+    { id: "so_4", partSku: "OIL-ENG-1540", partName: "Масло Mobil Delvac 20л", qty: 2, price: 42000, total: 84000, supplier: "ТОО Helios OIL", status: "Оформлен", date: "2026-06-20" }
   ]
 };
 

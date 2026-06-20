@@ -3,11 +3,30 @@
 // Инициализация данных
 let db = JSON.parse(localStorage.getItem("kaz_bild_invest_db")) || initialData;
 
+// Обновляем БД до новой версии с субарендой и страховыми договорами при необходимости
+if (!db || !db.vehicles || !db.vehicles.find(v => v.id === "v113")) {
+  localStorage.setItem("kaz_bild_invest_db", JSON.stringify(initialData));
+  db = JSON.parse(JSON.stringify(initialData)); // Deep copy to avoid reference issues
+}
+
+// Гарантируем наличие новых таблиц в БД, если сессия загружена из кэша
+if (!db.companies) db.companies = initialData.companies || [];
+if (!db.tasks) db.tasks = initialData.tasks || [];
+if (!db.driverMessages) db.driverMessages = initialData.driverMessages || [];
+if (!db.supplyOrders) db.supplyOrders = initialData.supplyOrders || [];
+if (!db.gpsAlerts) {
+  db.gpsAlerts = [
+    { id: "alert_1", vehicleId: "v101", type: "geofence", message: "Автокран Zoomlion (714 ADE 06) покинул геозону объекта Карабатан без путевого листа!", time: "12:10", status: "active" },
+    { id: "alert_2", vehicleId: "v107", type: "idling", message: "Простой! Самосвал Shacman (228 KBB 06) заведен более 3 часов на месте без движения.", time: "11:45", status: "active" }
+  ];
+}
+
 // Глобальные переменные симулятора
 let gpsInterval = null;
 let isGpsSimulating = true;
 let currentWhLevel = 'central';
 let currentGanttView = 'days'; // days / hours
+let activeCompanyFilter = 'all'; // Фильтр компаний по типу
 
 // Инициализация при загрузке страницы
 window.onload = function() {
@@ -31,17 +50,17 @@ function initApp() {
   // Отрисовка всех вкладок
   renderAll();
   
-  // Инициализация Leaflet карты
+  // Инициализация Leafлет карты
   initMap();
   
   // Запуск GPS-симуляции
   startGpsSimulation();
   
-  // Инициализация канваса для подписи на телефоне машиниста
-  initSignaturePad();
-  
   // Применение ролевой модели
   applyRolePermissions();
+
+  // Проверка просроченных задач и отправка уведомлений в бот
+  setTimeout(checkOverdueTasks, 1000);
 }
 
 // Переключение Вкладок
@@ -58,24 +77,44 @@ function switchTab(tabId) {
   const targetPane = document.getElementById("tab-" + tabId);
   if (targetPane) targetPane.classList.add("active");
   
+  // Авто-закрытие боковой панели на мобильных устройствах
+  const sidebar = document.querySelector(".sidebar");
+  if (sidebar && sidebar.classList.contains("open")) {
+    sidebar.classList.remove("open");
+  }
+  
   // Обновление заголовка
   const titles = {
     dashboard: "Дашборд и Аналитика",
     crm: "CRM и Продажи",
     dispatch: "Диспетчеризация и Расписание",
+    tasks: "Задачи и поручения спецтехнике",
     gps: "GPS-Мониторинг парка",
+    dispatcher_hub: "Рабочее место Диспетчера (Логистика и Безопасность)",
     fuel: "Учет ГСМ и «Умный ГСМ»",
     warehouse: "Склад и Цепочки Логистики",
+    purchasing_hub: "Снабжение и Закупки (Панель Снабженца)",
     repairs: "Ремонты и ТО спецтехники",
     hr: "HR-Модуль и Допуски",
-    directories: "Справочники контрагентов",
+    companies: "Реестр контрагентов",
     settings: "Настройки ERP"
   };
   document.getElementById("pageTitleDisplay").innerText = titles[tabId] || "Панель управления";
   
   // Обновление специфических элементов табов
-  if (tabId === 'gps') {
+  if (tabId === 'dashboard') {
+    renderObjectsPnl();
+    renderFleetRoiTable();
+    updateKpiDashboard();
+    renderFinancialChart(window.activeChartPeriod || "year");
+  } else if (tabId === 'gps') {
     setTimeout(() => { if (window.map) window.map.invalidateSize(); }, 200);
+  } else if (tabId === 'dispatcher_hub') {
+    initDispatcherMap();
+    setTimeout(() => { if (window.dispatcherMap) window.dispatcherMap.invalidateSize(); }, 200);
+    renderDispatcherHub();
+  } else if (tabId === 'purchasing_hub') {
+    renderPurchasingHub();
   }
 }
 
@@ -98,13 +137,13 @@ function applyRolePermissions() {
     item.style.display = "flex"; // сброс
     
     if (role === "Warehouse") {
-      // Только Склад, Логистика, Справочники
-      if (!clickAttr.includes("warehouse") && !clickAttr.includes("directories")) {
+      // Только Склад, Логистика, Компании, Снабжение
+      if (!clickAttr.includes("warehouse") && !clickAttr.includes("companies") && !clickAttr.includes("purchasing_hub")) {
         item.style.display = "none";
       }
     } else if (role === "Mechanic") {
-      // Ремонты, ТО, Склад, Справочники
-      if (!clickAttr.includes("repairs") && !clickAttr.includes("warehouse") && !clickAttr.includes("directories")) {
+      // Ремонты, ТО, Склад, Компании, Задачи
+      if (!clickAttr.includes("repairs") && !clickAttr.includes("warehouse") && !clickAttr.includes("companies") && !clickAttr.includes("tasks")) {
         item.style.display = "none";
       }
     } else if (role === "HR") {
@@ -113,13 +152,18 @@ function applyRolePermissions() {
         item.style.display = "none";
       }
     } else if (role === "Dispatcher") {
-      // Только CRM, Диспетчеризация, GPS, ГСМ
-      if (!clickAttr.includes("crm") && !clickAttr.includes("dispatch") && !clickAttr.includes("gps") && !clickAttr.includes("fuel")) {
+      // Только CRM, Диспетчеризация, GPS, ГСМ, Задачи, Пульт Диспетчера
+      if (!clickAttr.includes("crm") && !clickAttr.includes("dispatch") && !clickAttr.includes("gps") && !clickAttr.includes("fuel") && !clickAttr.includes("tasks") && !clickAttr.includes("dispatcher_hub")) {
         item.style.display = "none";
       }
     } else if (role === "Purchaser") {
-      // Только Склад, Логистика, Справочники
-      if (!clickAttr.includes("warehouse") && !clickAttr.includes("directories")) {
+      // Только Склад, Логистика, Компании, Снабжение
+      if (!clickAttr.includes("warehouse") && !clickAttr.includes("companies") && !clickAttr.includes("purchasing_hub")) {
+        item.style.display = "none";
+      }
+    } else if (role === "Accountant") {
+      // Только Дашборд, CRM, HR, Компании, Настройки
+      if (!clickAttr.includes("dashboard") && !clickAttr.includes("crm") && !clickAttr.includes("hr") && !clickAttr.includes("companies") && !clickAttr.includes("settings")) {
         item.style.display = "none";
       }
     }
@@ -151,29 +195,35 @@ function renderCrmKanban() {
   kanban.innerHTML = "";
   
   const stages = [
-    { id: "Лид", name: "Запросы / Лиды" },
-    { id: "КП", name: "Формирование КП" },
-    { id: "Договор", name: "Согласование и Договор" },
-    { id: "Назначение", name: "Назначение техники" },
-    { id: "Выполнение работ", name: "Выполнение работ" },
-    { id: "Закрытие заказа", name: "АВР и Закрытие" },
-    { id: "Оплата", name: "Оплата / Счета" }
+    { id: "Лид", name: "Запросы / Лиды", color: "#64748B", badgeBg: "#E2E8F0" },
+    { id: "КП", name: "Формирование КП", color: "#D97706", badgeBg: "#FEF3C7" },
+    { id: "Договор", name: "Согласование и Договор", color: "#8B5CF6", badgeBg: "#F5F3FF" },
+    { id: "Назначение", name: "Назначение техники", color: "#4F46E5", badgeBg: "#E0E7FF" },
+    { id: "Выполнение работ", name: "Выполнение работ", color: "#2563EB", badgeBg: "#DBEAFE" },
+    { id: "Закрытие заказа", name: "АВР и Закрытие", color: "#0D9488", badgeBg: "#CCFBF1" },
+    { id: "Оплата", name: "Оплата / Счета", color: "#16A34A", badgeBg: "#DCFCE7" }
   ];
   
   stages.forEach(stage => {
     const col = document.createElement("div");
-    col.className = "col-2 card";
+    col.className = "col-2 card kanban-column";
     col.style.padding = "12px";
     col.style.minHeight = "400px";
     col.style.backgroundColor = "var(--bg-secondary)";
+    col.style.borderTop = `4px solid ${stage.color}`;
     
     col.innerHTML = `
-      <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 12px; display: flex; justify-content: space-between;">
+      <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: ${stage.color}; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
         <span>${stage.name}</span>
-        <span class="badge badge-neutral" style="padding: 2px 6px;">${db.deals.filter(d => d.stage === stage.id).length}</span>
+        <span style="padding: 2px 6px; border-radius: 4px; background-color: ${stage.badgeBg}; color: ${stage.color}; font-size: 10px; font-weight: 700;">${db.deals.filter(d => d.stage === stage.id).length}</span>
       </div>
       <div class="kanban-cards-wrapper" style="display: flex; flex-direction: column; gap: 10px;" id="stage-${stage.id}"></div>
     `;
+    
+    // Add drag and drop listeners to columns
+    col.addEventListener("dragover", allowDealDrop);
+    col.addEventListener("dragleave", handleDealDragLeave);
+    col.addEventListener("drop", (e) => handleDealDrop(e, stage.id));
     
     kanban.appendChild(col);
     
@@ -181,9 +231,16 @@ function renderCrmKanban() {
     db.deals.filter(d => d.stage === stage.id).forEach(deal => {
       const card = document.createElement("div");
       card.className = "card";
+      card.id = `deal-card-${deal.id}`;
       card.style.padding = "12px";
       card.style.marginBottom = "0";
       card.style.cursor = "pointer";
+      card.style.borderLeft = `3px solid ${stage.color}`;
+      
+      // Make card draggable
+      card.draggable = true;
+      card.addEventListener("dragstart", (e) => handleDealDragStart(e, deal.id));
+      card.addEventListener("dragend", handleDealDragEnd);
       
       const site = db.sites.find(s => s.id === deal.siteId);
       const siteName = site ? site.name : "Неизвестно";
@@ -205,6 +262,55 @@ function renderCrmKanban() {
     });
   });
 }
+
+// Drag and drop handlers for CRM deals
+function handleDealDragStart(e, dealId) {
+  e.dataTransfer.setData("text/plain", dealId);
+  e.dataTransfer.effectAllowed = "move";
+  setTimeout(() => {
+    const el = document.getElementById(`deal-card-${dealId}`);
+    if (el) el.classList.add("dragging");
+  }, 0);
+}
+
+function handleDealDragEnd(e) {
+  e.target.classList.remove("dragging");
+  document.querySelectorAll("#kanbanBoard > div").forEach(col => col.classList.remove("drag-over"));
+}
+
+function allowDealDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add("drag-over");
+}
+
+function handleDealDragLeave(e) {
+  e.currentTarget.classList.remove("drag-over");
+}
+
+function handleDealDrop(e, newStage) {
+  e.preventDefault();
+  e.currentTarget.classList.remove("drag-over");
+  
+  const dealId = e.dataTransfer.getData("text/plain");
+  const deal = db.deals.find(d => d.id === dealId);
+  if (!deal) return;
+
+  // Validation: Without contract, transition to "Назначение" or later is blocked
+  const restrictedStages = ["Назначение", "Выполнение работ", "Закрытие заказа", "Оплата"];
+  if (restrictedStages.includes(newStage) && !deal.contractSigned) {
+    showSystemNotification(`Ошибка: Перевод сделки "${deal.companyName}" на этап "${newStage}" заблокирован. Сначала необходимо подписать договор.`);
+    return;
+  }
+
+  deal.stage = newStage;
+  saveState();
+  renderCrmKanban();
+  updateKpiDashboard();
+  renderObjectsPnl();
+  
+  showSystemNotification(`Сделка "${deal.companyName}" успешно перемещена в стадию "${newStage}"`);
+}
+
 
 // Карточка деталей сделки
 function openDealDetails(dealId) {
@@ -254,7 +360,12 @@ function openDealDetails(dealId) {
       <div class="pnl-row"><span>Сроки проекта:</span><strong>${deal.startDate} по ${deal.endDate}</strong></div>
       <div class="pnl-row"><span>Стоимость заказа:</span><strong>${deal.price.toLocaleString()} KZT</strong></div>
       <div class="pnl-row"><span>Стадия заказа:</span><span class="badge badge-warning">${deal.stage}</span></div>
-      <div class="pnl-row"><span>Договор:</span><strong>${deal.contractNumber || 'Не присвоен'} (${deal.contractSigned ? 'Подписан' : 'Не подписан'})</strong></div>
+      <div class="pnl-row"><span>Договор:</span><strong>
+        ${deal.contractSigned 
+          ? `<a href="#" onclick="openContractDocument('${deal.id}'); return false;" style="color:var(--brand-color); font-weight:700; text-decoration:underline;" title="Открыть договор в просмотре">${deal.contractNumber}</a>` 
+          : `<span style="color:var(--status-danger);">Не подписан</span>`
+        }
+      </strong></div>
       <div class="pnl-row"><span>Выставленный счет:</span><span class="badge badge-neutral">${deal.invoiceStatus}</span></div>
       <div>
         <h5 style="margin-bottom: 6px; font-weight: 600;">Назначенная техника (${deal.vehicleIds.length} ед.):</h5>
@@ -1416,6 +1527,9 @@ function renderEmployeesTable() {
     const totalDeductions = db.payrollDeductions.filter(x => x.driverId === d.id).reduce((sum, x) => sum + x.amount, 0);
     
     const tr = document.createElement("tr");
+    tr.style.cursor = "pointer";
+    tr.onclick = () => openEmployeeDetails(d.id);
+    tr.className = "clickable-row-hover";
     tr.innerHTML = `
       <td><strong>${d.name}</strong><br><span style="font-size:11px;color:var(--text-secondary);">ИИН: ${d.iin}</span></td>
       <td>${d.position}</td>
@@ -1432,6 +1546,201 @@ function renderEmployeesTable() {
     `;
     tbody.appendChild(tr);
   });
+}
+
+function openEmployeeDetails(driverId) {
+  const d = db.drivers.find(x => x.id === driverId);
+  if (!d) return;
+  
+  const body = document.getElementById("employeeModalBody");
+  const footer = document.getElementById("employeeModalFooter");
+  
+  const today = new Date("2026-06-18");
+  const medDays = Math.ceil((new Date(d.medExpiry) - today) / (1000 * 60 * 60 * 24));
+  const tbDays = Math.ceil((new Date(d.tbExpiry) - today) / (1000 * 60 * 60 * 24));
+  
+  let medStatus = medDays < 0 ? `🔴 Просрочено на ${Math.abs(medDays)} дн.` : (medDays <= 7 ? `🔴 ТО СРОЧНО (истекает через ${medDays} дн.)` : (medDays <= 30 ? `🟡 Предупреждение (истекает через ${medDays} дн.)` : `🟢 Годен до ${d.medExpiry} (${medDays} дн.)`));
+  let tbStatus = tbDays < 0 ? `🔴 Истек допуск на ${Math.abs(tbDays)} дн.` : (tbDays <= 30 ? `🟡 Истекает через ${tbDays} дн.` : `🟢 Допуск до ${d.tbExpiry} (${tbDays} дн.)`);
+  
+  const vehicle = db.vehicles.find(v => v.driverId === d.id);
+  const vehicleInfo = vehicle ? `<span style="color:var(--brand-color); font-weight:700;">${vehicle.name} (${vehicle.plate}) [Инв: ${vehicle.invNumber}]</span>` : `<span style="color:var(--text-secondary); font-style:italic;">Спецтехника не привязана</span>`;
+  
+  const activeTasks = db.tasks.filter(t => t.assignee === d.id && t.status !== 'completed');
+  let tasksHtml = "";
+  if (activeTasks.length === 0) {
+    tasksHtml = `<div style="font-size:12px; color:var(--text-secondary); font-style:italic;">Нет активных задач</div>`;
+  } else {
+    tasksHtml = activeTasks.map(t => `
+      <div style="padding: 8px; border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 6px; background-color: var(--bg-card); display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-weight:600; font-size:12px;">${t.title}</div>
+          <div style="font-size:10px; color:var(--text-secondary);">Дедлайн: ${t.dueDate}</div>
+        </div>
+        <span class="badge badge-warning" style="font-size:9px; padding: 2px 6px;">${t.status}</span>
+      </div>
+    `).join("");
+  }
+  
+  body.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      <!-- Шапка -->
+      <div style="background: var(--bg-secondary); padding: 16px; border-radius: 10px; border-left: 4px solid ${d.isBlocked ? 'var(--status-danger)' : 'var(--status-success)'};">
+        <h4 style="font-size:16px; font-weight:700; color: var(--text-primary);">${d.name}</h4>
+        <div style="font-size:12px; color: var(--text-secondary); margin-top: 4px;">Должность: <strong>${d.position}</strong></div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+          <span class="badge badge-neutral" style="font-size: 9px; padding: 2px 6px;">ИИН: ${d.iin}</span>
+          <span class="badge badge-neutral" style="font-size: 9px; padding: 2px 6px;">Категория: ${d.licenseCategory}</span>
+          <span class="badge ${d.isBlocked ? 'badge-danger' : 'badge-success'}" style="font-size: 9px; padding: 2px 6px;">
+            ${d.isBlocked ? 'Заблокирован' : 'Допущен'}
+          </span>
+        </div>
+      </div>
+      
+      <!-- Личные данные -->
+      <div class="grid-container" style="gap:12px; border-bottom: 1px dashed var(--border-color); padding-bottom: 12px;">
+        <div class="col-6">
+          <div style="font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-weight:700; margin-bottom:4px;">Телефон:</div>
+          <div style="font-size:13px; font-weight:600;">${d.phone}</div>
+        </div>
+        <div class="col-6">
+          <div style="font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-weight:700; margin-bottom:4px;">Техника:</div>
+          <div style="font-size:13px;">${vehicleInfo}</div>
+        </div>
+      </div>
+
+      <!-- Допуски и Корочки -->
+      <div style="border-bottom: 1px dashed var(--border-color); padding-bottom: 12px;">
+        <h5 style="font-weight:700; font-size:11px; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Допуски и медосмотр</h5>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; font-size:12px;">
+            <span>Медосмотр:</span>
+            <strong>${medStatus}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:12px;">
+            <span>Инструктаж ТБ / ОТ / ПТМ:</span>
+            <strong>${tbStatus}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:12px;">
+            <span>Договор материальной ответственности:</span>
+            <strong>${d.materialLiability ? '🟢 Подписан (МО)' : '🔴 Не подписан'}</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Размещение -->
+      <div style="border-bottom: 1px dashed var(--border-color); padding-bottom: 12px;">
+        <h5 style="font-weight:700; font-size:11px; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Размещение и СИЗ</h5>
+        <div class="grid-container" style="gap:12px;">
+          <div class="col-6" style="font-size:12px;">
+            <div>Общежитие / Вагончик:</div>
+            <strong>${d.lodging || 'Не указано'}</strong>
+          </div>
+          <div class="col-6" style="font-size:12px;">
+            <div>План питания:</div>
+            <strong>${d.mealPlan || 'Не указано'}</strong>
+          </div>
+          <div class="col-6" style="font-size:12px; margin-top: 6px;">
+            <div>Размер СИЗ / Спецодежда:</div>
+            <strong>${d.uniformSize || '50-52 (XL)'}</strong>
+          </div>
+          <div class="col-6" style="font-size:12px; margin-top: 6px;">
+            <div>Командировочные:</div>
+            <strong>${d.travelCosts ? d.travelCosts.toLocaleString() + ' ₸' : '0 ₸'}</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Задачи -->
+      <div>
+        <h5 style="font-weight:700; font-size:11px; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Текущие поручения / наряды</h5>
+        ${tasksHtml}
+      </div>
+    </div>
+  `;
+  
+  footer.innerHTML = `
+    <div style="display:flex; gap:8px;">
+      <button class="btn-secondary" style="color:var(--status-danger); border-color:var(--status-danger); font-size:11px; padding: 6px 12px;" onclick="toggleEmployeeBlockStatus('${d.id}')">
+        ${d.isBlocked ? 'Разблокировать' : 'Заблокировать'}
+      </button>
+      <button class="btn-secondary" style="font-size:11px; padding: 6px 12px;" onclick="openEditEmployeeModal('${d.id}')">
+        📝 Редактировать
+      </button>
+    </div>
+    <button class="btn-primary" style="font-size: 13px; padding: 8px 20px; border-radius: 30px;" onclick="closeEmployeeModal()">Закрыть</button>
+  `;
+  
+  document.getElementById("employeeDetailsModal").classList.add("active");
+}
+
+function closeEmployeeModal() {
+  document.getElementById("employeeDetailsModal").classList.remove("active");
+}
+
+function toggleEmployeeBlockStatus(driverId) {
+  const d = db.drivers.find(x => x.id === driverId);
+  if (!d) return;
+  
+  d.isBlocked = !d.isBlocked;
+  saveState();
+  renderEmployeesTable();
+  closeEmployeeModal();
+  openEmployeeDetails(driverId);
+  showSystemNotification(`Статус допуска для ${d.name} изменен на: ${d.isBlocked ? 'Заблокирован' : 'Допущен'}`);
+}
+
+function openEditEmployeeModal(driverId) {
+  const d = db.drivers.find(x => x.id === driverId);
+  if (!d) return;
+  
+  document.getElementById("editEmployeeId").value = d.id;
+  document.getElementById("editEmployeeName").value = d.name;
+  document.getElementById("editEmployeeIin").value = d.iin;
+  document.getElementById("editEmployeePhone").value = d.phone;
+  document.getElementById("editEmployeePosition").value = d.position;
+  document.getElementById("editEmployeeLicense").value = d.licenseCategory;
+  document.getElementById("editEmployeeMedExpiry").value = d.medExpiry;
+  document.getElementById("editEmployeeTbExpiry").value = d.tbExpiry;
+  document.getElementById("editEmployeeSalary").value = d.baseSalary || 0;
+  document.getElementById("editEmployeeContractType").value = d.contractType || "TD";
+  document.getElementById("editEmployeeMo").value = d.materialLiability ? "true" : "false";
+  document.getElementById("editEmployeeUniformSize").value = d.uniformSize || "50-52 (XL)";
+  document.getElementById("editEmployeeTravelCosts").value = d.travelCosts || 0;
+  document.getElementById("editEmployeeLodging").value = d.lodging || "Не требуется / Местный";
+  document.getElementById("editEmployeeMealPlan").value = d.mealPlan || "Без питания";
+  
+  closeEmployeeModal();
+  openModal("editEmployeeModal");
+}
+
+function submitEditEmployee() {
+  const id = document.getElementById("editEmployeeId").value;
+  const d = db.drivers.find(x => x.id === id);
+  if (!d) return;
+  
+  d.name = document.getElementById("editEmployeeName").value;
+  d.iin = document.getElementById("editEmployeeIin").value;
+  d.phone = document.getElementById("editEmployeePhone").value;
+  d.position = document.getElementById("editEmployeePosition").value;
+  d.licenseCategory = document.getElementById("editEmployeeLicense").value;
+  d.medExpiry = document.getElementById("editEmployeeMedExpiry").value;
+  d.tbExpiry = document.getElementById("editEmployeeTbExpiry").value;
+  d.baseSalary = parseInt(document.getElementById("editEmployeeSalary").value) || 0;
+  d.contractType = document.getElementById("editEmployeeContractType").value;
+  d.materialLiability = document.getElementById("editEmployeeMo").value === "true";
+  d.uniformSize = document.getElementById("editEmployeeUniformSize").value;
+  d.travelCosts = parseInt(document.getElementById("editEmployeeTravelCosts").value) || 0;
+  d.lodging = document.getElementById("editEmployeeLodging").value;
+  d.mealPlan = document.getElementById("editEmployeeMealPlan").value;
+  
+  saveState();
+  renderEmployeesTable();
+  if (typeof renderLodgingTable === "function") renderLodgingTable();
+  if (typeof renderLodgingStats === "function") renderLodgingStats();
+  
+  closeModal("editEmployeeModal");
+  openEmployeeDetails(d.id);
+  showSystemNotification("Профиль сотрудника успешно обновлен!");
 }
 
 function submitCreateEmployee() {
@@ -1477,7 +1786,6 @@ function submitCreateEmployee() {
   saveState();
   
   renderEmployeesTable();
-  renderDriverDropdowns();
   closeModal("createEmployeeModal");
   showSystemNotification("Профиль сотрудника успешно добавлен!");
 }
@@ -1601,12 +1909,33 @@ function renderChatHistory() {
   
   db.chatLog.forEach(log => {
     const msg = document.createElement("div");
-    msg.className = `chat-message ${log.sender === 'System' ? 'system' : 'user'}`;
+    
+    // Determine the WhatsApp class based on sender
+    let messageClass = "whatsapp-message driver";
+    if (log.sender === "Менеджер") {
+      messageClass = "whatsapp-message manager";
+    } else if (log.sender === "System" || log.sender === "ИИ-Агент" || log.sender.includes("ИИ-Логист")) {
+      messageClass = "whatsapp-message bot";
+    }
+    
+    msg.className = messageClass;
+    
+    // Colored name for sender in WhatsApp group
+    let nameColor = "#35a649"; // Default green
+    if (log.sender.includes("Водитель")) {
+      nameColor = "#1f71a3"; // Blue for drivers
+    } else if (log.sender.includes("Механик")) {
+      nameColor = "#e67e22"; // Orange for mechanics
+    } else if (log.sender === "Менеджер") {
+      nameColor = "#8e44ad"; // Purple for manager
+    } else if (log.sender.includes("ИИ")) {
+      nameColor = "#e74c3c"; // Crimson red for AI agent
+    }
     
     msg.innerHTML = `
-      <div style="font-weight:700; font-size:10px; margin-bottom:4px; text-transform:uppercase;">${log.sender}</div>
-      <div>${log.message}</div>
-      <div class="chat-message-time">${log.time}</div>
+      <div style="font-weight:700; font-size:10px; margin-bottom:4px; text-transform:uppercase; color: ${nameColor};">${log.sender}</div>
+      <div style="line-height: 1.4;">${log.message}</div>
+      <div class="chat-message-time" style="font-size: 9px; color: #666; margin-top: 4px; text-align: right;">${log.time}</div>
     `;
     container.appendChild(msg);
   });
@@ -1619,295 +1948,217 @@ function sendChatMessage() {
   const text = input.value.trim();
   if (!text) return;
   
-  // Добавляем сообщение пользователя
   const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
-  db.chatLog.push({ sender: "Менеджер", time: time, message: text });
+  let sender = "Менеджер";
+  let messageText = text;
+  let driverId = null;
+  
+  // Checking for driver name prefix (e.g. "Сериков: Принял смену")
+  const matchPrefix = text.match(/^([^:]+):\s*(.*)/);
+  if (matchPrefix) {
+    const rawSender = matchPrefix[1].trim();
+    messageText = matchPrefix[2].trim();
+    
+    if (rawSender.toLowerCase().includes("сериков")) {
+      sender = "Сериков А. С. (Водитель)";
+      driverId = "d101";
+    } else if (rawSender.toLowerCase().includes("калиев")) {
+      sender = "Калиев М. К. (Водитель)";
+      driverId = "d102";
+    } else if (rawSender.toLowerCase().includes("жусупов")) {
+      sender = "Жусупов Б. Н. (Водитель)";
+      driverId = "d103";
+    } else {
+      sender = `${rawSender} (Водитель)`;
+    }
+  }
+  
+  // Add user message to log
+  db.chatLog.push({ sender: sender, time: time, message: messageText });
   input.value = "";
   renderChatHistory();
   
-  // ИИ-парсинг сообщения
-  // Шаблон: @bot Штраф ТБ. Водитель Сериков А. на объекте Карабатан-2 отстранен по алкоголю, штраф 200000
-  if (text.includes("@bot") && text.toLowerCase().includes("штраф")) {
-    setTimeout(() => {
-      // Ищем имя водителя
-      const driverMatch = text.match(/Водитель\s+([A-Яa-яa-z]+\s+[A-Яa-яa-z]\.)/i);
-      const siteMatch = text.match(/объекте\s+([A-Яa-я0-9\-\sА-я]+)\s+отстранен/i);
-      const fineMatch = text.match(/штраф\s+(\d+)/i);
-      
-      const driverName = driverMatch ? driverMatch[1] : "Сериков А.";
-      const siteName = siteMatch ? siteMatch[1].trim() : "Карабатан";
-      const fineAmount = fineMatch ? parseInt(fineMatch[1]) : 200000;
-      
-      // Находим водителя
-      const driver = db.drivers.find(d => d.name.includes(driverName.substring(0, 7)));
+  // AI-Agent parsing logic (simulating delay)
+  setTimeout(() => {
+    const lowerText = messageText.toLowerCase();
+    
+    // Find driver in database
+    let driver = driverId ? db.drivers.find(d => d.id === driverId) : null;
+    if (!driver) {
+      if (lowerText.includes("сериков")) driver = db.drivers.find(d => d.id === "d101");
+      else if (lowerText.includes("калиев")) driver = db.drivers.find(d => d.id === "d102");
+      else if (lowerText.includes("жусупов")) driver = db.drivers.find(d => d.id === "d103");
+      else if (sender !== "Менеджер") {
+        const cleanName = sender.split(" ")[0];
+        driver = db.drivers.find(d => d.name.includes(cleanName));
+      }
+    }
+    // Default fallback to first driver if message is driver-related
+    if (!driver && (lowerText.includes("смену") || lowerText.includes("заправил") || lowerText.includes("поломал") || lowerText.includes("сломал"))) {
+      driver = db.drivers.find(d => d.id === "d101");
+    }
+    
+    // Find vehicle
+    let vehicle = null;
+    if (driver) {
+      vehicle = db.vehicles.find(v => v.driverId === driver.id);
+    }
+    if (lowerText.includes("zoomlion") || lowerText.includes("714")) {
+      vehicle = db.vehicles.find(v => v.id === "v101");
+    } else if (lowerText.includes("xcmg") || lowerText.includes("452")) {
+      vehicle = db.vehicles.find(v => v.id === "v102");
+    } else if (lowerText.includes("экскаватор")) {
+      vehicle = db.vehicles.find(v => v.id === "v103");
+    }
+    if (!vehicle) vehicle = db.vehicles.find(v => v.id === "v101");
+    
+    // Match construction site
+    let siteId = "karabatan";
+    let siteName = "Карабатан";
+    if (lowerText.includes("макат")) {
+      siteId = "makat";
+      siteName = "Макат";
+    } else if (lowerText.includes("индер")) {
+      siteId = "inder";
+      siteName = "Индер";
+    } else if (lowerText.includes("караб")) {
+      siteId = "karabatan";
+      siteName = "Карабатан";
+    }
+    
+    let processed = false;
+    let aiResponse = "";
+    
+    // 1. НАЧАЛО СМЕНЫ
+    if (lowerText.includes("принял смену") || lowerText.includes("начал смену") || lowerText.includes("заступил")) {
+      if (driver && vehicle) {
+        vehicle.status = "В работе";
+        driver.shiftsWorked = (driver.shiftsWorked || 0) + 1;
+        saveState();
+        
+        aiResponse = `🤖 ИИ-Логист: Смена зафиксирована!\n- Водитель: ${driver.name}\n- Техника: ${vehicle.invNumber} (${vehicle.name})\n- Объект: ${siteName}\nДанные внесены в путевой лист ERP. Статус техники обновлен на 'В работе'.`;
+        processed = true;
+      }
+    }
+    
+    // 2. КОНЕЦ СМЕНЫ
+    else if (lowerText.includes("сдал смену") || lowerText.includes("смену сдал") || lowerText.includes("закончил смену") || lowerText.includes("завершил работу")) {
+      if (driver && vehicle) {
+        vehicle.status = "Свободна";
+        saveState();
+        
+        aiResponse = `🤖 ИИ-Логист: Окончание смены принято!\n- Водитель: ${driver.name}\n- Техника: ${vehicle.invNumber} (${vehicle.name})\nСтатус спецтехники в ERP изменен на 'Свободна'. Смена закрыта.`;
+        processed = true;
+      }
+    }
+    
+    // 3. ЗАПРАВКА ГСМ
+    else if (lowerText.includes("заправил") || lowerText.includes("заправка") || lowerText.includes("заправился")) {
+      if (driver && vehicle) {
+        const litersMatch = lowerText.match(/(\d+)\s*л/) || lowerText.match(/заправил\s+(\d+)/) || lowerText.match(/(\d+)\s*литр/);
+        const liters = litersMatch ? parseInt(litersMatch[1]) : 150;
+        const cost = liters * 295; // 295 KZT/литр
+        
+        db.fuelLogs.push({
+          id: "fl_" + (db.fuelLogs.length + 1),
+          date: new Date().toISOString().split('T')[0],
+          time: time,
+          vehicleId: vehicle.id,
+          driverId: driver.id,
+          fuelType: "Дизель",
+          liters: liters,
+          cost: cost,
+          fuelCard: `CARD-99${driver.id.substring(1)}`,
+          approved: true
+        });
+        saveState();
+        
+        aiResponse = `🤖 ИИ-Логист: Отчет о заправке обработан!\n- Водитель: ${driver.name}\n- Техника: ${vehicle.invNumber}\n- Объем: ${liters} л\n- Сумма: ${cost.toLocaleString()} KZT списана с топливной карты.\nРасход добавлен в финансовую аналитику объекта ${siteName}.`;
+        processed = true;
+      }
+    }
+    
+    // 4. ПОЛОМКА / ЗАЯВКА НА РЕМОНТ
+    else if (lowerText.includes("сломался") || lowerText.includes("поломка") || lowerText.includes("ремонт") || lowerText.includes("поломал")) {
+      if (driver && vehicle) {
+        vehicle.status = "На ремонте";
+        
+        db.repairs.push({
+          id: "rep_" + (db.repairs.length + 1),
+          vehicleId: vehicle.id,
+          siteId: siteId,
+          driverId: driver.id,
+          description: messageText,
+          status: "Новая",
+          createdAt: new Date().toISOString().split('T')[0],
+          faultByDriver: false,
+          damageCost: 0,
+          explanatoryAttached: false,
+          partsRequested: [],
+          laborCost: 0
+        });
+        saveState();
+        
+        aiResponse = `🤖 ИИ-Логист: Заявка на ремонт создана!\n- Водитель: ${driver.name}\n- Техника: ${vehicle.invNumber} (${vehicle.name})\n- Описание неисправности: "${messageText}"\nСтатус техники изменен на 'На ремонте'. Заявка отправлена в ремонтный модуль.`;
+        processed = true;
+      }
+    }
+    
+    // 5. ШТРАФ ТБ
+    else if (lowerText.includes("штраф")) {
+      const fineMatch = lowerText.match(/штраф\s+(\d+)/) || [null, "15000"];
+      const fineAmount = parseInt(fineMatch[1]);
       
       if (driver) {
-        // Добавляем удержание
         driver.finesThisMonth += fineAmount;
-        
-        // Вносим запись в лог удержаний
         db.payrollDeductions.push({
           id: "pd_" + (db.payrollDeductions.length + 1),
           driverId: driver.id,
-          type: "Штраф ТБ (Алкоголь)",
+          type: "Штраф ТБ",
           amount: fineAmount,
-          date: "2026-06-18",
-          reference: `AI Messenger: ${text}`,
+          date: new Date().toISOString().split('T')[0],
+          reference: `AI WhatsApp: ${messageText}`,
           approved: true
         });
         
-        // Срываем смену в CRM для этого объекта
-        const deal = db.deals.find(d => d.siteId.includes("karabatan") && d.stage === "Выполнение работ");
-        if (deal) {
-          deal.stage = "Закрытие заказа";
-          deal.jobType = "СОРВАНА СМЕНА (Нарушение водителя)";
+        if (fineAmount >= 100000) {
+          // Серьезный штраф - срываем смену
+          const deal = db.deals.find(d => d.siteId === siteId && d.stage === "Выполнение работ");
+          if (deal) {
+            deal.stage = "Закрытие заказа";
+            deal.jobType = "СОРВАНА СМЕНА (Нарушение водителя)";
+          }
         }
-        
         saveState();
         
-        db.chatLog.push({
-          sender: "System",
-          time: time,
-          message: `🤖 ИИ-Ассистент: Запрос верифицирован директоратом!\n- Водитель: ${driver.name}\n- Нарушение: Алкоголь на объекте ${siteName}\n- Сумма штрафа: ${fineAmount.toLocaleString()} KZT списана с баланса водителя.\n- Смена на объекте переведена в аварийный статус.`
-        });
-        
-        renderChatHistory();
-        renderEmployeesTable();
-        renderCrmKanban();
-        renderObjectsPnl();
-      } else {
-        db.chatLog.push({
-          sender: "System",
-          time: time,
-          message: `🤖 ИИ-Ассистент: Ошибка! Водитель "${driverName}" не найден в базе данных ERP.`
-        });
-        renderChatHistory();
+        aiResponse = `🤖 ИИ-Логист: Нарушение зафиксировано!\n- Водитель: ${driver.name}\n- Штраф ТБ: ${fineAmount.toLocaleString()} KZT будет удержан из ФОТ.\n- Ссылка на лог: AI WhatsApp.\nДанные внесены в ERP.`;
+        processed = true;
       }
-    }, 1200);
-  }
-}
-
-
-// ----------------------------------------------------
-// МОДУЛЬ 10: ЭМУЛЯТОР СМАРТФОНА МАШИНИСТА
-// ----------------------------------------------------
-
-function togglePhoneSimulator() {
-  const wrapper = document.getElementById("phoneSimulatorWrapper");
-  const isHidden = wrapper.style.display === "none";
-  wrapper.style.display = isHidden ? "flex" : "none";
-  
-  if (isHidden) {
-    renderDriverPhoneScreen();
-  }
-}
-
-// Рендеринг экрана водителя
-function renderDriverPhoneScreen() {
-  const select = document.getElementById("phoneDriverSelect");
-  
-  // Заполняем выпадающий список водителей (если пуст)
-  if (select.children.length === 0) {
-    db.drivers.forEach(d => {
-      const opt = document.createElement("option");
-      opt.value = d.id;
-      opt.innerText = `${d.name} (${d.position})`;
-      select.appendChild(opt);
-    });
-  }
-  
-  updateDriverPhoneScreen();
-}
-
-function updateDriverPhoneScreen() {
-  const dId = document.getElementById("phoneDriverSelect").value;
-  const d = db.drivers.find(x => x.id === dId);
-  if (!d) return;
-  
-  const shiftDetails = document.getElementById("phoneShiftDetails");
-  
-  // Находим спецтехнику водителя
-  const v = db.vehicles.find(x => x.driverId === d.id);
-  const site = v ? db.sites.find(s => s.id === v.currentSiteId) : null;
-  
-  shiftDetails.innerHTML = `
-    <div style="margin-bottom:8px;">Водитель: <strong>${d.name}</strong></div>
-    <div>Машина: <strong>${v ? v.name : 'Не привязана'}</strong></div>
-    <div>Госномер: <strong>${v ? v.plate : '-'}</strong></div>
-    <div>Объект: <strong>${site ? site.name : '-'}</strong></div>
-    <div>Смен отработано: <strong>${d.shiftsWorked}</strong></div>
-  `;
-  
-  // Отображаем кнопку Начать/Завершить смену
-  const startBtn = document.getElementById("phoneShiftStartBtn");
-  const endBtn = document.getElementById("phoneShiftEndBtn");
-  
-  if (v && v.status === "Работает") {
-    startBtn.style.display = "none";
-    endBtn.style.display = "block";
-  } else {
-    startBtn.style.display = "block";
-    endBtn.style.display = "none";
-  }
-}
-
-function phoneStartShift() {
-  const dId = document.getElementById("phoneDriverSelect").value;
-  const d = db.drivers.find(x => x.id === dId);
-  const v = db.vehicles.find(x => x.driverId === dId);
-  
-  if (d.isBlocked) {
-    alert("Допуск заблокирован! Проверьте корочки ТБ или медосмотр в HR-модуле.");
-    return;
-  }
-  
-  if (v) {
-    v.status = "Работает";
-    saveState();
-    updateDriverPhoneScreen();
-    renderGanttChart();
-    showSystemNotification(`Водитель ${d.name} запустил смену на технике ${v.invNumber}`);
-  }
-}
-
-function phoneEndShift() {
-  const dId = document.getElementById("phoneDriverSelect").value;
-  const d = db.drivers.find(x => x.id === dId);
-  const v = db.vehicles.find(x => x.driverId === dId);
-  
-  if (v) {
-    v.status = "Свободна";
-    d.shiftsWorked++;
-    saveState();
-    updateDriverPhoneScreen();
-    renderGanttChart();
-    renderEmployeesTable();
-    showSystemNotification(`Водитель ${d.name} успешно закрыл смену!`);
-  }
-}
-
-function phoneRequestFuel() {
-  const dId = document.getElementById("phoneDriverSelect").value;
-  const v = db.vehicles.find(x => x.driverId === dId);
-  const liters = parseInt(document.getElementById("phoneFuelLiters").value) || 0;
-  
-  if (liters <= 0) {
-    alert("Введите количество литров!");
-    return;
-  }
-  
-  if (v) {
-    // Вносим лог
-    const log = {
-      id: "fl_" + (db.fuelLogs.length + 1),
-      date: new Date().toISOString().split('T')[0],
-      time: new Date().toTimeString().split(' ')[0].substring(0, 5),
-      vehicleId: v.id,
-      driverId: dId,
-      fuelType: "Дизель",
-      liters: liters,
-      cost: liters * 295,
-      fuelCard: "CARD-USER",
-      approved: true
-    };
-    db.fuelLogs.push(log);
-    saveState();
-    
-    renderFuelTable();
-    document.getElementById("phoneFuelLiters").value = "";
-    alert("Чек АЗС отправлен в бухгалтерию!");
-  }
-}
-
-function phoneReportBreakdown() {
-  const dId = document.getElementById("phoneDriverSelect").value;
-  const v = db.vehicles.find(x => x.driverId === dId);
-  const desc = document.getElementById("phoneBreakdownDesc").value;
-  
-  if (!desc) {
-    alert("Опишите неисправность!");
-    return;
-  }
-  
-  if (v) {
-    const newRep = {
-      id: "rep_" + (db.repairs.length + 1),
-      vehicleId: v.id,
-      siteId: v.currentSiteId,
-      driverId: dId,
-      description: desc,
-      status: "Диагностика",
-      createdAt: new Date().toISOString().split('T')[0],
-      faultByDriver: false,
-      damageCost: 0,
-      partsRequested: [],
-      laborCost: 10000
-    };
-    
-    v.status = "На ремонте";
-    db.repairs.push(newRep);
-    saveState();
-    
-    renderRepairsTable();
-    renderGanttChart();
-    document.getElementById("phoneBreakdownDesc").value = "";
-    alert("Заявка о поломке отправлена диспетчеру и механику!");
-  }
-}
-
-// Сенсорный/мышиный канвас подписи АВР
-function initSignaturePad() {
-  const canvas = document.getElementById("phoneSignatureCanvas");
-  if (!canvas) return;
-  
-  const ctx = canvas.getContext("2d");
-  ctx.strokeStyle = "#000";
-  ctx.lineWidth = 2;
-  
-  let drawing = false;
-  
-  canvas.addEventListener("mousedown", () => drawing = true);
-  canvas.addEventListener("mouseup", () => {
-    drawing = false;
-    ctx.beginPath();
-  });
-  
-  canvas.addEventListener("mousemove", (e) => {
-    if (!drawing) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-  });
-}
-
-function phoneSubmitSignature() {
-  const dId = document.getElementById("phoneDriverSelect").value;
-  const d = db.drivers.find(x => x.id === dId);
-  
-  // Находим активную сделку на объекте этого водителя
-  const v = db.vehicles.find(x => x.driverId === dId);
-  if (v) {
-    const deal = db.deals.find(deal => deal.vehicleIds.includes(v.id) && deal.stage === "Выполнение работ");
-    if (deal) {
-      deal.stage = "Закрытие заказа";
-      saveState();
-      renderCrmKanban();
-      alert("Акт выполненных работ успешно подписан с мобильного телефона заказчиком!");
-      
-      // Очистка подписи
-      const canvas = document.getElementById("phoneSignatureCanvas");
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      return;
     }
-  }
-  alert("Нет активной смены с незакрытыми АВР для данного оператора!");
+    
+    if (!processed) {
+      if (sender === "Менеджер") {
+        aiResponse = `🤖 ИИ-Логист: Принял сообщение от руководства. Ожидаю отчетов водителей в группе. Для ручного ввода отчета водителя используйте формат:\n"Имя_Водителя: Сообщение отчета" (например, "Сериков: Заправил автокран на 100 литров").`;
+      } else {
+        aiResponse = `🤖 ИИ-Логист: Сообщение от водителя ${driver ? driver.name : sender} получено и сохранено в истории группы. Специфические команды не обнаружены.`;
+      }
+    }
+    
+    db.chatLog.push({
+      sender: "ИИ-Агент",
+      time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+      message: aiResponse
+    });
+    
+    renderChatHistory();
+    renderAll();
+    
+  }, 1000);
 }
+
+
+// МОДУЛЬ 10: Убран (Отчетность переведена в WhatsApp)
+
 
 
 // ----------------------------------------------------
@@ -1947,6 +2198,11 @@ function renderObjectsPnl() {
     
     const card = document.createElement("div");
     card.className = "col-4 object-pnl-card";
+    card.style.cursor = "pointer";
+    card.style.transition = "transform 0.2s, box-shadow 0.2s";
+    card.onmouseenter = () => { card.style.transform = "translateY(-3px)"; card.style.boxShadow = "0 6px 16px rgba(0,0,0,0.1)"; };
+    card.onmouseleave = () => { card.style.transform = "translateY(0)"; card.style.boxShadow = "var(--shadow)"; };
+    card.onclick = () => openSitePnlDetailModal(site.id);
     
     card.innerHTML = `
       <div style="font-weight:700; font-size:14px; border-bottom:1px solid var(--border-color); padding-bottom:8px;">${site.name}</div>
@@ -2011,53 +2267,196 @@ function calculateMonthlyPayroll() {
   const tbody = table.querySelector("tbody");
   tbody.innerHTML = "";
   
+  db.payrollApprovals = db.payrollApprovals || {};
+  
+  // Show/Hide bulk action button
+  const bulkArea = document.getElementById("payrollBulkActionArea");
+  if (bulkArea) {
+    if (db.settings.activeRole === "Accountant" || db.settings.activeRole === "Director") {
+      bulkArea.style.display = "block";
+    } else {
+      bulkArea.style.display = "none";
+    }
+  }
+  
   db.drivers.forEach(d => {
     // В субаренде оклад и расчет ЗП не производятся (они идут подрядчикам)
     if (d.baseSalary === 0) {
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td><strong>${d.name}</strong><br><span style="font-size:10px;color:var(--text-secondary);">${d.position}</span></td>
-        <td colspan="7" style="text-align:center; color:var(--text-secondary); font-style:italic;">Субаренда (Выплата партнеру по акту)</td>
+        <td colspan="8" style="text-align:center; color:var(--text-secondary); font-style:italic;">Субаренда (Выплата партнеру по акту)</td>
       `;
       tbody.appendChild(tr);
       return;
     }
 
-    // Доход = оклад + бонусы за смены (по 10,000 ₸ за смену)
-    const shiftBonus = d.shiftsWorked * 10000;
-    const grossEarnings = d.baseSalary + shiftBonus;
+    const isApproved = db.payrollApprovals[d.id] && db.payrollApprovals[d.id].approved;
     
-    // Все удержания по логам
-    const totalDeductions = d.fuelDeduction + d.finesThisMonth + d.activeDebt;
+    let grossEarnings, shiftBonus, taskBonus;
+    let fuelDeduction, finesThisMonth, activeDebt;
+    let totalDeductions, maxDeductionAllowed, actualDeduction, rolloverDebt, netPayout;
     
-    // Лимит по Трудовому Кодексу РК (не более 50% от дохода за один раз)
-    const maxDeductionAllowed = grossEarnings * 0.5;
+    if (isApproved) {
+      const record = db.payrollApprovals[d.id];
+      grossEarnings = record.grossEarnings;
+      shiftBonus = record.shiftBonus || 0;
+      taskBonus = record.taskBonus || 0;
+      fuelDeduction = record.fuelDeduction;
+      finesThisMonth = record.finesThisMonth;
+      activeDebt = record.activeDebt;
+      totalDeductions = fuelDeduction + finesThisMonth + activeDebt;
+      maxDeductionAllowed = grossEarnings * 0.5;
+      actualDeduction = record.actualDeduction;
+      rolloverDebt = record.rolloverDebt;
+      netPayout = record.netPayout;
+    } else {
+      shiftBonus = d.shiftsWorked * 10000;
+      taskBonus = d.taskBonus || 0;
+      grossEarnings = d.baseSalary + shiftBonus + taskBonus;
+      fuelDeduction = d.fuelDeduction;
+      finesThisMonth = d.finesThisMonth;
+      activeDebt = d.activeDebt;
+      totalDeductions = fuelDeduction + finesThisMonth + activeDebt;
+      maxDeductionAllowed = grossEarnings * 0.5;
+      actualDeduction = Math.min(totalDeductions, maxDeductionAllowed);
+      rolloverDebt = totalDeductions - actualDeduction;
+      netPayout = grossEarnings - actualDeduction;
+    }
     
-    // Фактически удержано в этом месяце
-    const actualDeduction = Math.min(totalDeductions, maxDeductionAllowed);
-    
-    // Остаток долга, переносимый на следующий месяц
-    const rolloverDebt = totalDeductions - actualDeduction;
-    
-    // Выплата на руки
-    const netPayout = grossEarnings - actualDeduction;
-    
-    // Записываем перенесенный долг обратно в базу данных водителя
-    d.activeDebt = rolloverDebt;
+    const hasDebtsOrFines = !isApproved && (fuelDeduction > 0 || finesThisMonth > 0 || activeDebt > 0);
     
     const tr = document.createElement("tr");
+    
+    if (hasDebtsOrFines) {
+      tr.style.backgroundColor = "rgba(220, 38, 38, 0.03)";
+      tr.style.borderLeft = "4px solid var(--status-danger)";
+    } else if (isApproved) {
+      tr.style.backgroundColor = "rgba(46, 125, 50, 0.03)";
+      tr.style.borderLeft = "4px solid var(--status-success)";
+    }
+    
+    let actionHtml = "";
+    if (isApproved) {
+      actionHtml = `<span class="badge badge-success" style="font-size: 10px; padding: 4px 8px; color: var(--status-success); background-color: rgba(46,125,50,0.1); font-weight:700;">✓ Утвержден</span>`;
+    } else {
+      if (db.settings.activeRole === "Accountant" || db.settings.activeRole === "Director") {
+        actionHtml = `<button class="btn-primary" style="font-size:10px; padding:4px 8px; margin:0;" onclick="approvePayrollSlip('${d.id}')">Утвердить</button>`;
+      } else {
+        actionHtml = `<span style="font-size:10px; color:var(--text-secondary); font-style:italic;">Ожидает</span>`;
+      }
+    }
+    
     tr.innerHTML = `
-      <td><strong>${d.name}</strong><br><span style="font-size:10px;color:var(--text-secondary);">${d.position}</span></td>
-      <td><strong>${grossEarnings.toLocaleString()} ₸</strong><br><span style="font-size:9px;color:var(--text-secondary);">Оклад: ${d.baseSalary.toLocaleString()} | Бонус: ${shiftBonus.toLocaleString()}</span></td>
-      <td style="color:${d.fuelDeduction > 0 ? 'var(--status-danger)' : 'inherit'};">${d.fuelDeduction.toLocaleString()} ₸</td>
-      <td style="color:${d.finesThisMonth > 0 ? 'var(--status-danger)' : 'inherit'};">${d.finesThisMonth.toLocaleString()} ₸</td>
-      <td><strong>${totalDeductions.toLocaleString()} ₸</strong></td>
-      <td>${maxDeductionAllowed.toLocaleString()} ₸</td>
-      <td style="font-weight:700; color:var(--status-success);">${netPayout.toLocaleString()} ₸</td>
+      <td>
+        <strong>${d.name}</strong>${hasDebtsOrFines ? ' <span style="color:var(--status-danger);" title="Есть долги или штрафы">⚠️</span>' : ''}<br>
+        <span style="font-size:10px;color:var(--text-secondary);">${d.position}</span>
+      </td>
+      <td>
+        <strong>${grossEarnings.toLocaleString()} ₸</strong><br>
+        <span style="font-size:9px;color:var(--text-secondary);">Оклад: ${d.baseSalary.toLocaleString()}${shiftBonus > 0 ? ` | Смены: ${shiftBonus.toLocaleString()}` : ''}${taskBonus > 0 ? ` | Задачи: ${taskBonus.toLocaleString()}` : ''}</span>
+      </td>
+      <td style="color:${fuelDeduction > 0 ? 'var(--status-danger)' : 'inherit'}; font-weight:${fuelDeduction > 0 ? '600' : 'normal'};">${fuelDeduction.toLocaleString()} ₸</td>
+      <td style="color:${finesThisMonth > 0 ? 'var(--status-danger)' : 'inherit'}; font-weight:${finesThisMonth > 0 ? '600' : 'normal'};">${finesThisMonth.toLocaleString()} ₸</td>
+      <td><strong>${totalDeductions.toLocaleString()} ₸</strong><br><span style="font-size:9px;color:var(--text-secondary);">Долг: ${activeDebt.toLocaleString()} ₸</span></td>
+      <td style="color:var(--text-secondary); font-size:12px;">${maxDeductionAllowed.toLocaleString()} ₸</td>
+      <td style="font-weight:700; color:var(--status-success); font-size:13px;">${netPayout.toLocaleString()} ₸</td>
       <td style="font-weight:600; color:${rolloverDebt > 0 ? 'var(--status-warning)' : 'inherit'};">${rolloverDebt.toLocaleString()} ₸</td>
+      <td style="text-align: center; vertical-align: middle;">${actionHtml}</td>
     `;
     tbody.appendChild(tr);
   });
+}
+
+function approvePayrollSlip(driverId) {
+  const d = db.drivers.find(x => x.id === driverId);
+  if (!d) return;
+  
+  db.payrollApprovals = db.payrollApprovals || {};
+  if (db.payrollApprovals[d.id] && db.payrollApprovals[d.id].approved) {
+    showSystemNotification("Этот расчетный листок уже утвержден!");
+    return;
+  }
+  
+  const shiftBonus = d.shiftsWorked * 10000;
+  const taskBonus = d.taskBonus || 0;
+  const grossEarnings = d.baseSalary + shiftBonus + taskBonus;
+  const totalDeductions = d.fuelDeduction + d.finesThisMonth + d.activeDebt;
+  const maxDeductionAllowed = grossEarnings * 0.5;
+  const actualDeduction = Math.min(totalDeductions, maxDeductionAllowed);
+  const rolloverDebt = totalDeductions - actualDeduction;
+  const netPayout = grossEarnings - actualDeduction;
+  
+  db.payrollApprovals[d.id] = {
+    approved: true,
+    date: new Date().toISOString().split('T')[0],
+    grossEarnings: grossEarnings,
+    shiftBonus: shiftBonus,
+    taskBonus: taskBonus,
+    fuelDeduction: d.fuelDeduction,
+    finesThisMonth: d.finesThisMonth,
+    activeDebt: d.activeDebt,
+    actualDeduction: actualDeduction,
+    rolloverDebt: rolloverDebt,
+    netPayout: netPayout
+  };
+  
+  d.activeDebt = rolloverDebt;
+  d.fuelDeduction = 0;
+  d.finesThisMonth = 0;
+  d.taskBonus = 0;
+  d.shiftsWorked = 0;
+  
+  saveState();
+  renderAll();
+  showSystemNotification(`Расчетный листок для ${d.name} успешно утвержден. Выплата на руки: ${netPayout.toLocaleString()} ₸.`);
+}
+
+function approveAllPayrollSlips() {
+  db.payrollApprovals = db.payrollApprovals || {};
+  let approvedCount = 0;
+  
+  db.drivers.forEach(d => {
+    if (d.baseSalary > 0 && (!db.payrollApprovals[d.id] || !db.payrollApprovals[d.id].approved)) {
+      const shiftBonus = d.shiftsWorked * 10000;
+      const taskBonus = d.taskBonus || 0;
+      const grossEarnings = d.baseSalary + shiftBonus + taskBonus;
+      const totalDeductions = d.fuelDeduction + d.finesThisMonth + d.activeDebt;
+      const maxDeductionAllowed = grossEarnings * 0.5;
+      const actualDeduction = Math.min(totalDeductions, maxDeductionAllowed);
+      const rolloverDebt = totalDeductions - actualDeduction;
+      const netPayout = grossEarnings - actualDeduction;
+      
+      db.payrollApprovals[d.id] = {
+        approved: true,
+        date: new Date().toISOString().split('T')[0],
+        grossEarnings: grossEarnings,
+        shiftBonus: shiftBonus,
+        taskBonus: taskBonus,
+        fuelDeduction: d.fuelDeduction,
+        finesThisMonth: d.finesThisMonth,
+        activeDebt: d.activeDebt,
+        actualDeduction: actualDeduction,
+        rolloverDebt: rolloverDebt,
+        netPayout: netPayout
+      };
+      
+      d.activeDebt = rolloverDebt;
+      d.fuelDeduction = 0;
+      d.finesThisMonth = 0;
+      d.taskBonus = 0;
+      d.shiftsWorked = 0;
+      approvedCount++;
+    }
+  });
+  
+  if (approvedCount > 0) {
+    saveState();
+    renderAll();
+    showSystemNotification(`Успешно утверждено расчетных листков: ${approvedCount}.`);
+  } else {
+    showSystemNotification("Нет доступных для утверждения расчетных листков.");
+  }
 }
 
 
@@ -2065,40 +2464,911 @@ function calculateMonthlyPayroll() {
 // ВСПОМОГАТЕЛЬНЫЕ РЕНДЕР-ФУНКЦИИ И СПРАВОЧНИКИ
 // ----------------------------------------------------
 
-function renderDirectories() {
-  const suppliers = document.getElementById("dirSuppliersList");
-  if (suppliers) {
-    suppliers.innerHTML = db.directories.suppliers.map(s => `
-      <li style="border-bottom: 1px dashed var(--border-color); padding-bottom: 8px;">
-        <strong>${s.name}</strong><br>
-        <span style="font-size:11px;color:var(--text-secondary);">${s.contact}</span><br>
-        <span style="font-size:12px;">${s.details}</span>
-      </li>
-    `).join("");
+// Вспомогательные функции поиска данных
+function getVehicleInvNumber(vId) {
+  if (!vId) return "-";
+  const v = db.vehicles.find(x => x.id === vId);
+  return v ? v.invNumber : "-";
+}
+function getVehicleName(vId) {
+  if (!vId) return "Без техники";
+  const v = db.vehicles.find(x => x.id === vId);
+  return v ? v.name : "Без техники";
+}
+function getVehiclePlate(vId) {
+  if (!vId) return "";
+  const v = db.vehicles.find(x => x.id === vId);
+  return v ? v.plate : "";
+}
+function getSiteName(sId) {
+  if (!sId) return "База Атырау";
+  const s = db.sites.find(x => x.id === sId);
+  return s ? s.name : "База Атырау";
+}
+function getDriverName(dId) {
+  if (!dId) return "Не назначен";
+  
+  const roles = {
+    Director: "Директор (Управление)",
+    Dispatcher: "Логист / Диспетчер",
+    Warehouse: "Заведующий складом",
+    Mechanic: "Механик (ТО и Ремонт)",
+    HR: "HR-специалист",
+    Purchaser: "Закупщик / Снабженец",
+    Accountant: "Бухгалтер / Расчетчик ФОТ"
+  };
+  
+  if (roles[dId]) {
+    return roles[dId];
   }
   
-  const contractors = document.getElementById("dirContractorsList");
-  if (contractors) {
-    contractors.innerHTML = db.directories.contractors.map(c => `
-      <li style="border-bottom: 1px dashed var(--border-color); padding-bottom: 8px;">
-        <strong>${c.name}</strong><br>
-        <span style="font-size:11px;color:var(--text-secondary);">${c.contact}</span><br>
-        <span style="font-size:12px;">${c.details}</span>
-      </li>
-    `).join("");
+  const d = db.drivers.find(x => x.id === dId);
+  return d ? d.name : dId;
+}
+function getDriverPosition(dId) {
+  if (!dId) return "";
+  const d = db.drivers.find(x => x.id === dId);
+  return d ? d.position : "";
+}
+
+// ----------------------------------------------------
+// МОДЕРНИЗАЦИЯ: МОДУЛЬ «КОМПАНИИ»
+// ----------------------------------------------------
+function filterCompanyType(type) {
+  activeCompanyFilter = type;
+  document.querySelectorAll("[id^='btn-comp-filter-']").forEach(btn => btn.classList.remove("active"));
+  const activeBtn = document.getElementById("btn-comp-filter-" + (type === "all" ? "all" : type === "Заказчик" ? "client" : type === "Арендодатель" ? "lessor" : type === "Поставщик" ? "supplier" : type === "Подрядчик по ремонту" ? "repair" : "insurer"));
+  if (activeBtn) activeBtn.classList.add("active");
+  renderCompanies();
+}
+
+function renderCompanies() {
+  const grid = document.getElementById("companiesGrid");
+  if (!grid) return;
+  
+  grid.innerHTML = "";
+  const searchInput = document.getElementById("companySearchInput");
+  const query = searchInput ? searchInput.value.toLowerCase() : "";
+  
+  const filtered = db.companies.filter(c => {
+    // Фильтр по типу
+    if (activeCompanyFilter !== 'all' && c.type !== activeCompanyFilter) return false;
+    
+    // Поиск
+    return c.name.toLowerCase().includes(query) ||
+           c.bin.includes(query) ||
+           c.city.toLowerCase().includes(query) ||
+           c.vehicleTypes.toLowerCase().includes(query);
+  });
+  
+  if (filtered.length === 0) {
+    grid.innerHTML = `<div class="col-12 text-center" style="color:var(--text-secondary); padding: 40px 0; grid-column: 1 / -1;">Контрагенты не найдены</div>`;
+    return;
   }
   
-  const insurers = document.getElementById("dirInsurersList");
-  if (insurers) {
-    insurers.innerHTML = db.directories.insurers.map(i => `
-      <li style="border-bottom: 1px dashed var(--border-color); padding-bottom: 8px;">
-        <strong>${i.name}</strong><br>
-        <span style="font-size:11px;color:var(--text-secondary);">${i.contact}</span><br>
-        <span style="font-size:12px;">${i.details}</span>
-      </li>
-    `).join("");
+  filtered.forEach(c => {
+    const card = document.createElement("div");
+    card.className = "company-card";
+    card.onclick = () => openCompanyDetails(c.id);
+    
+    let badgeClass = "badge-success";
+    if (c.status === "На проверке ТБ") badgeClass = "badge-warning";
+    else if (c.status === "Заблокирован за долги") badgeClass = "badge-danger";
+    
+    card.innerHTML = `
+      <div class="company-card-header">
+        <span class="company-card-title">${c.name}</span>
+        <span class="badge ${badgeClass}">${c.status}</span>
+      </div>
+      <div class="company-card-body">
+        <div>БИН: <strong>${c.bin}</strong> | Город: <strong>${c.city}</strong></div>
+        <div style="font-size: 11px; margin-top:4px;">Спецтехника / Работы: <em>${c.vehicleTypes}</em></div>
+        <div style="font-size: 10px; color:var(--text-secondary); margin-top:2px;">Тип: <strong>${c.type}</strong></div>
+      </div>
+      <div class="company-card-analytics">
+        <div>
+          <span style="color:var(--text-secondary); font-size:10px;">Договоры</span>
+          <span class="analytics-val">${c.activeContracts}</span>
+        </div>
+        <div>
+          <span style="color:var(--text-secondary); font-size:10px;">Баланс</span>
+          <span class="analytics-val" style="color:${c.debt > 0 ? 'var(--status-danger)' : c.debt < 0 ? 'var(--status-success)' : 'inherit'}">
+            ${c.debt.toLocaleString()} ₸
+          </span>
+        </div>
+        <div>
+          <span style="color:var(--text-secondary); font-size:10px;">Индекс ТБ</span>
+          <span class="analytics-val" style="color:${c.safetyIndex >= 95 ? 'var(--status-success)' : c.safetyIndex >= 85 ? 'var(--status-warning)' : 'var(--status-danger)'}">
+            ${c.safetyIndex}%
+          </span>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function openCompanyDetails(compId) {
+  const c = db.companies.find(x => x.id === compId);
+  if (!c) return;
+  
+  const body = document.getElementById("companyModalBody");
+  const footer = document.getElementById("companyModalFooter");
+  if (!body || !footer) return;
+  
+  let safetyText = "";
+  if (c.safetyIndex >= 95) {
+    safetyText = `<span style="color:var(--status-success); font-weight:600;">🟢 Высокий уровень безопасности (${c.safetyIndex}%). Проверка ОТ и ТБ пройдена успешно.</span>`;
+  } else if (c.safetyIndex >= 85) {
+    safetyText = `<span style="color:var(--status-warning); font-weight:600;">🟡 Средний уровень риска (${c.safetyIndex}%). Рекомендуется повторный аудит.</span>`;
+  } else {
+    safetyText = `<span style="color:var(--status-danger); font-weight:600;">🔴 Высокий уровень риска! Индекс ТБ: ${c.safetyIndex}%. Допуски заблокированы.</span>`;
+  }
+  
+  let balanceText = "";
+  let balanceBtnHtml = "";
+  if (c.debt > 0) {
+    balanceText = `<span style="color:var(--status-danger); font-weight:700;">Дебиторская задолженность перед нами: ${c.debt.toLocaleString()} ₸</span>`;
+    balanceBtnHtml = `<button class="btn-primary" style="background-color:var(--status-success); border-color:var(--status-success); font-size:11px; padding:4px 10px; margin:0;" onclick="registerCompanyPayment('${c.id}')">💸 Зарегистрировать оплату</button>`;
+  } else if (c.debt < 0) {
+    balanceText = `<span style="color:var(--status-success); font-weight:700;">Кредиторская задолженность (наша переплата): ${Math.abs(c.debt).toLocaleString()} ₸</span>`;
+    balanceBtnHtml = `<button class="btn-secondary" style="font-size:11px; padding:4px 10px; margin:0;" onclick="showSystemNotification('Акт сверки по авансу Helios OIL отправлен на согласование')">📝 Списать аванс</button>`;
+  } else {
+    balanceText = `<span style="color:var(--text-secondary);">Задолженность отсутствует. Баланс расчетов нулевой.</span>`;
+    balanceBtnHtml = `<button class="btn-secondary" style="font-size:11px; padding:4px 10px; margin:0;" onclick="openReconciliationStatement('${c.id}')">📊 Запросить Акт сверки</button>`;
+  }
+
+  // Поиск всех связанных договоров и заказов в системе
+  const cleanName = (str) => str.replace(/[«»""''\s]/g, "").toLowerCase();
+  const compClean = cleanName(c.name);
+
+  // 1. CRM сделки / договоры аренды техники
+  const companyDeals = db.deals.filter(d => {
+    const dClean = cleanName(d.companyName);
+    return dClean.includes(compClean) || compClean.includes(dClean);
+  });
+
+  // 2. Заказы снабжения (для поставщиков)
+  const companySupplyOrders = db.supplyOrders ? db.supplyOrders.filter(so => {
+    const sClean = cleanName(so.supplier);
+    return sClean.includes(compClean) || compClean.includes(sClean);
+  }) : [];
+
+  // 3. Заказы на ремонт (для ремонтных подрядчиков)
+  const companyRepairs = db.repairs ? db.repairs.filter(r => {
+    if (r.contractorName) {
+      const rClean = cleanName(r.contractorName);
+      return rClean.includes(compClean) || compClean.includes(rClean);
+    }
+    return false;
+  }) : [];
+
+  // 4. Субаренда спецтехники (для арендодателей)
+  const companySubrentVehicles = db.vehicles ? db.vehicles.filter(v => {
+    if (v.ownerType === "subrent" && v.subrentProvider) {
+      const vClean = cleanName(v.subrentProvider);
+      return vClean.includes(compClean) || compClean.includes(vClean);
+    }
+    return false;
+  }) : [];
+
+  // 5. Договоры страхования спецтехники (для страховых компаний)
+  const companyInsuranceVehicles = db.vehicles ? db.vehicles.filter(v => {
+    if (v.insuranceProvider) {
+      const iClean = cleanName(v.insuranceProvider);
+      return iClean.includes(compClean) || compClean.includes(iClean);
+    }
+    return false;
+  }) : [];
+
+  // Разделение на Действующие и Завершенные
+  const activeDeals = companyDeals.filter(d => d.invoiceStatus !== "Оплачено");
+  const completedDeals = companyDeals.filter(d => d.invoiceStatus === "Оплачено");
+  
+  const activeOrders = companySupplyOrders.filter(so => so.status !== "Доставлен");
+  const completedOrders = companySupplyOrders.filter(so => so.status === "Доставлен");
+  
+  const activeRepairs = companyRepairs.filter(r => r.status !== "Готово");
+  const completedRepairs = companyRepairs.filter(r => r.status === "Готово");
+
+  const activeSubrent = companySubrentVehicles.filter(v => v.status !== "Архив" && v.status !== "Завершен");
+  const completedSubrent = companySubrentVehicles.filter(v => v.status === "Архив" || v.status === "Завершен");
+
+  const currentDate = new Date();
+  const activeInsurance = companyInsuranceVehicles.filter(v => new Date(v.insuranceDate) >= currentDate);
+  const completedInsurance = companyInsuranceVehicles.filter(v => new Date(v.insuranceDate) < currentDate);
+  
+  const totalActive = activeDeals.length + activeOrders.length + activeRepairs.length + activeSubrent.length + activeInsurance.length;
+  const totalCompleted = completedDeals.length + completedOrders.length + completedRepairs.length + completedSubrent.length + completedInsurance.length;
+
+  // Генерация списков для вкладок
+  const renderItemCard = (type, title, status, subtitle, price, docBtn, clickAction) => {
+    let color = "#2563EB"; // crm
+    if (type === 'supply') color = "#16A34A";
+    if (type === 'repair') color = "#DC2626";
+    if (type === 'subrent') color = "#8B5CF6"; // Фиолетовый для субаренды
+    if (type === 'insurance') color = "#D97706"; // Янтарный для страхования
+    
+    const priceText = type === 'subrent' ? `${price.toLocaleString()} ₸/сутки` : `${price.toLocaleString()} ₸`;
+    
+    return `
+      <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px; background-color: var(--bg-card); cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; margin-bottom: 8px;" 
+           onclick="${clickAction}"
+           onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.08)';"
+           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-weight: 700; font-size: 11px; color: ${color}; text-transform: uppercase;">${title}</span>
+          <span class="badge badge-warning" style="font-size: 9px; padding: 2px 6px;">${status}</span>
+        </div>
+        <div style="font-size: 12px; font-weight: 600; color: var(--text-primary);">${subtitle}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-secondary); border-top: 1px dashed var(--border-color); padding-top: 6px; margin-top: 4px;">
+          <span>Сумма/Тариф:</span>
+          <strong style="color: var(--text-primary); font-size: 12px;">${priceText}</strong>
+        </div>
+        ${docBtn}
+      </div>
+    `;
+  };
+
+  // HTML Действующих
+  let activeListHtml = "";
+  if (totalActive === 0) {
+    activeListHtml = `<div style="padding: 16px; text-align: center; color: var(--text-secondary); font-style: italic; font-size: 12px;">Нет действующих договоров или заказов в работе.</div>`;
+  } else {
+    activeDeals.forEach(d => {
+      const docBtn = d.contractSigned 
+        ? `<button class="btn-secondary" style="font-size:10px; padding:4px 8px; margin-top:6px; width:100%; text-align:center;" onclick="event.stopPropagation(); openContractDocument('${d.id}');">📄 Открыть Договор (ЭЦП)</button>`
+        : `<button class="btn-secondary" style="font-size:10px; padding:4px 8px; margin-top:6px; width:100%; text-align:center; color:var(--status-danger); border-color:var(--status-danger);" disabled>📄 Договор не подписан</button>`;
+      
+      activeListHtml += renderItemCard('crm', `📄 ДОГОВОР ${d.contractNumber || 'Б/Н'}`, d.stage, d.jobType, d.price, docBtn, `closeCompanyModal(); setTimeout(() => openDealDetails('${d.id}'), 150);`);
+    });
+    
+    activeOrders.forEach(so => {
+      const docBtn = `<button class="btn-secondary" style="font-size:10px; padding:4px 8px; margin-top:6px; width:100%; text-align:center;" onclick="event.stopPropagation(); openOrderDocument('${so.id}');">📦 Открыть Накладную</button>`;
+      activeListHtml += renderItemCard('supply', `📦 ЗАКАЗ ПОСТАВКИ ${so.id}`, so.status, `Закупка: ${so.partName} (x${so.qty} шт.)`, so.total, docBtn, `closeCompanyModal(); setTimeout(() => openSupplyOrderDetail('${so.id}'), 150);`);
+    });
+    
+    activeRepairs.forEach(r => {
+      const docBtn = `<button class="btn-secondary" style="font-size:10px; padding:4px 8px; margin-top:6px; width:100%; text-align:center;" onclick="event.stopPropagation(); openRepairDocument('${r.id}');">🔧 Открыть Заказ-наряд</button>`;
+      activeListHtml += renderItemCard('repair', `🔧 ЗАКАЗ-НАРЯД ${r.id}`, r.status, r.description, r.laborCost, docBtn, `closeCompanyModal(); setTimeout(() => openRepairManage('${r.id}'), 150);`);
+    });
+
+    activeSubrent.forEach(v => {
+      const docBtn = `<button class="btn-secondary" style="font-size:10px; padding:4px 8px; margin-top:6px; width:100%; text-align:center;" onclick="event.stopPropagation(); openSubrentContractDocument('${v.id}');">📄 Открыть Договор Аренды</button>`;
+      activeListHtml += renderItemCard('subrent', `🚜 ДОГОВОР АРЕНДЫ SUB-${v.invNumber}`, v.status, `${v.name} (Госномер: ${v.plate})`, v.subrentRate, docBtn, `closeCompanyModal();`);
+    });
+
+    activeInsurance.forEach(v => {
+      const docBtn = `<button class="btn-secondary" style="font-size:10px; padding:4px 8px; margin-top:6px; width:100%; text-align:center;" onclick="event.stopPropagation(); openInsurancePolicyDocument('${v.id}');">📄 Открыть Полис</button>`;
+      activeListHtml += renderItemCard('insurance', `🛡️ ПОЛИС POL-${v.invNumber}`, "Активен", `Страхование техники: ${v.name} (${v.plate})`, v.insuranceCost, docBtn, `closeCompanyModal();`);
+    });
+  }
+
+  // HTML Завершенных
+  let completedListHtml = "";
+  if (totalCompleted === 0) {
+    completedListHtml = `<div style="padding: 16px; text-align: center; color: var(--text-secondary); font-style: italic; font-size: 12px;">Нет завершенных (оплаченных) сделок в архиве.</div>`;
+  } else {
+    completedDeals.forEach(d => {
+      const docBtn = `<button class="btn-secondary" style="font-size:10px; padding:4px 8px; margin-top:6px; width:100%; text-align:center;" onclick="event.stopPropagation(); openContractDocument('${d.id}');">📄 Открыть Договор (ЭЦП)</button>`;
+      completedListHtml += renderItemCard('crm', `📄 ДОГОВОР ${d.contractNumber || 'Б/Н'}`, "Оплачен", d.jobType, d.price, docBtn, `closeCompanyModal(); setTimeout(() => openDealDetails('${d.id}'), 150);`);
+    });
+    
+    completedOrders.forEach(so => {
+      const docBtn = `<button class="btn-secondary" style="font-size:10px; padding:4px 8px; margin-top:6px; width:100%; text-align:center;" onclick="event.stopPropagation(); openOrderDocument('${so.id}');">📦 Открыть Накладную</button>`;
+      completedListHtml += renderItemCard('supply', `📦 ЗАКАЗ ПОСТАВКИ ${so.id}`, "Выполнен", `Закупка: ${so.partName} (x${so.qty} шт.)`, so.total, docBtn, `closeCompanyModal(); setTimeout(() => openSupplyOrderDetail('${so.id}'), 150);`);
+    });
+    
+    completedRepairs.forEach(r => {
+      const docBtn = `<button class="btn-secondary" style="font-size:10px; padding:4px 8px; margin-top:6px; width:100%; text-align:center;" onclick="event.stopPropagation(); openRepairDocument('${r.id}');">🔧 Открыть Заказ-наряд</button>`;
+      completedListHtml += renderItemCard('repair', `🔧 ЗАКАЗ-НАРЯД ${r.id}`, "Готово", r.description, r.laborCost, docBtn, `closeCompanyModal(); setTimeout(() => openRepairManage('${r.id}'), 150);`);
+    });
+
+    completedSubrent.forEach(v => {
+      const docBtn = `<button class="btn-secondary" style="font-size:10px; padding:4px 8px; margin-top:6px; width:100%; text-align:center;" onclick="event.stopPropagation(); openSubrentContractDocument('${v.id}');">📄 Открыть Договор Аренды</button>`;
+      completedListHtml += renderItemCard('subrent', `🚜 ДОГОВОР АРЕНДЫ SUB-${v.invNumber}`, "Завершен", `${v.name} (Госномер: ${v.plate})`, v.subrentRate, docBtn, `closeCompanyModal();`);
+    });
+
+    completedInsurance.forEach(v => {
+      const docBtn = `<button class="btn-secondary" style="font-size:10px; padding:4px 8px; margin-top:6px; width:100%; text-align:center;" onclick="event.stopPropagation(); openInsurancePolicyDocument('${v.id}');">📄 Открыть Полис</button>`;
+      completedListHtml += renderItemCard('insurance', `🛡️ ПОЛИС POL-${v.invNumber}`, "Истек", `Страхование техники: ${v.name} (${v.plate})`, v.insuranceCost, docBtn, `closeCompanyModal();`);
+    });
+  }
+
+  body.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <!-- Вкладки сверху -->
+      <div class="chart-period-selector" style="display: flex; gap: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+        <button class="btn-secondary active" id="btn-comp-tab-info" onclick="switchCompanyTab('info')" style="font-size:11px; padding:6px 12px;">📋 Информация</button>
+        <button class="btn-secondary" id="btn-comp-tab-active" onclick="switchCompanyTab('active')" style="font-size:11px; padding:6px 12px;">🔄 Действующие (${totalActive})</button>
+        <button class="btn-secondary" id="btn-comp-tab-archive" onclick="switchCompanyTab('archive')" style="font-size:11px; padding:6px 12px;">✓ Завершенные (${totalCompleted})</button>
+      </div>
+
+      <!-- СОДЕРЖИМОЕ ВКЛАДКИ: ИНФОРМАЦИЯ -->
+      <div id="compTabContentInfo" style="display:block;">
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <!-- Карточка предприятия -->
+          <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; border-left: 4px solid var(--brand-color);">
+            <h4 style="font-size:14px; font-weight:700; color: var(--text-primary); margin:0;">${c.name}</h4>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
+              <span class="badge badge-neutral" style="font-size: 9px; padding: 2px 5px;">${c.type}</span>
+              <span class="badge badge-neutral" style="font-size: 9px; padding: 2px 5px;">БИН: ${c.bin}</span>
+              <span class="badge badge-neutral" style="font-size: 9px; padding: 2px 5px;">г. ${c.city}</span>
+              <span class="badge ${c.status === 'Активен' ? 'badge-success' : 'badge-danger'}" style="font-size: 9px; padding: 2px 5px;">${c.status}</span>
+            </div>
+          </div>
+          
+          <!-- Профиль деятельности -->
+          <div style="padding: 4px 0;">
+            <span style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); display:block; margin-bottom:2px;">Профиль деятельности и ТМЦ:</span>
+            <span style="font-size:12.5px; font-weight: 500;">${c.vehicleTypes}</span>
+          </div>
+
+          <!-- Финансовое состояние -->
+          <div style="border-top:1px solid var(--border-color); padding-top:10px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <span style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); display:block; margin-bottom:2px;">Взаиморасчеты (Баланс):</span>
+              <div style="font-size:12.5px; margin-bottom: 2px;">${balanceText}</div>
+            </div>
+            <div>
+              ${balanceBtnHtml}
+            </div>
+          </div>
+          
+          <!-- Проверка безопасности -->
+          <div style="border-top:1px solid var(--border-color); padding-top:10px;">
+            <span style="font-size:10px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); display:block; margin-bottom:4px;">Безопасность и Комплаенс ТБ:</span>
+            <div style="font-size:12px;">${safetyText}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- СОДЕРЖИМОЕ ВКЛАДКИ: ДЕЙСТВУЮЩИЕ -->
+      <div id="compTabContentActive" style="display:none;">
+        <div style="display:flex; flex-direction:column; gap:10px; max-height:300px; overflow-y:auto; padding-right: 4px;">
+          ${activeListHtml}
+        </div>
+      </div>
+
+      <!-- СОДЕРЖИМОЕ ВКЛАДКИ: ЗАВЕРШЕННЫЕ -->
+      <div id="compTabContentArchive" style="display:none;">
+        <div style="display:flex; flex-direction:column; gap:10px; max-height:300px; overflow-y:auto; padding-right: 4px;">
+          ${completedListHtml}
+        </div>
+      </div>
+    </div>
+  `;
+  
+  footer.innerHTML = `
+    <div style="display:flex; gap:8px;">
+      <button class="btn-secondary" style="color:var(--status-danger); border-color:var(--status-danger); font-size:11px; padding:6px 12px;" onclick="toggleCompanyStatus('${c.id}')">
+        Изменить статус допуска
+      </button>
+    </div>
+    <button class="btn-primary" style="font-size: 13px; padding: 8px 20px; border-radius: 30px;" onclick="closeCompanyModal()">Закрыть</button>
+  `;
+  
+  document.getElementById("companyDetailsModal").classList.add("active");
+}
+
+function switchCompanyTab(tabName) {
+  document.querySelectorAll("[id^='btn-comp-tab-']").forEach(btn => btn.classList.remove("active"));
+  const activeBtn = document.getElementById("btn-comp-tab-" + tabName);
+  if (activeBtn) activeBtn.classList.add("active");
+  
+  document.getElementById("compTabContentInfo").style.display = tabName === 'info' ? 'block' : 'none';
+  document.getElementById("compTabContentActive").style.display = tabName === 'active' ? 'block' : 'none';
+  document.getElementById("compTabContentArchive").style.display = tabName === 'archive' ? 'block' : 'none';
+}
+
+function registerCompanyPayment(compId) {
+  const c = db.companies.find(x => x.id === compId);
+  if (!c) return;
+  
+  const cleanName = (str) => str.replace(/[«»""''\s]/g, "").toLowerCase();
+  const compClean = cleanName(c.name);
+  
+  db.deals.forEach(d => {
+    const dClean = cleanName(d.companyName);
+    if (dClean.includes(compClean) || compClean.includes(dClean)) {
+      if (d.invoiceStatus !== "Оплачено") {
+        d.invoiceStatus = "Оплачено";
+        d.stage = "Оплата";
+      }
+    }
+  });
+  
+  const oldDebt = c.debt;
+  c.debt = 0;
+  saveState();
+  renderCompanies();
+  renderDebtorsTable();
+  openCompanyDetails(c.id);
+  showSystemNotification(`Оплата от ${c.name} в размере ${oldDebt.toLocaleString()} ₸ зарегистрирована. Задолженность полностью погашена!`);
+}
+
+function openReconciliationStatement(compId) {
+  const c = db.companies.find(x => x.id === compId);
+  if (!c) return;
+  
+  const body = document.getElementById("viewDocumentBody");
+  if (!body) return;
+  
+  const dateStr = new Date().toISOString().split('T')[0];
+  const balanceVal = c.debt;
+  
+  let balanceStatusText = "";
+  if (balanceVal > 0) {
+    balanceStatusText = `Сальдо в пользу ТОО «KazBildInvest»: <strong>${balanceVal.toLocaleString()} ₸</strong> (дебиторская задолженность)`;
+  } else if (balanceVal < 0) {
+    balanceStatusText = `Сальдо в пользу ${c.name}: <strong>${Math.abs(balanceVal).toLocaleString()} ₸</strong> (кредиторская задолженность)`;
+  } else {
+    balanceStatusText = `Задолженность отсутствует. Баланс расчетов нулевой.`;
+  }
+  
+  body.innerHTML = `
+    <div class="document-view-container" style="font-family: 'Outfit', 'Inter', sans-serif; color: #333; line-height: 1.5;">
+      <div style="text-align: center; border-bottom: 2px solid var(--brand-color); padding-bottom: 12px; margin-bottom: 16px;">
+        <h3 style="font-size: 16px; font-weight: 700; text-transform: uppercase; margin: 0; color: #1E3A8A;">Акт сверки взаиморасчетов</h3>
+        <div style="font-size: 12px; color: #555; margin-top: 4px;">За период по состоянию на ${dateStr}</div>
+      </div>
+      
+      <div style="font-size: 11px; margin-bottom: 16px;">
+        <p>Мы, нижеподписавшиеся, ТОО «KazBildInvest» (в лице Генерального директора Исаева Ж. А.) с одной стороны, и <strong>${c.name}</strong> с другой стороны, составили настоящий акт сверки в том, что состояние взаимных расчетов по данным учета на указанную дату характеризуется следующими показателями:</p>
+      </div>
+      
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px;">
+        <thead>
+          <tr style="background-color: #F8F9FA; border-bottom: 1px solid #DDD;">
+            <th style="padding: 8px; text-align: left; border: 1px solid #DDD; font-weight: 700;">Дебет (наши требования к ${c.name})</th>
+            <th style="padding: 8px; text-align: left; border: 1px solid #DDD; font-weight: 700;">Кредит (требования ${c.name} к нам)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding: 8px; border: 1px solid #DDD; vertical-align: top;">
+              ${balanceVal > 0 ? `Оказано услуг аренды / поставки техники на сумму: <strong>${balanceVal.toLocaleString()} ₸</strong>` : `Расчеты по договорам закрыты или переплата`}
+            </td>
+            <td style="padding: 8px; border: 1px solid #DDD; vertical-align: top;">
+              ${balanceVal < 0 ? `Поставлено ТМЦ / оказано услуг на сумму: <strong>${Math.abs(balanceVal).toLocaleString()} ₸</strong>` : `Претензий не предъявлено`}
+            </td>
+          </tr>
+          <tr style="font-weight: 700; background-color: #EEE;">
+            <td style="padding: 8px; border: 1px solid #DDD;">Итого Дебет: ${balanceVal > 0 ? balanceVal.toLocaleString() + ' ₸' : '0 ₸'}</td>
+            <td style="padding: 8px; border: 1px solid #DDD;">Итого Кредит: ${balanceVal < 0 ? Math.abs(balanceVal).toLocaleString() + ' ₸' : '0 ₸'}</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div style="font-size: 12px; margin-bottom: 20px; background: var(--bg-secondary); padding: 12px; border-radius: 6px; border-left: 4px solid var(--brand-color);">
+        <strong>Результат сверки:</strong>
+        <p style="margin: 4px 0 0 0;">${balanceStatusText}</p>
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; border-top: 1px dashed #CCC; padding-top: 12px; font-size: 11px; margin-top: 20px;">
+        <div>
+          <strong>ТОО «KazBildInvest»:</strong>
+          <div style="margin-top: 8px; color: #2563EB; font-weight: bold; border: 1px solid #2563EB; padding: 2px 6px; border-radius: 4px; display: inline-block;">ПОДПИСАНО ЭЦП</div>
+        </div>
+        <div style="text-align: right;">
+          <strong>${c.name}:</strong>
+          <div style="margin-top: 8px; color: #16A34A; font-weight: bold; border: 1px solid #16A34A; padding: 2px 6px; border-radius: 4px; display: inline-block;">ПОДПИСАНО ЭЦП</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  closeCompanyModal();
+  openModal("viewDocumentModal");
+}
+
+function closeCompanyModal() {
+  document.getElementById("companyDetailsModal").classList.remove("active");
+}
+
+function toggleCompanyStatus(compId) {
+  const c = db.companies.find(x => x.id === compId);
+  if (!c) return;
+  
+  const statuses = ["Активен", "На проверке ТБ", "Заблокирован за долги"];
+  let currIdx = statuses.indexOf(c.status);
+  let nextIdx = (currIdx + 1) % statuses.length;
+  c.status = statuses[nextIdx];
+  
+  saveState();
+  renderCompanies();
+  openCompanyDetails(c.id);
+  showSystemNotification(`Статус контрагента ${c.name} изменен на "${c.status}"`);
+}
+
+function openCreateCompanyModal() {
+  document.getElementById("companyForm").reset();
+  openModal("createCompanyModal");
+}
+
+function submitCreateCompany() {
+  const name = document.getElementById("newCompName").value.trim();
+  const bin = document.getElementById("newCompBin").value.trim();
+  const type = document.getElementById("newCompType").value;
+  const city = document.getElementById("newCompCity").value.trim();
+  const vehicleTypes = document.getElementById("newCompVehicleTypes").value.trim();
+  const debt = parseInt(document.getElementById("newCompDebt").value) || 0;
+  const safetyIndex = parseInt(document.getElementById("newCompSafetyIndex").value) || 100;
+  const status = document.getElementById("newCompStatus").value;
+  
+  if (!name || !bin || !city || !vehicleTypes) {
+    alert("Пожалуйста, заполните все обязательные поля!");
+    return;
+  }
+  
+  const newComp = {
+    id: "comp_" + (db.companies.length + 1) + "_" + Date.now().toString().slice(-4),
+    name,
+    bin,
+    type,
+    city,
+    vehicleTypes,
+    activeContracts: 1,
+    debt,
+    safetyIndex,
+    status
+  };
+  
+  db.companies.push(newComp);
+  saveState();
+  renderCompanies();
+  closeModal("createCompanyModal");
+  showSystemNotification(`Компания ${name} добавлена в реестр контрагентов!`);
+}
+
+// ----------------------------------------------------
+// МОДЕРНИЗАЦИЯ: МОДУЛЬ «ЗАДАЧИ И ПОРУЧЕНИЯ» (KANBAN)
+// ----------------------------------------------------
+function renderTasksKanban() {
+  const lists = {
+    todo: document.getElementById("task-list-todo"),
+    in_progress: document.getElementById("task-list-in_progress"),
+    safety_review: document.getElementById("task-list-safety_review"),
+    completed: document.getElementById("task-list-completed")
+  };
+  
+  // Очистка списков
+  Object.keys(lists).forEach(key => {
+    if (lists[key]) lists[key].innerHTML = "";
+  });
+  
+  const currentDate = "2026-06-20";
+
+  const taskStages = {
+    todo: { color: "#64748B", badgeBg: "#E2E8F0" },
+    in_progress: { color: "#2563EB", badgeBg: "#DBEAFE" },
+    safety_review: { color: "#D97706", badgeBg: "#FEF3C7" },
+    completed: { color: "#16A34A", badgeBg: "#DCFCE7" }
+  };
+  
+  db.tasks.forEach(t => {
+    const list = lists[t.status];
+    if (!list) return;
+    
+    // Проверка просрочки
+    const isOverdue = t.status !== 'completed' && t.dueDate < currentDate;
+    
+    const card = document.createElement("div");
+    card.className = `task-card ${isOverdue ? 'overdue' : ''}`;
+    card.draggable = true;
+    card.id = `task-card-${t.id}`;
+    card.style.borderLeft = `3px solid ${taskStages[t.status].color}`;
+    
+    // Установка перетаскивания
+    card.addEventListener("dragstart", (e) => handleTaskDragStart(e, t.id));
+    card.addEventListener("dragend", handleTaskDragEnd);
+    
+    card.innerHTML = `
+      <div class="task-card-title">${t.title}</div>
+      <div class="task-card-desc">${t.description}</div>
+      <div class="task-card-meta">
+        <span>Срок: <strong>${t.dueDate}</strong></span>
+        ${t.vehicleId ? `<span>Машина: ${getVehicleInvNumber(t.vehicleId)}</span>` : ''}
+        ${t.siteId ? `<span>Объект: ${getSiteName(t.siteId)}</span>` : ''}
+        <span>Исполнитель: <strong>${getDriverName(t.assignee)}</strong></span>
+        ${t.signedDocument ? `
+          <span style="background:var(--status-success); color:white; font-weight:600; cursor:pointer;" onclick="openSignedDocument('${t.id}')">
+            📄 Документ
+          </span>` : ''}
+      </div>
+    `;
+    list.appendChild(card);
+  });
+  
+  // Обновление счетчиков в заголовках и цвета колонок
+  Object.keys(taskStages).forEach(status => {
+    const colEl = document.getElementById(`task-col-${status}`);
+    if (colEl) {
+      colEl.style.borderTop = `4px solid ${taskStages[status].color}`;
+      
+      const headerEl = colEl.querySelector(".kanban-column-header");
+      if (headerEl) {
+        headerEl.style.color = taskStages[status].color;
+        headerEl.style.fontWeight = "700";
+        headerEl.style.fontSize = "11px";
+        headerEl.style.display = "flex";
+        headerEl.style.justifyContent = "space-between";
+        headerEl.style.alignItems = "center";
+        
+        const countSpan = document.getElementById(`task-count-${status}`);
+        if (countSpan) {
+          countSpan.className = ""; // Remove badge-neutral
+          countSpan.style.padding = "2px 6px";
+          countSpan.style.borderRadius = "4px";
+          countSpan.style.backgroundColor = taskStages[status].badgeBg;
+          countSpan.style.color = taskStages[status].color;
+          countSpan.style.fontSize = "10px";
+          countSpan.style.fontWeight = "700";
+          countSpan.innerText = db.tasks.filter(t => t.status === status).length;
+        }
+      }
+    }
+  });
+}
+
+function handleTaskDragStart(e, taskId) {
+  e.dataTransfer.setData("text/plain", taskId);
+  e.dataTransfer.effectAllowed = "move";
+  // Используем таймаут, чтобы прозрачность не применялась к drag-образу
+  setTimeout(() => {
+    const el = document.getElementById(`task-card-${taskId}`);
+    if (el) el.classList.add("dragging");
+  }, 0);
+}
+
+function handleTaskDragEnd(e) {
+  e.target.classList.remove("dragging");
+  document.querySelectorAll(".kanban-column").forEach(col => col.classList.remove("drag-over"));
+}
+
+function allowTaskDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add("drag-over");
+}
+
+function handleTaskDragLeave(e) {
+  e.currentTarget.classList.remove("drag-over");
+}
+
+function handleTaskDrop(e, newStatus) {
+  e.preventDefault();
+  e.currentTarget.classList.remove("drag-over");
+  
+  const taskId = e.dataTransfer.getData("text/plain");
+  changeTaskStatus(taskId, newStatus);
+}
+
+function changeTaskStatus(taskId, newStatus) {
+  const t = db.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  
+  const oldStatus = t.status;
+  t.status = newStatus;
+  
+  // Авто-начисление водителю при закрытии
+  if (newStatus === "completed" && oldStatus !== "completed") {
+    t.signedDocument = true;
+    t.signedDate = "2026-06-20";
+    
+    // Начисление бонуса для линейных сотрудников
+    const driver = db.drivers.find(d => d.id === t.assignee);
+    const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
+    
+    if (driver && driver.baseSalary > 0) {
+      driver.taskBonus = (driver.taskBonus || 0) + 15000;
+      showSystemNotification(`Задача выполнена! Начислен бонус 15,000 ₸ водителю ${driver.name}`);
+      
+      db.chatLog.push({
+        sender: "System",
+        time: time,
+        message: `🤖 ИИ-Ассистент: Задача "${t.title}" выполнена водителем ${driver.name} и проверена контролером (${t.controller}). Водителю начислен бонус 15 000 KZT. ФОТ пересчитан.`
+      });
+    } else {
+      showSystemNotification(`Задача выполнена исполнителем ${getDriverName(t.assignee)}!`);
+      db.chatLog.push({
+        sender: "System",
+        time: time,
+        message: `🤖 ИИ-Ассистент: Задача "${t.title}" выполнена исполнителем ${getDriverName(t.assignee)} и проверена контролером (${t.controller}).`
+      });
+    }
+  } else if (newStatus !== "completed" && oldStatus === "completed") {
+    // Отмена выполнения
+    t.signedDocument = false;
+    t.signedDate = null;
+    const driver = db.drivers.find(d => d.id === t.assignee);
+    if (driver && driver.taskBonus) {
+      driver.taskBonus = Math.max(0, driver.taskBonus - 15000);
+    }
+  }
+  
+  saveState();
+  renderTasksKanban();
+  calculateMonthlyPayroll();
+  renderChatHistory();
+}
+
+function openCreateTaskModal() {
+  document.getElementById("taskForm").reset();
+  
+  // Populate Assignee select list with all employees
+  const assigneeSelect = document.getElementById("newTaskAssigneeSelect");
+  if (assigneeSelect) {
+    let html = `
+      <optgroup label="Административный персонал">
+        <option value="Director">Директор (Управление)</option>
+        <option value="Dispatcher">Логист / Диспетчер</option>
+        <option value="Warehouse">Заведующий складом</option>
+        <option value="Mechanic">Механик (ТО и Ремонт)</option>
+        <option value="HR">HR-специалист</option>
+        <option value="Purchaser">Закупщик / Снабженец</option>
+        <option value="Accountant">Бухгалтер / Расчетчик ФОТ</option>
+      </optgroup>
+      <optgroup label="Линейный персонал (Машинисты / Водители)">
+    `;
+    html += db.drivers.map(d => `<option value="${d.id}">${d.name} (${d.position})</option>`).join("");
+    html += `</optgroup>`;
+    assigneeSelect.innerHTML = html;
+  }
+  
+  // Populate Vehicle select list
+  const vehicleSelect = document.getElementById("newTaskVehicleSelect");
+  if (vehicleSelect) {
+    let html = `<option value="">Без привязки к машине</option>`;
+    html += db.vehicles.map(v => `<option value="${v.id}">${v.invNumber} (${v.name})</option>`).join("");
+    vehicleSelect.innerHTML = html;
+  }
+  
+  // Populate Site select list
+  const siteSelect = document.getElementById("newTaskSiteSelect");
+  if (siteSelect) {
+    let html = `<option value="">Без привязки к объекту</option>`;
+    html += db.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+    siteSelect.innerHTML = html;
+  }
+  
+  openModal("createTaskModal");
+}
+
+function submitCreateTask() {
+  const title = document.getElementById("newTaskTitle").value.trim();
+  const description = document.getElementById("newTaskDesc").value.trim();
+  const vehicleId = document.getElementById("newTaskVehicleSelect").value;
+  const siteId = document.getElementById("newTaskSiteSelect").value;
+  const dueDate = document.getElementById("newTaskDueDate").value;
+  const assignee = document.getElementById("newTaskAssigneeSelect").value;
+  const controller = document.getElementById("newTaskController").value;
+  const documentType = document.getElementById("newTaskDocType").value;
+  
+  if (!title || !description || !dueDate || !assignee) {
+    alert("Пожалуйста, заполните все обязательные поля!");
+    return;
+  }
+  
+  const newTask = {
+    id: "task_" + (db.tasks.length + 1) + "_" + Date.now().toString().slice(-4),
+    title,
+    description,
+    vehicleId: vehicleId || null,
+    siteId: siteId || null,
+    dueDate,
+    initiator: db.settings.activeRole,
+    assignee,
+    controller,
+    status: "todo",
+    signedDocument: false,
+    signedDate: null,
+    documentType
+  };
+  
+  db.tasks.push(newTask);
+  saveState();
+  renderTasksKanban();
+  closeModal("createTaskModal");
+  showSystemNotification(`Задача "${title}" успешно создана!`);
+  
+  // Проверка на просрочку
+  const currentDate = "2026-06-20";
+  if (dueDate < currentDate) {
+    const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
+    db.chatLog.push({
+      sender: "System",
+      time: time,
+      message: `⚠️ ВНИМАНИЕ! Новая задача "${title}" создана уже просроченной (дедлайн: ${dueDate})! Исполнителю ${getDriverName(assignee)} срочно приступить к работе.`
+    });
+    saveState();
+    renderChatHistory();
+  }
+
+}
+
+// ----------------------------------------------------
+// МОДЕРНИЗАЦИЯ: ПОДПИСЬ И ГЕНЕРАЦИЯ ДОКУМЕНТОВ
+// Линейная отчетность перенесена в ИИ WhatsApp
+
+
+function openSignedDocument(taskId) {
+  const t = db.tasks.find(x => x.id === taskId);
+  if (!t) return;
+  
+  const body = document.getElementById("viewDocumentBody");
+  const signatureImg = t.signatureData ? `<img src="${t.signatureData}" style="max-height: 60px; max-width: 150px; border-bottom:1px solid #CCC; background:#FFF; display:block; margin: 4px 0;" />` : `<em>Электронная подпись</em>`;
+  
+  body.innerHTML = `
+    <div class="document-view-container">
+      <div class="document-header">
+        <div style="font-weight:800; font-size:12px; letter-spacing:1px;">ТОО KAZBILDINVEST</div>
+        <div style="font-size:10px; color:#555;">Система автоматизации нарядов и согласований</div>
+        <div class="document-title">${t.documentType}</div>
+      </div>
+      
+      <div class="document-meta-grid">
+        <div>Номер документа: <strong>KBI-DOC-${t.id.replace('task_', '').toUpperCase()}</strong></div>
+        <div>Дата составления: <strong>${t.signedDate || '2026-06-20'}</strong></div>
+        <div>Объект: <strong>${getSiteName(t.siteId)}</strong></div>
+        <div>Спецтехника: <strong>${getVehicleName(t.vehicleId)} (${getVehiclePlate(t.vehicleId)})</strong></div>
+      </div>
+      
+      <div class="document-body">
+        <p>Настоящим документом подтверждается, что исполнитель (машинист/водитель) <strong>${getDriverName(t.assignee)}</strong> в полном объеме и качественно выполнил порученные работы:</p>
+        <div style="background:#F8F9FA; border-left:3px solid var(--brand-color); padding:10px; margin: 12px 0; font-weight:600;">
+          ${t.title}
+        </div>
+        <p style="font-size:12px; color:#555; font-style:italic;">Описание: ${t.description}</p>
+        <p style="margin-top:12px;">Контроль и приемка работ произведена. Нарушений правил охраны труда и техники безопасности (ТБ/ОТ) не обнаружено. Контролирующий орган: <strong>${t.controller}</strong>.</p>
+      </div>
+      
+      <div class="document-footer-signatures">
+        <div>
+          <div>Сдал (Исполнитель):</div>
+          <div style="margin-top: 10px;">${signatureImg}</div>
+          <div style="font-size:10px; color:#666; margin-top:2px;">${getDriverName(t.assignee)}</div>
+        </div>
+        
+        <div style="text-align:right; display: flex; flex-direction: column; align-items: flex-end;">
+          <div>Принял (Контролер):</div>
+          <div style="margin-top: 25px; font-weight:bold; color:var(--brand-color); border: 2px solid var(--brand-color); padding: 4px 8px; border-radius:4px; display:inline-block; font-size:10px; letter-spacing:0.5px;">ПРИНЯТО В ERP</div>
+          <div style="font-size:10px; color:#666; margin-top:6px;">${t.controller}</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  openModal("viewDocumentModal");
+}
+
+function checkOverdueTasks() {
+  const currentDate = "2026-06-20";
+  let newlyAlerted = false;
+  
+  db.tasks.forEach(t => {
+    if (t.status !== 'completed' && t.dueDate < currentDate) {
+      // Проверяем, есть ли уже алерт в чат-логе
+      const alreadyAlerted = db.chatLog.some(log => log.message.includes(t.title));
+      if (!alreadyAlerted) {
+        const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
+        const vehicleInfo = t.vehicleId ? ` по спецтехнике ${getVehicleInvNumber(t.vehicleId)}` : "";
+        db.chatLog.push({
+          sender: "System",
+          time: time,
+          message: `⚠️ ВНИМАНИЕ! Обнаружена просроченная критическая задача "${t.title}"${vehicleInfo} на объекте ${getSiteName(t.siteId)}. Дедлайн был: ${t.dueDate}. Просьба исполнителю ${getDriverName(t.assignee)} зайти в кабинет водителя и закрыть наряд-допуск!`
+        });
+        newlyAlerted = true;
+      }
+    }
+  });
+  
+  if (newlyAlerted) {
+    saveState();
+    renderChatHistory();
   }
 }
+
+
 
 // Заполнение выпадающих списков при инициализации форм
 function renderFormSelectors() {
@@ -2368,7 +3638,8 @@ function renderAll() {
   renderRepairsTable();
   renderMaintenanceTracker();
   renderEmployeesTable();
-  renderDirectories();
+  renderCompanies();
+  renderTasksKanban();
   renderMovesHistoryTable();
   renderFormSelectors();
   renderObjectsPnl();
@@ -2377,17 +3648,1693 @@ function renderAll() {
   renderGpsVehicleList();
   renderLodgingTable();
   renderLodgingStats();
+  updateKpiDashboard();
+  
+  // Render financial analytics chart
+  window.activeChartPeriod = window.activeChartPeriod || "year";
+  renderFinancialChart(window.activeChartPeriod);
 }
 
-function renderDriverDropdowns() {
-  const select = document.getElementById("phoneDriverSelect");
-  if (select) {
-    select.innerHTML = "";
-    db.drivers.forEach(d => {
-      const opt = document.createElement("option");
-      opt.value = d.id;
-      opt.innerText = `${d.name} (${d.position})`;
-      select.appendChild(opt);
+
+// ----------------------------------------------------
+// МОДУЛЬ ДИСПЕТЧЕРА И СНАБЖЕНЦА
+// ----------------------------------------------------
+
+function toggleSidebar() {
+  const sidebar = document.querySelector(".sidebar");
+  if (sidebar) {
+    sidebar.classList.toggle("open");
+  }
+}
+
+function initDispatcherMap() {
+  if (window.dispatcherMap) return;
+  const container = document.getElementById('dispatcher-map-container');
+  if (!container) return;
+
+  const centralKaz = [47.116, 52.848];
+  window.dispatcherMap = L.map('dispatcher-map-container').setView(centralKaz, 8);
+  
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; CartoDB'
+  }).addTo(window.dispatcherMap);
+  
+  // Рисуем геозоны
+  window.dispatcherGeofenceLayers = {};
+  db.sites.forEach(site => {
+    const polygon = L.polygon(site.polygon, {
+      color: site.id === 'karabatan2' ? '#FF5722' : '#2196F3',
+      fillColor: site.id === 'karabatan2' ? '#FF5722' : '#2196F3',
+      fillOpacity: 0.15,
+      weight: 2
+    }).addTo(window.dispatcherMap);
+    polygon.bindTooltip(`Геозона: ${site.name}`, { permanent: false, direction: "center" });
+    window.dispatcherGeofenceLayers[site.id] = polygon;
+  });
+
+  // Маркеры техники на диспетчерской карте
+  window.dispatcherVehicleMarkers = {};
+  db.vehicles.forEach(v => {
+    const markerInfo = window.vehicleMarkers[v.id];
+    const lat = markerInfo ? markerInfo.lat : 47.116;
+    const lng = markerInfo ? markerInfo.lng : 52.848;
+    
+    let color = 'blue';
+    if (v.ownerType === 'subrent') color = 'purple';
+    if (v.status === 'На ремонте' || v.status === 'Неисправна') color = 'red';
+    
+    const customIcon = L.divIcon({
+      className: 'custom-div-icon',
+      html: `<div style="background-color:${color}; width:12px; height:12px; border-radius:50%; border:2px solid #FFF; box-shadow:0 0 4px rgba(0,0,0,0.4);"></div>`,
+      iconSize: [12, 12],
+      iconAnchor: [6, 6]
+    });
+
+    const marker = L.marker([lat, lng], { icon: customIcon }).addTo(window.dispatcherMap);
+    const driver = db.drivers.find(d => d.id === v.driverId);
+    
+    marker.bindPopup(`
+      <div style="font-family:'Inter',sans-serif; font-size:11px;">
+        <strong>${v.name}</strong><br>
+        Госномер: ${v.plate}<br>
+        Инв. №: ${v.invNumber}<br>
+        Машинист: ${driver ? driver.name : 'Нет'}<br>
+        Статус: <strong>${v.status}</strong><br>
+        Топливо: 85% | Скорость: <span id="disp-popup-speed-${v.id}">12</span> км/ч
+      </div>
+    `);
+    
+    window.dispatcherVehicleMarkers[v.id] = { marker, lat, lng };
+  });
+}
+
+function renderDispatcherHub() {
+  renderDispatcherAlerts();
+  
+  // Заполняем селекторы
+  const select = document.getElementById("dispatchChatDriverSelect");
+  if (select && select.innerHTML === "") {
+    select.innerHTML = db.drivers.map(d => `<option value="${d.id}">${d.name} (${d.position})</option>`).join("");
+    select.onchange = () => {
+      renderDriverChat(select.value);
+    };
+  }
+  
+  if (select && select.value) {
+    renderDriverChat(select.value);
+  }
+}
+
+function renderDispatcherAlerts() {
+  const alertsLog = document.getElementById("dispatcherAlertsLog");
+  if (!alertsLog) return;
+  alertsLog.innerHTML = "";
+  
+  const activeAlerts = db.gpsAlerts.filter(a => a.status === "active");
+  if (activeAlerts.length === 0) {
+    alertsLog.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--text-secondary); font-size: 12px;">Нет активных инцидентов GPS.</div>`;
+    return;
+  }
+  
+  activeAlerts.forEach(alert => {
+    const alertDiv = document.createElement("div");
+    alertDiv.className = `alert-log-item ${alert.type === 'geofence' ? 'danger' : 'warning'}`;
+    alertDiv.style.cssText = `
+      padding: 10px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background-color: var(--bg-card);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border-left: 4px solid ${alert.type === 'geofence' ? 'var(--status-danger)' : 'var(--status-warning)'};
+    `;
+    
+    let actionsHtml = "";
+    if (alert.type === "geofence") {
+      actionsHtml = `
+        <div style="display: flex; gap: 6px;">
+          <button class="btn-primary" style="font-size: 10px; padding: 4px 8px; background-color: var(--status-success);" onclick="resolveGpsAlert('${alert.id}', 'allow')">Разрешить выезд</button>
+          <button class="btn-secondary" style="font-size: 10px; padding: 4px 8px;" onclick="resolveGpsAlert('${alert.id}', 'warn')">Предупредить водителя</button>
+        </div>
+      `;
+    } else if (alert.type === "idling") {
+      actionsHtml = `
+        <div style="display: flex; gap: 6px;">
+          <button class="btn-secondary" style="font-size: 10px; padding: 4px 8px;" onclick="resolveGpsAlert('${alert.id}', 'warn')">Предупредить</button>
+          <button class="btn-primary" style="font-size: 10px; padding: 4px 8px; background-color: var(--brand-color);" onclick="resolveGpsAlert('${alert.id}', 'downtime')">Оформить простой</button>
+        </div>
+      `;
+    }
+    
+    alertDiv.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 11px;">
+        <span style="font-weight: 600;">${alert.type === 'geofence' ? '🚨 Выезд из геозоны' : '⚠️ Длительный простой'}</span>
+        <span style="color: var(--text-secondary); font-size: 10px;">${alert.time}</span>
+      </div>
+      <div style="font-size: 11px; line-height: 1.4;">${alert.message}</div>
+      ${actionsHtml}
+    `;
+    alertsLog.appendChild(alertDiv);
+  });
+}
+
+function resolveGpsAlert(alertId, actionType) {
+  const alert = db.gpsAlerts.find(a => a.id === alertId);
+  if (!alert) return;
+  
+  const vehicle = db.vehicles.find(v => v.id === alert.vehicleId);
+  
+  if (actionType === "allow") {
+    alert.status = "resolved";
+    db.vehicleMoves.push({
+      id: "m_" + Date.now(),
+      vehicleId: alert.vehicleId,
+      oldSite: "Объект " + (vehicle ? getSiteName(vehicle.currentSiteId) : "Карабатан"),
+      newSite: "Выезд за пределы геозоны",
+      date: new Date().toISOString().split('T')[0],
+      reason: "Согласовано диспетчером",
+      author: "Диспетчер"
+    });
+    showSystemNotification("Выезд официально разрешен. Запись внесена в журнал перемещений.");
+  } else if (actionType === "warn") {
+    alert.status = "resolved";
+    if (vehicle && vehicle.driverId) {
+      db.driverMessages.push({
+        id: "msg_" + Date.now(),
+        driverId: vehicle.driverId,
+        sender: "Диспетчер",
+        time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+        message: alert.type === 'geofence' ? "Внимание! Вы зафиксированы вне геозоны! Немедленно вернитесь на объект или свяжитесь с диспетчером." : "Зафиксирован простой двигателя более 3 часов. Сообщите причину!"
+      });
+      renderDriverChat(vehicle.driverId);
+    }
+    showSystemNotification("Водителю отправлено предупреждение в чат.");
+  } else if (actionType === "downtime") {
+    alert.status = "resolved";
+    if (vehicle) {
+      vehicle.status = "На ремонте";
+      db.repairs.push({
+        id: "rep_" + Date.now(),
+        vehicleId: vehicle.id,
+        siteId: vehicle.currentSiteId || "karabatan",
+        driverId: vehicle.driverId,
+        description: "Длительный простой двигателя без движения. Зафиксировано GPS.",
+        status: "Новая",
+        createdAt: new Date().toISOString().split('T')[0],
+        faultByDriver: false,
+        damageCost: 0,
+        explanatoryAttached: false,
+        partsRequested: [],
+        laborCost: 0
+      });
+    }
+    showSystemNotification("Оформить простой: Статус техники изменен на 'На ремонте', создана заявка.");
+  }
+  
+  saveState();
+  renderDispatcherAlerts();
+  renderRepairsTable();
+  renderGanttChart();
+  renderMovesHistoryTable();
+}
+
+function renderDriverChat(driverId) {
+  const dispatchSelect = document.getElementById("dispatchChatDriverSelect");
+  if (dispatchSelect) {
+    const activeDispDriverId = dispatchSelect.value;
+    const dispatchChatHistory = document.getElementById("dispatchChatHistory");
+    if (dispatchChatHistory && activeDispDriverId) {
+      dispatchChatHistory.innerHTML = "";
+      const msgs = db.driverMessages.filter(m => m.driverId === activeDispDriverId);
+      msgs.forEach(m => {
+        const msgDiv = document.createElement("div");
+        msgDiv.style.cssText = `padding: 6px 10px; border-radius: 8px; max-width: 80%; font-size: 11px; margin-bottom: 4px; line-height: 1.3; display: flex; flex-direction: column;`;
+        if (m.sender === "Диспетчер") {
+          msgDiv.style.backgroundColor = "var(--brand-color)";
+          msgDiv.style.color = "#FFF";
+          msgDiv.style.alignSelf = "flex-end";
+          msgDiv.innerHTML = `
+            <div style="font-weight:700; font-size:10px; margin-bottom:2px; display:flex; justify-content:space-between; width:100%;">
+              <span>Диспетчер</span>
+              <span style="opacity:0.8; font-weight:normal;">${m.time}</span>
+            </div>
+            <div>${m.message}</div>
+          `;
+        } else {
+          msgDiv.style.backgroundColor = "var(--bg-card)";
+          msgDiv.style.border = "1px solid var(--border-color)";
+          msgDiv.style.alignSelf = "flex-start";
+          msgDiv.innerHTML = `
+            <div style="font-weight:700; font-size:10px; margin-bottom:2px; display:flex; justify-content:space-between; width:100%;">
+              <span style="color:var(--brand-color);">${getDriverName(m.driverId)}</span>
+              <span style="color:var(--text-secondary); font-weight:normal;">${m.time}</span>
+            </div>
+            <div>${m.message}</div>
+          `;
+        }
+        dispatchChatHistory.appendChild(msgDiv);
+        
+        if (m.reply) {
+          const repDiv = document.createElement("div");
+          repDiv.style.cssText = `padding: 6px 10px; border-radius: 8px; max-width: 80%; font-size: 11px; margin-bottom: 4px; line-height: 1.3; display: flex; flex-direction: column;`;
+          repDiv.style.backgroundColor = "var(--bg-card)";
+          repDiv.style.border = "1px solid var(--border-color)";
+          repDiv.style.alignSelf = "flex-start";
+          repDiv.innerHTML = `
+            <div style="font-weight:700; font-size:10px; margin-bottom:2px; display:flex; justify-content:space-between; width:100%;">
+              <span style="color:var(--brand-color);">${getDriverName(m.driverId)}</span>
+              <span style="color:var(--text-secondary); font-weight:normal;">${m.time}</span>
+            </div>
+            <div>${m.reply}</div>
+          `;
+          dispatchChatHistory.appendChild(repDiv);
+        }
+      });
+      dispatchChatHistory.scrollTop = dispatchChatHistory.scrollHeight;
+    }
+  }
+
+
+}
+
+function sendDispatchChatMessage() {
+  const select = document.getElementById("dispatchChatDriverSelect");
+  if (!select) return;
+  const driverId = select.value;
+  if (!driverId) return;
+  
+  const input = document.getElementById("dispatchChatMessageText");
+  const text = input.value.trim();
+  if (!text) return;
+  
+  const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
+  db.driverMessages.push({
+    id: "msg_" + Date.now(),
+    driverId: driverId,
+    sender: "Диспетчер",
+    time: time,
+    message: text
+  });
+  
+  saveState();
+  input.value = "";
+  renderDriverChat(driverId);
+}
+
+
+function loadDriverChatHistory() {
+  const select = document.getElementById("dispatchChatDriverSelect");
+  if (select && select.value) {
+    renderDriverChat(select.value);
+  }
+}
+
+function renderPurchasingHub() {
+  // 1. Pending requests
+  const requestsTable = document.getElementById("purchasingRequestsTable");
+  if (requestsTable) {
+    const tbody = requestsTable.querySelector("tbody");
+    tbody.innerHTML = "";
+    
+    let requestCount = 0;
+    db.repairs.forEach(rep => {
+      const v = db.vehicles.find(x => x.id === rep.vehicleId);
+      const vName = v ? `${v.name} (${v.plate})` : "Неизвестно";
+      
+      if (rep.partsRequested) {
+        rep.partsRequested.forEach(part => {
+          if (part.status === "Запрошено" || part.status === "В заказе") {
+            requestCount++;
+            const row = document.createElement("tr");
+            row.innerHTML = `
+              <td><strong>${vName}</strong></td>
+              <td>${part.name}<br><small style="color:var(--text-secondary);">${part.sku}</small></td>
+              <td>${part.qty} шт.</td>
+              <td>${rep.description}</td>
+              <td>
+                ${part.status === "Запрошено" ? 
+                  `<button class="btn-primary" style="font-size:11px; padding:4px 8px;" onclick="openCreateSupplyOrderModal('${part.sku}', '${part.name}', ${part.qty}, '${rep.id}')">Оформить заказ</button>` : 
+                  `<span class="badge badge-warning" style="font-size:10px;">В заказе</span>`
+                }
+              </td>
+            `;
+            tbody.appendChild(row);
+          }
+        });
+      }
+    });
+    
+    if (requestCount === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-secondary);">Нет активных запросов на запчасти от механиков.</td></tr>`;
+    }
+  }
+
+  // 2. Supply Orders
+  const ordersTable = document.getElementById("purchasingOrdersTable");
+  if (ordersTable) {
+    const tbody = ordersTable.querySelector("tbody");
+    tbody.innerHTML = "";
+    
+    if (db.supplyOrders && db.supplyOrders.length > 0) {
+      db.supplyOrders.forEach(so => {
+        const row = document.createElement("tr");
+        const isOrdered = so.status === "Оформлен";
+        row.innerHTML = `
+          <td><strong>${so.id}</strong><br><small style="color:var(--text-secondary);">${so.date}</small></td>
+          <td>${so.partName}<br><small style="color:var(--text-secondary);">${so.partSku} (x${so.qty})</small></td>
+          <td><strong>${so.total.toLocaleString()} ₸</strong></td>
+          <td>${so.supplier}</td>
+          <td>
+            <span class="badge ${isOrdered ? 'badge-warning' : 'badge-success'}" style="font-size:10px;">
+              ${so.status}
+            </span>
+          </td>
+          <td>
+            ${isOrdered ? 
+              `<button class="btn-primary" style="font-size:11px; padding:4px 8px;" onclick="receiveSupplyOrder('${so.id}')">Принять на склад</button>` : 
+              `<span style="color:var(--status-success); font-weight:600;">✓ Доставлено</span>`
+            }
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    } else {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-secondary);">Нет заказов поставщикам.</td></tr>`;
+    }
+  }
+
+  // 3. Board Stock Allocation Table
+  const boardTable = document.getElementById("boardStockAllocationTable");
+  if (boardTable) {
+    const tbody = boardTable.querySelector("tbody");
+    tbody.innerHTML = "";
+    
+    db.vehicles.forEach(v => {
+      const driver = db.drivers.find(d => d.id === v.driverId);
+      const driverName = driver ? driver.name : "Не назначен";
+      
+      const boardItems = db.warehouses.board ? (db.warehouses.board[v.id] || []) : [];
+      const itemsHtml = boardItems.length > 0 ? 
+        boardItems.map(item => `<span class="badge badge-neutral" style="margin-right: 4px; margin-bottom: 4px; font-size: 11px;">${item.name} (${item.balance} шт)</span>`).join("") : 
+        `<span style="color:var(--text-secondary); font-style:italic; font-size:11px;">Пусто</span>`;
+         
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td><strong>${v.name}</strong><br><small style="color:var(--text-secondary);">${v.plate} | ${v.invNumber}</small></td>
+        <td>${driverName}</td>
+        <td><div style="display:flex; flex-wrap:wrap;">${itemsHtml}</div></td>
+        <td><span class="badge badge-success" style="font-size:10px;">Активен</span></td>
+      `;
+      tbody.appendChild(row);
     });
   }
 }
+
+function openCreateSupplyOrderModal(partSku, partName, qty, repairId) {
+  openModal("createSupplyOrderModal");
+  
+  // Заполняем селектор деталей (все SKU с Центрального склада + запрошенная деталь)
+  const select = document.getElementById("soPartSelect");
+  if (select) {
+    const allSkusMap = new Map();
+    db.warehouses.central.forEach(item => allSkusMap.set(item.sku, { sku: item.sku, name: item.name }));
+    db.repairs.forEach(rep => {
+      if (rep.partsRequested) {
+        rep.partsRequested.forEach(part => {
+          if (!allSkusMap.has(part.sku)) {
+            allSkusMap.set(part.sku, { sku: part.sku, name: part.name });
+          }
+        });
+      }
+    });
+    
+    select.innerHTML = Array.from(allSkusMap.values()).map(p => `<option value="${p.sku}">${p.name} (${p.sku})</option>`).join("");
+  }
+  
+  // Заполняем поставщиков
+  const supplierSelect = document.getElementById("soSupplierSelect");
+  if (supplierSelect) {
+    supplierSelect.innerHTML = db.directories.suppliers.map(s => `<option value="${s.name}">${s.name}</option>`).join("");
+  }
+
+  if (partSku) {
+    document.getElementById("soPartSelect").value = partSku;
+    document.getElementById("soQty").value = qty || 1;
+    autoFillOrderPrice();
+    
+    const form = document.getElementById("supplyOrderForm");
+    form.dataset.repairId = repairId;
+    form.dataset.partSku = partSku;
+  } else {
+    const form = document.getElementById("supplyOrderForm");
+    delete form.dataset.repairId;
+    delete form.dataset.partSku;
+  }
+}
+
+function autoFillOrderPrice() {
+  const sku = document.getElementById("soPartSelect").value;
+  const item = db.warehouses.central.find(i => i.sku === sku);
+  const price = item ? item.price : 15000;
+  document.getElementById("soPrice").value = price;
+  recalcOrderTotal();
+}
+
+function recalcOrderTotal() {
+  const qty = parseInt(document.getElementById("soQty").value) || 0;
+  const price = parseInt(document.getElementById("soPrice").value) || 0;
+  document.getElementById("soTotalDisplay").value = (qty * price).toLocaleString() + " ₸";
+}
+
+function submitCreateSupplyOrder() {
+  const form = document.getElementById("supplyOrderForm");
+  const sku = document.getElementById("soPartSelect").value;
+  const qty = parseInt(document.getElementById("soQty").value) || 1;
+  const price = parseInt(document.getElementById("soPrice").value) || 0;
+  const supplier = document.getElementById("soSupplierSelect").value;
+  
+  const select = document.getElementById("soPartSelect");
+  const partName = select.options[select.selectedIndex]?.text.split(" (")[0] || sku;
+  
+  const repairId = form.dataset.repairId;
+  const partSku = form.dataset.partSku;
+  
+  const newOrder = {
+    id: "so_" + (db.supplyOrders.length + 1),
+    partSku: sku,
+    partName: partName,
+    qty: qty,
+    price: price,
+    total: qty * price,
+    supplier: supplier,
+    status: "Оформлен",
+    date: new Date().toISOString().split('T')[0]
+  };
+  
+  db.supplyOrders.push(newOrder);
+  
+  if (repairId) {
+    const repair = db.repairs.find(r => r.id === repairId);
+    if (repair && repair.partsRequested) {
+      const part = repair.partsRequested.find(p => p.sku === partSku);
+      if (part) {
+        part.status = "В заказе";
+      }
+    }
+  }
+  
+  saveState();
+  closeModal("createSupplyOrderModal");
+  renderPurchasingHub();
+  renderRepairsTable();
+  showSystemNotification(`Создан заказ поставщику ${supplier} на сумму ${newOrder.total.toLocaleString()} ₸`);
+}
+
+function receiveSupplyOrder(orderId) {
+  const so = db.supplyOrders.find(o => o.id === orderId);
+  if (!so) return;
+  
+  so.status = "Доставлен";
+  
+  // 1. Пополнение остатка на центральном складе
+  const centralItem = db.warehouses.central.find(i => i.sku === so.partSku);
+  if (centralItem) {
+    centralItem.balance += so.qty;
+  } else {
+    db.warehouses.central.push({
+      id: "tmc_" + Date.now(),
+      sku: so.partSku,
+      name: so.partName,
+      category: "Запчасти",
+      supplier: so.supplier,
+      price: so.price,
+      balance: so.qty,
+      minStock: 2
+    });
+  }
+  
+  // 2. Взаиморасчеты с поставщиком
+  const company = db.companies.find(c => {
+    const cleanCName = c.name.replace(/[«»""'']/g, "").toLowerCase();
+    const cleanSName = so.supplier.replace(/[«»""'']/g, "").toLowerCase();
+    return cleanCName.includes(cleanSName) || cleanSName.includes(cleanCName);
+  });
+  
+  if (company) {
+    company.debt = (company.debt || 0) + so.total;
+  }
+  
+  // 3. Обновление статуса в заявках ремонта
+  db.repairs.forEach(rep => {
+    if (rep.partsRequested) {
+      rep.partsRequested.forEach(part => {
+        if (part.sku === so.partSku && part.status === "В заказе") {
+          part.status = "На складе";
+        }
+      });
+    }
+  });
+
+  saveState();
+  renderPurchasingHub();
+  renderWarehouseInventory();
+  renderRepairsTable();
+  renderCompanies();
+  showSystemNotification(`Заказ ${orderId} принят на Склад. Товарный запас пополнен на ${so.qty} шт.`);
+}
+
+function openTransferBoardStockModal() {
+  openModal("transferBoardStockModal");
+  
+  // Заполняем селекторы
+  const vehicleSelect = document.getElementById("tbsVehicleSelect");
+  if (vehicleSelect) {
+    vehicleSelect.innerHTML = db.vehicles.map(v => `<option value="${v.id}">${v.invNumber} (${v.name})</option>`).join("");
+  }
+  
+  const partSelect = document.getElementById("tbsPartSelect");
+  if (partSelect) {
+    partSelect.innerHTML = db.warehouses.central.map(i => `<option value="${i.sku}">${i.name} (${i.sku})</option>`).join("");
+  }
+  
+  updateTbsWarehouseLimit();
+}
+
+function updateTbsWarehouseLimit() {
+  const sku = document.getElementById("tbsPartSelect").value;
+  const centralItem = db.warehouses.central.find(i => i.sku === sku);
+  const qty = centralItem ? centralItem.balance : 0;
+  document.getElementById("tbsLimitDisplay").value = `${qty} шт.`;
+  document.getElementById("tbsQty").max = qty;
+}
+
+function submitTransferBoardStock() {
+  const vehicleId = document.getElementById("tbsVehicleSelect").value;
+  const sku = document.getElementById("tbsPartSelect").value;
+  const qty = parseInt(document.getElementById("tbsQty").value) || 1;
+  
+  const centralItem = db.warehouses.central.find(i => i.sku === sku);
+  if (!centralItem) {
+    alert("Деталь не найдена на Центральном складе!");
+    return;
+  }
+  
+  if (centralItem.balance < qty) {
+    alert(`Недостаточное количество на складе! Доступно: ${centralItem.balance}`);
+    return;
+  }
+  
+  // Списание с центрального склада
+  centralItem.balance -= qty;
+  
+  // Зачисление в бортовой запас
+  if (!db.warehouses.board) db.warehouses.board = {};
+  if (!db.warehouses.board[vehicleId]) db.warehouses.board[vehicleId] = [];
+  
+  const boardItem = db.warehouses.board[vehicleId].find(i => i.sku === sku);
+  if (boardItem) {
+    boardItem.balance += qty;
+  } else {
+    db.warehouses.board[vehicleId].push({
+      sku: sku,
+      name: centralItem.name,
+      balance: qty
+    });
+  }
+  
+  saveState();
+  closeModal("transferBoardStockModal");
+  renderPurchasingHub();
+  renderWarehouseInventory();
+  showSystemNotification(`Передано ${qty} шт. (${centralItem.name}) в бортовой запас техники.`);
+}
+
+// ----------------------------------------------------
+// МОДУЛЬ 12: ДЕТАЛИЗАЦИЯ И ИНТЕРАКТИВ ДАШБОРДА (KPI И P&L)
+// ----------------------------------------------------
+
+function updateKpiDashboard() {
+  // Выручка
+  const activeDeals = db.deals.filter(d => d.stage !== "Лид" && d.stage !== "КП");
+  const totalRevenue = activeDeals.reduce((sum, d) => sum + d.price, 0);
+  const revenuePlan = 10000000;
+  const revenuePercent = Math.round((totalRevenue / revenuePlan) * 100);
+  
+  const kpiRevenueEl = document.getElementById("kpiRevenue");
+  if (kpiRevenueEl) {
+    kpiRevenueEl.innerText = `${totalRevenue.toLocaleString()} ₸`;
+    const subtextEl = kpiRevenueEl.nextElementSibling;
+    if (subtextEl) {
+      subtextEl.innerText = `План: ${revenuePlan.toLocaleString()} ₸ (${revenuePercent}%)`;
+    }
+  }
+
+  // Утилизация
+  const totalVehicles = db.vehicles.length;
+  const workingVehicles = db.vehicles.filter(v => v.status === "В работе" || v.status === "Работает").length;
+  const utilPercent = totalVehicles > 0 ? ((workingVehicles / totalVehicles) * 100).toFixed(1) : 0;
+  
+  const kpiUtilizationEl = document.getElementById("kpiUtilization");
+  if (kpiUtilizationEl) {
+    kpiUtilizationEl.innerText = `${utilPercent}%`;
+    const subtextEl = kpiUtilizationEl.nextElementSibling;
+    if (subtextEl) {
+      subtextEl.innerText = `${workingVehicles} из ${totalVehicles} единиц в работе`;
+    }
+  }
+
+  // Дебиторская задолженность
+  const totalDebt = db.companies.reduce((sum, c) => sum + (c.debt || 0), 0);
+  const kpiDebtorsEl = document.getElementById("kpiDebtors");
+  if (kpiDebtorsEl) {
+    kpiDebtorsEl.innerText = `${totalDebt.toLocaleString()} ₸`;
+    kpiDebtorsEl.style.color = totalDebt > 0 ? "var(--status-danger)" : "var(--text-primary)";
+  }
+
+  // Удержания (штрафы)
+  const totalDeductions = db.drivers.reduce((sum, d) => {
+    const fuelFine = (d.fuelTheftFines || 0) * 20000;
+    const speedFine = (d.speedViolations || 0) * 5000;
+    const safetyFine = (d.safetyViolationCount || 0) * 15000;
+    return sum + fuelFine + speedFine + safetyFine;
+  }, 0);
+  const kpiDeductionsEl = document.getElementById("kpiDeductions");
+  if (kpiDeductionsEl) {
+    kpiDeductionsEl.innerText = `${totalDeductions.toLocaleString()} ₸`;
+  }
+}
+
+function openKpiDetailModal(kpiType) {
+  const modal = document.getElementById("dashboardDetailModal");
+  const title = document.getElementById("dashboardDetailTitle");
+  const body = document.getElementById("dashboardDetailBody");
+  if (!modal || !title || !body) return;
+
+  if (kpiType === 'revenue') {
+    title.innerText = "Анализ выручки: Активные заказы и договоры";
+    const activeDeals = db.deals.filter(d => d.stage !== "Лид" && d.stage !== "КП");
+    const totalRev = activeDeals.reduce((sum, d) => sum + d.price, 0);
+    
+    let tableRows = activeDeals.map(d => {
+      const site = db.sites.find(s => s.id === d.siteId);
+      const siteName = site ? site.name : "Неизвестно";
+      return `
+        <tr style="cursor: pointer;" onclick="closeModal('dashboardDetailModal'); setTimeout(() => openDealDetails('${d.id}'), 150);">
+          <td><strong>${d.companyName}</strong><br><small style="color:var(--text-secondary);">${d.jobType}</small></td>
+          <td>${siteName}</td>
+          <td>${d.startDate} - ${d.endDate}</td>
+          <td><span class="badge ${d.contractSigned ? 'badge-success' : 'badge-danger'}">${d.contractSigned ? 'Подписан' : 'Нет договора'}</span></td>
+          <td style="text-align: right; font-weight: 700;">${d.price.toLocaleString()} ₸</td>
+        </tr>
+      `;
+    }).join("");
+    
+    body.innerHTML = `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 16px; background: var(--bg-secondary); padding: 12px; border-radius: 8px;">
+        <span>Всего выручки (этапы Договор - Оплата):</span>
+        <strong style="color: var(--brand-color); font-size: 16px;">${totalRev.toLocaleString()} ₸</strong>
+      </div>
+      <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">💡 Кликните по строке сделки, чтобы открыть её карточку управления и документы.</p>
+      <div class="table-wrapper">
+        <table class="clean-table">
+          <thead>
+            <tr>
+              <th>Контрагент / Работы</th>
+              <th>Объект</th>
+              <th>Сроки</th>
+              <th>Договор</th>
+              <th style="text-align: right;">Сумма</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows || '<tr><td colspan="5" style="text-align:center;">Нет активных сделок</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } else if (kpiType === 'utilization') {
+    title.innerText = "Утилизация спецтехники и статус парка";
+    const totalVehicles = db.vehicles.length;
+    const workingVehicles = db.vehicles.filter(v => v.status === "В работе" || v.status === "Работает").length;
+    const maintenanceVehicles = db.vehicles.filter(v => v.status === "На ремонте" || v.status === "Неисправна").length;
+    const freeVehicles = totalVehicles - workingVehicles - maintenanceVehicles;
+    
+    let tableRows = db.vehicles.map(v => {
+      const driver = db.drivers.find(d => d.id === v.driverId);
+      const driverName = driver ? driver.name : "Не назначен";
+      const site = db.sites.find(s => s.id === v.currentSiteId);
+      const siteName = site ? site.name : "База / Свободна";
+      
+      return `
+        <tr>
+          <td><strong>${v.name}</strong><br><small style="color:var(--text-secondary);">${v.plate} | Инв: ${v.invNumber}</small></td>
+          <td>${driverName}</td>
+          <td>${siteName}</td>
+          <td>
+            <select class="select-clean" style="font-size: 11px; padding: 2px 6px;" onchange="dashboardChangeVehicleStatus('${v.id}', this.value)">
+              <option value="В работе" ${v.status === 'В работе' || v.status === 'Работает' ? 'selected' : ''}>В работе</option>
+              <option value="Свободна" ${v.status === 'Свободна' || v.status === 'В резерве' ? 'selected' : ''}>Свободна</option>
+              <option value="На ремонте" ${v.status === 'На ремонте' || v.status === 'Неисправна' ? 'selected' : ''}>На ремонте</option>
+            </select>
+          </td>
+        </tr>
+      `;
+    }).join("");
+    
+    body.innerHTML = `
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; text-align: center;">
+        <div style="background: rgba(22, 163, 74, 0.1); padding: 8px; border-radius: 6px;">
+          <div style="font-size:10px; text-transform:uppercase; color:var(--text-secondary);">В работе</div>
+          <strong style="color: var(--status-success); font-size: 16px;">${workingVehicles} ед.</strong>
+        </div>
+        <div style="background: rgba(220, 38, 38, 0.1); padding: 8px; border-radius: 6px;">
+          <div style="font-size:10px; text-transform:uppercase; color:var(--text-secondary);">Ремонт</div>
+          <strong style="color: var(--status-danger); font-size: 16px;">${maintenanceVehicles} ед.</strong>
+        </div>
+        <div style="background: var(--bg-secondary); padding: 8px; border-radius: 6px;">
+          <div style="font-size:10px; text-transform:uppercase; color:var(--text-secondary);">Резерв</div>
+          <strong style="color: var(--text-primary); font-size: 16px;">${freeVehicles} ед.</strong>
+        </div>
+      </div>
+      <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">💡 Вы можете изменить статус техники прямо в таблице ниже. Дашборд и Карта пересчитаются мгновенно.</p>
+      <div class="table-wrapper" style="max-height: 320px; overflow-y: auto;">
+        <table class="clean-table">
+          <thead>
+            <tr>
+              <th>Спецтехника</th>
+              <th>Машинист</th>
+              <th>Текущая локация</th>
+              <th>Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } else if (kpiType === 'debtors') {
+    title.innerText = "Контроль дебиторской задолженности";
+    const totalDebt = db.companies.reduce((sum, c) => sum + (c.debt || 0), 0);
+    
+    let tableRows = db.companies.filter(c => (c.debt || 0) > 0).map(c => {
+      const isBlocked = c.blacklistStatus === 'blocked';
+      return `
+        <tr>
+          <td>
+            <strong>${c.name}</strong><br>
+            <small style="color:var(--text-secondary);">БИН: ${c.bin} | Статус: 
+              <span class="badge ${isBlocked ? 'badge-danger' : 'badge-success'}" style="font-size: 9px; padding: 2px 4px;">
+                ${isBlocked ? 'Блокирован' : 'Допущен'}
+              </span>
+            </small>
+          </td>
+          <td style="font-weight: 700; color: var(--status-danger);">${c.debt.toLocaleString()} ₸</td>
+          <td style="text-align: right;">
+            <button class="btn-primary" style="font-size: 10px; padding: 4px 8px; background-color: var(--status-success);" onclick="dashboardPayClientDebt('${c.bin}')">Оплатить (ККТ)</button>
+            <button class="btn-secondary" style="font-size: 10px; padding: 4px 8px;" onclick="dashboardSendReminder('${c.name}')">СМС-напоминание</button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+    
+    body.innerHTML = `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 16px; background: rgba(220, 38, 38, 0.05); border: 1px solid rgba(220, 38, 38, 0.15); padding: 12px; border-radius: 8px;">
+        <span>Общая дебиторская задолженность контрагентов:</span>
+        <strong style="color: var(--status-danger); font-size: 16px;">${totalDebt.toLocaleString()} ₸</strong>
+      </div>
+      <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">💡 Нажмите «Оплатить», чтобы списать задолженность контрагента и зарегистрировать приход средств.</p>
+      <div class="table-wrapper">
+        <table class="clean-table">
+          <thead>
+            <tr>
+              <th>Клиент и Допуск</th>
+              <th>Задолженность</th>
+              <th style="text-align: right;">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows || '<tr><td colspan="3" style="text-align:center;">Нет задолженностей</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } else if (kpiType === 'deductions') {
+    title.innerText = "Штрафные удержания водителей (ТБ / ГСМ)";
+    const driversWithDeductions = db.drivers.filter(d => (d.fuelTheftFines || 0) > 0 || (d.speedViolations || 0) > 0 || (d.safetyViolationCount || 0) > 0);
+    const totalDeductions = driversWithDeductions.reduce((sum, d) => {
+      const fuelFine = (d.fuelTheftFines || 0) * 20000;
+      const speedFine = (d.speedViolations || 0) * 5000;
+      const safetyFine = (d.safetyViolationCount || 0) * 15000;
+      return sum + fuelFine + speedFine + safetyFine;
+    }, 0);
+    
+    let tableRows = "";
+    driversWithDeductions.forEach(d => {
+      const fuelFine = (d.fuelTheftFines || 0) * 20000;
+      const speedFine = (d.speedViolations || 0) * 5000;
+      const safetyFine = (d.safetyViolationCount || 0) * 15000;
+      
+      if (fuelFine > 0) {
+        tableRows += `
+          <tr>
+            <td><strong>${d.name}</strong><br><small style="color:var(--text-secondary);">${d.position}</small></td>
+            <td>🚨 Слив топлива (ГСМ)</td>
+            <td style="color:var(--status-danger); font-weight:700;">-${fuelFine.toLocaleString()} ₸</td>
+            <td style="text-align: right;"><button class="btn-secondary" style="font-size: 10px; padding: 4px 8px; color: var(--status-danger);" onclick="dashboardAnnulDeduction('${d.id}', 'fuel')">Аннулировать</button></td>
+          </tr>
+        `;
+      }
+      if (speedFine > 0) {
+        tableRows += `
+          <tr>
+            <td><strong>${d.name}</strong><br><small style="color:var(--text-secondary);">${d.position}</small></td>
+            <td>⚠️ Превышение скорости (GPS)</td>
+            <td style="color:var(--status-danger); font-weight:700;">-${speedFine.toLocaleString()} ₸</td>
+            <td style="text-align: right;"><button class="btn-secondary" style="font-size: 10px; padding: 4px 8px; color: var(--status-danger);" onclick="dashboardAnnulDeduction('${d.id}', 'speed')">Аннулировать</button></td>
+          </tr>
+        `;
+      }
+      if (safetyFine > 0) {
+        tableRows += `
+          <tr>
+            <td><strong>${d.name}</strong><br><small style="color:var(--text-secondary);">${d.position}</small></td>
+            <td>🛑 Нарушение регламентов ТБ</td>
+            <td style="color:var(--status-danger); font-weight:700;">-${safetyFine.toLocaleString()} ₸</td>
+            <td style="text-align: right;"><button class="btn-secondary" style="font-size: 10px; padding: 4px 8px; color: var(--status-danger);" onclick="dashboardAnnulDeduction('${d.id}', 'safety')">Аннулировать</button></td>
+          </tr>
+        `;
+      }
+    });
+    
+    body.innerHTML = `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 16px; background: var(--bg-secondary); padding: 12px; border-radius: 8px;">
+        <span>Сумма штрафных удержаний из заработной платы водителей:</span>
+        <strong style="color: var(--status-danger); font-size: 16px;">${totalDeductions.toLocaleString()} ₸</strong>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; background: rgba(37,99,235,0.05); padding: 10px; border-radius: 6px; flex-wrap: wrap;">
+        <span style="font-size: 12px; font-weight:600;">Выписать штраф:</span>
+        <select class="select-clean" id="dashAddFineDriver" style="font-size: 11px;">
+          ${db.drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join("")}
+        </select>
+        <select class="select-clean" id="dashAddFineType" style="font-size: 11px;">
+          <option value="fuel">Слив топлива (20 000 ₸)</option>
+          <option value="speed">Превышение скорости (5 000 ₸)</option>
+          <option value="safety">Нарушение ТБ (15 000 ₸)</option>
+        </select>
+        <button class="btn-primary" style="font-size: 11px; padding: 4px 8px;" onclick="dashboardAddDeduction()">Применить</button>
+      </div>
+      <div class="table-wrapper">
+        <table class="clean-table">
+          <thead>
+            <tr>
+              <th>Сотрудник</th>
+              <th>Нарушение</th>
+              <th>Сумма</th>
+              <th style="text-align: right;">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows || '<tr><td colspan="4" style="text-align:center;">Нарушений не зарегистрировано</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+  openModal("dashboardDetailModal");
+}
+
+function dashboardChangeVehicleStatus(vehicleId, newStatus) {
+  const v = db.vehicles.find(x => x.id === vehicleId);
+  if (!v) return;
+  v.status = newStatus;
+  saveState();
+  renderAll();
+  openKpiDetailModal('utilization');
+  showSystemNotification(`Статус техники ${v.invNumber} изменен на "${newStatus}"`);
+}
+
+function dashboardPayClientDebt(companyBin) {
+  const c = db.companies.find(x => x.bin === companyBin);
+  if (!c) return;
+  const paidAmt = c.debt || 0;
+  c.debt = 0;
+  saveState();
+  renderAll();
+  openKpiDetailModal('debtors');
+  showSystemNotification(`Оплата от ${c.name} на сумму ${paidAmt.toLocaleString()} ₸ успешно зачислена!`);
+}
+
+function dashboardSendReminder(companyName) {
+  const time = new Date().toTimeString().split(' ')[0].substring(0, 5);
+  db.chatLog.push({
+    sender: "System",
+    time: time,
+    message: `🔔 Эскалация долга: Клиенту "${companyName}" отправлено официальное SMS-предупреждение с требованием немедленной оплаты счетов.`
+  });
+  saveState();
+  renderChatHistory();
+  showSystemNotification(`Отправлено напоминание для ${companyName}`);
+}
+
+function dashboardAnnulDeduction(driverId, fineType) {
+  const d = db.drivers.find(x => x.id === driverId);
+  if (!d) return;
+  
+  if (fineType === 'fuel') d.fuelTheftFines = Math.max(0, (d.fuelTheftFines || 0) - 1);
+  if (fineType === 'speed') d.speedViolations = Math.max(0, (d.speedViolations || 0) - 1);
+  if (fineType === 'safety') d.safetyViolationCount = Math.max(0, (d.safetyViolationCount || 0) - 1);
+  
+  saveState();
+  renderAll();
+  openKpiDetailModal('deductions');
+  showSystemNotification(`Штраф водителя ${d.name} успешно аннулирован.`);
+}
+
+function dashboardAddDeduction() {
+  const driverId = document.getElementById("dashAddFineDriver").value;
+  const fineType = document.getElementById("dashAddFineType").value;
+  const d = db.drivers.find(x => x.id === driverId);
+  if (!d) return;
+
+  if (fineType === 'fuel') d.fuelTheftFines = (d.fuelTheftFines || 0) + 1;
+  if (fineType === 'speed') d.speedViolations = (d.speedViolations || 0) + 1;
+  if (fineType === 'safety') d.safetyViolationCount = (d.safetyViolationCount || 0) + 1;
+
+  saveState();
+  renderAll();
+  openKpiDetailModal('deductions');
+  showSystemNotification(`Штраф успешно начислен водителю ${d.name}.`);
+}
+
+function openSitePnlDetailModal(siteId) {
+  const modal = document.getElementById("dashboardDetailModal");
+  const title = document.getElementById("dashboardDetailTitle");
+  const body = document.getElementById("dashboardDetailBody");
+  if (!modal || !title || !body) return;
+
+  const site = db.sites.find(s => s.id === siteId);
+  if (!site) return;
+
+  const siteDeals = db.deals.filter(d => d.siteId === site.id);
+  const revenue = siteDeals.reduce((sum, d) => sum + d.price, 0);
+  
+  const siteVehicles = db.vehicles.filter(v => v.currentSiteId === site.id);
+  const siteDrivers = db.drivers.filter(d => siteVehicles.some(v => v.driverId === d.id));
+  
+  const salaryCost = siteDrivers.reduce((sum, d) => sum + d.baseSalary + (d.shiftsWorked * 10000), 0);
+  const fuelCost = db.fuelLogs.filter(f => siteVehicles.some(v => v.id === f.vehicleId)).reduce((sum, f) => sum + f.cost, 0);
+  const subrentCost = siteVehicles.filter(v => v.ownerType === 'subrent').reduce((sum, v) => sum + (v.subrentRate * 15), 0);
+  const repairCost = db.repairs.filter(r => r.siteId === site.id).reduce((sum, r) => sum + r.laborCost + (r.damageCost || 0), 0);
+  const netProfit = revenue - (salaryCost + fuelCost + subrentCost + repairCost);
+
+  let dealsHtml = siteDeals.map(d => `
+    <div class="pnl-row" style="font-size: 12px; margin-bottom: 4px; border-bottom: 1px dashed var(--border-color); padding-bottom: 4px;">
+      <span>Договор ${d.contractNumber || 'Б/Н'} - ${d.companyName} (${d.jobType})</span>
+      <strong style="color:var(--status-success);">+${d.price.toLocaleString()} ₸</strong>
+    </div>
+  `).join("");
+
+  let vehiclesHtml = siteVehicles.map(v => {
+    const drv = db.drivers.find(x => x.id === v.driverId);
+    return `
+      <span class="badge badge-neutral" style="margin-right: 6px; margin-bottom: 6px; font-size: 11px;">
+        ${v.name} (${v.plate}) - ${drv ? drv.name : 'Без машиниста'}
+      </span>
+    `;
+  }).join("");
+
+  title.innerText = `Финансовый анализ объекта: ${site.name}`;
+  
+  body.innerHTML = `
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px;">
+        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; margin-bottom: 8px;">Активные договоры на объекте:</div>
+        ${dealsHtml || '<span style="color:var(--text-secondary); font-style:italic; font-size:12px;">Нет активных договоров</span>'}
+      </div>
+      
+      <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px;">
+        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; margin-bottom: 8px;">Распределенная техника (${siteVehicles.length} ед.):</div>
+        <div style="display: flex; flex-wrap: wrap;">
+          ${vehiclesHtml || '<span style="color:var(--text-secondary); font-style:italic; font-size:12px;">Техника не закреплена</span>'}
+        </div>
+      </div>
+      
+      <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+        <div style="font-weight: 700; font-size: 13px; margin-bottom: 12px; text-transform: uppercase; color: var(--text-secondary);">Детализированный P&L (Отчет о прибылях и убытках)</div>
+        <div class="pnl-row"><span>1. Доходы (Выручка от клиентов):</span><strong style="color: var(--status-success);">+${revenue.toLocaleString()} ₸</strong></div>
+        <div class="pnl-row"><span>2. Расходы на оплату труда машинистов:</span><span style="color: var(--status-danger); font-weight: 600;">-${salaryCost.toLocaleString()} ₸</span></div>
+        <div class="pnl-row"><span>3. Расходы на топливо (ГСМ по датчикам):</span><span style="color: var(--status-danger); font-weight: 600;">-${fuelCost.toLocaleString()} ₸</span></div>
+        <div class="pnl-row"><span>4. Расходы на аренду техники партнеров:</span><span style="color: var(--status-danger); font-weight: 600;">-${subrentCost.toLocaleString()} ₸</span></div>
+        <div class="pnl-row"><span>5. Затраты на ремонты и закупку ТМЦ:</span><span style="color: var(--status-danger); font-weight: 600;">-${repairCost.toLocaleString()} ₸</span></div>
+        <div class="pnl-row" style="background-color: ${netProfit >= 0 ? 'rgba(46,125,50,0.08)' : 'rgba(198,40,40,0.08)'}; padding: 10px; border-radius:6px; margin-top: 10px; border: 1px solid ${netProfit >= 0 ? 'var(--status-success)' : 'var(--status-danger)'};">
+          <span style="font-weight: 700; font-size: 13px;">Чистая прибыль (Рентабельность):</span>
+          <strong style="color: ${netProfit >= 0 ? 'var(--status-success)' : 'var(--status-danger)'}; font-size: 16px;">${netProfit.toLocaleString()} ₸</strong>
+        </div>
+      </div>
+      
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button class="btn-secondary" onclick="closeModal('dashboardDetailModal'); switchTab('dispatch');">Журнал перемещений</button>
+        <button class="btn-primary" onclick="closeModal('dashboardDetailModal'); openAssignVehiclesFormForSite('${site.id}')">Закрепить технику</button>
+      </div>
+    </div>
+  `;
+  
+  openModal("dashboardDetailModal");
+}
+
+function openAssignVehiclesFormForSite(siteId) {
+  const deal = db.deals.find(d => d.siteId === siteId);
+  if (deal) {
+    openAssignVehiclesForm(deal.id);
+  } else {
+    showSystemNotification("Нет активной сделки для закрепления техники на данном объекте!");
+  }
+}
+
+// Вспомогательные функции для открытия модальных окон (устранение console ReferenceErrors)
+function openReceivePartModal() {
+  openModal("receivePartModal");
+}
+function openTransferPartModal() {
+  openModal("transferPartModal");
+}
+function openRequisitionModal() {
+  openModal("requisitionModal");
+}
+function openCreateRepairModal() {
+  openModal("createRepairModal");
+}
+function openRelocateVehicleModal() {
+  openModal("relocateVehicleModal");
+}
+function openCreateDealModal() {
+  openModal("createDealModal");
+}
+function openCreateEmployeeModal() {
+  openModal("createEmployeeModal");
+}
+
+function openSupplyOrderDetail(orderId) {
+  const so = db.supplyOrders.find(o => o.id === orderId);
+  if (!so) return;
+
+  const modal = document.getElementById("dashboardDetailModal");
+  const title = document.getElementById("dashboardDetailTitle");
+  const body = document.getElementById("dashboardDetailBody");
+  if (!modal || !title || !body) return;
+
+  title.innerText = `Детали заказа снабжения: ${so.id}`;
+  
+  let actionBtnHtml = "";
+  if (so.status === "Оформлен") {
+    actionBtnHtml = `<button class="btn-primary" onclick="closeModal('dashboardDetailModal'); receiveSupplyOrder('${so.id}');">Принять на склад</button>`;
+  } else {
+    actionBtnHtml = `<span style="color:var(--status-success); font-weight:600;">✓ Доставлено на Центральный склад</span>`;
+  }
+
+  body.innerHTML = `
+    <div style="display: flex; flex-direction: column; gap: 14px; font-family:'Inter', sans-serif;">
+      <div class="pnl-row"><span>Артикул детали (SKU):</span><strong>${so.partSku}</strong></div>
+      <div class="pnl-row"><span>Наименование ТМЦ:</span><strong>${so.partName}</strong></div>
+      <div class="pnl-row"><span>Количество прихода:</span><strong>${so.qty} шт.</strong></div>
+      <div class="pnl-row"><span>Цена за единицу:</span><strong>${so.price.toLocaleString()} ₸</strong></div>
+      <div class="pnl-row" style="background: var(--bg-secondary); padding: 10px; border-radius: 6px; border-left: 3px solid var(--brand-color);">
+        <span>Итоговая сумма заказа:</span>
+        <strong style="color: var(--brand-color); font-size: 14px;">${so.total.toLocaleString()} ₸</strong>
+      </div>
+      <div class="pnl-row"><span>Поставщик ТМЦ:</span><strong>${so.supplier}</strong></div>
+      <div class="pnl-row"><span>Дата оформления:</span><strong>${so.date}</strong></div>
+      <div class="pnl-row"><span>Текущий статус:</span><span class="badge ${so.status === 'Доставлен' ? 'badge-success' : 'badge-warning'}">${so.status}</span></div>
+      
+      <div style="margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px;">
+        ${actionBtnHtml}
+      </div>
+    </div>
+  `;
+
+  openModal("dashboardDetailModal");
+}
+
+// ----------------------------------------------------
+// ДОКУМЕНТЫ КОНТРАГЕНТОВ (ДОГОВОРЫ, НАКЛАДНЫЕ, НАРЯДЫ)
+// ----------------------------------------------------
+
+function openContractDocument(dealId) {
+  const deal = db.deals.find(x => x.id === dealId);
+  if (!deal) return;
+  
+  const body = document.getElementById("viewDocumentBody");
+  if (!body) return;
+  
+  body.innerHTML = `
+    <div class="document-view-container" style="font-family: 'Outfit', 'Inter', sans-serif; color: #333; line-height: 1.5;">
+      <div style="text-align: center; border-bottom: 2px solid #2563EB; padding-bottom: 12px; margin-bottom: 16px;">
+        <h3 style="font-size: 16px; font-weight: 700; text-transform: uppercase; margin: 0; color: #1E3A8A;">Типовой договор имущественного найма (аренды)</h3>
+        <div style="font-size: 12px; color: #555; margin-top: 4px;">№ ${deal.contractNumber || 'Д-06/2026-TMP'}</div>
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 16px;">
+        <span>г. Атырау</span>
+        <span>Дата заключения: ${deal.startDate}</span>
+      </div>
+      
+      <div style="font-size: 12px; margin-bottom: 12px;">
+        <p><strong>Наймодатель:</strong> ТОО «KazBildInvest», в лице Генерального директора Исаева Ж. А., действующего на основании Устава, с одной стороны, и</p>
+        <p><strong>Наниматель:</strong> ${deal.companyName}, в лице ответственного представителя ${deal.contactPerson}, с другой стороны, заключили настоящий Договор о нижеследующем:</p>
+      </div>
+      
+      <div style="font-size: 11px; margin-bottom: 16px;">
+        <h5 style="font-weight: 700; margin-bottom: 4px; text-transform: uppercase; color: #1E3A8A;">1. Предмет Договора</h5>
+        <p>1.1. Наймодатель предоставляет за плату во временное владение и пользование Нанимателю спецтехнику для выполнения работ по объекту: <strong>${getSiteName(deal.siteId)}</strong>.</p>
+        <p>1.2. Вид выполняемых работ: <strong>${deal.jobType}</strong>.</p>
+        <p>1.3. Сроки аренды: с <strong>${deal.startDate}</strong> по <strong>${deal.endDate}</strong>.</p>
+        
+        <h5 style="font-weight: 700; margin-top: 8px; margin-bottom: 4px; text-transform: uppercase; color: #1E3A8A;">2. Стоимость услуг и порядок расчетов</h5>
+        <p>2.1. Общая сумма договора составляет <strong>${deal.price.toLocaleString()} KZT (тенге)</strong> без учета НДС.</p>
+        <p>2.2. Наниматель обязуется оплатить услуги согласно выставленным счетам и актам выполненных работ (АВР) в установленные сроки.</p>
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; border-top: 1px dashed #CCC; padding-top: 12px; font-size: 11px; margin-top: 20px;">
+        <div>
+          <strong>Наймодатель (ТОО KazBildInvest):</strong>
+          <div style="margin-top: 8px; color: #2563EB; font-weight: bold; border: 1px solid #2563EB; padding: 2px 6px; border-radius: 4px; display: inline-block;">ПОДПИСАНО ЭЦП</div>
+        </div>
+        <div style="text-align: right;">
+          <strong>Наниматель (${deal.companyName}):</strong>
+          <div style="margin-top: 8px; color: ${deal.contractSigned ? '#16A34A' : '#DC2626'}; font-weight: bold; border: 1px solid ${deal.contractSigned ? '#16A34A' : '#DC2626'}; padding: 2px 6px; border-radius: 4px; display: inline-block;">
+            ${deal.contractSigned ? 'ПОДПИСАНО ЭЦП' : 'ОЖИДАЕТ ПОДПИСИ'}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  closeCompanyModal();
+  closeModal("dealDetailsModal");
+  openModal("viewDocumentModal");
+}
+
+function openOrderDocument(orderId) {
+  const so = db.supplyOrders.find(x => x.id === orderId);
+  if (!so) return;
+  
+  const body = document.getElementById("viewDocumentBody");
+  if (!body) return;
+  
+  body.innerHTML = `
+    <div class="document-view-container" style="font-family: 'Outfit', 'Inter', sans-serif; color: #333; line-height: 1.5;">
+      <div style="text-align: center; border-bottom: 2px solid #16A34A; padding-bottom: 12px; margin-bottom: 16px;">
+        <h3 style="font-size: 16px; font-weight: 700; text-transform: uppercase; margin: 0; color: #16A34A;">Накладная на поставку ТМЦ</h3>
+        <div style="font-size: 12px; color: #555; margin-top: 4px;">№ ${so.id}</div>
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 16px;">
+        <span>г. Атырау</span>
+        <span>Дата: ${so.date}</span>
+      </div>
+      
+      <div style="font-size: 12px; margin-bottom: 12px;">
+        <p><strong>Поставщик:</strong> ${so.supplier}</p>
+        <p><strong>Получатель:</strong> ТОО «KazBildInvest» (Центральный Склад)</p>
+      </div>
+      
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px;">
+        <thead>
+          <tr style="background-color: #F8F9FA; border-bottom: 1px solid #DDD;">
+            <th style="padding: 6px; text-align: left; border: 1px solid #DDD;">Наименование товара</th>
+            <th style="padding: 6px; text-align: center; border: 1px solid #DDD;">SKU / Артикул</th>
+            <th style="padding: 6px; text-align: right; border: 1px solid #DDD;">Кол-во</th>
+            <th style="padding: 6px; text-align: right; border: 1px solid #DDD;">Цена</th>
+            <th style="padding: 6px; text-align: right; border: 1px solid #DDD;">Сумма</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding: 6px; border: 1px solid #DDD;">${so.partName}</td>
+            <td style="padding: 6px; text-align: center; border: 1px solid #DDD;">${so.partSku}</td>
+            <td style="padding: 6px; text-align: right; border: 1px solid #DDD;">${so.qty} шт.</td>
+            <td style="padding: 6px; text-align: right; border: 1px solid #DDD;">${so.price.toLocaleString()} ₸</td>
+            <td style="padding: 6px; text-align: right; border: 1px solid #DDD;">${so.total.toLocaleString()} ₸</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div style="display: flex; justify-content: space-between; border-top: 1px dashed #CCC; padding-top: 12px; font-size: 11px;">
+        <div>
+          <strong>Поставщик (${so.supplier}):</strong>
+          <div style="margin-top: 8px; color: #16A34A; font-weight: bold; border: 1px solid #16A34A; padding: 2px 6px; border-radius: 4px; display: inline-block;">ОТГРУЖЕНО</div>
+        </div>
+        <div style="text-align: right;">
+          <strong>Получатель (ТОО KazBildInvest):</strong>
+          <div style="margin-top: 8px; color: ${so.status === 'Доставлен' ? '#16A34A' : '#D97706'}; font-weight: bold; border: 1px solid ${so.status === 'Доставлен' ? '#16A34A' : '#D97706'}; padding: 2px 6px; border-radius: 4px; display: inline-block;">
+            ${so.status === 'Доставлен' ? 'ПРИНЯТО НА СКЛАД' : 'В ПУТИ / ОФОРМЛЕН'}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  closeCompanyModal();
+  openModal("viewDocumentModal");
+}
+
+function openRepairDocument(repairId) {
+  const r = db.repairs.find(x => x.id === repairId);
+  if (!r) return;
+  
+  const body = document.getElementById("viewDocumentBody");
+  if (!body) return;
+  
+  body.innerHTML = `
+    <div class="document-view-container" style="font-family: 'Outfit', 'Inter', sans-serif; color: #333; line-height: 1.5;">
+      <div style="text-align: center; border-bottom: 2px solid #DC2626; padding-bottom: 12px; margin-bottom: 16px;">
+        <h3 style="font-size: 16px; font-weight: 700; text-transform: uppercase; margin: 0; color: #DC2626;">Заказ-наряд на ремонт / ТО</h3>
+        <div style="font-size: 12px; color: #555; margin-top: 4px;">№ ${r.id}</div>
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 16px;">
+        <span>г. Атырау</span>
+        <span>Дата создания: ${r.createdAt}</span>
+      </div>
+      
+      <div style="font-size: 12px; margin-bottom: 12px;">
+        <p><strong>Заказчик:</strong> ТОО «KazBildInvest»</p>
+        <p><strong>Подрядчик по ремонту:</strong> ${r.contractorName || 'Собственная ремонтная служба (Механик)'}</p>
+        <p><strong>Спецтехника:</strong> ${getVehicleName(r.vehicleId)} [Инв: ${getVehicleInvNumber(r.vehicleId)}]</p>
+      </div>
+      
+      <div style="font-size: 11px; margin-bottom: 16px; background: #FEE2E2; padding: 10px; border-radius: 6px; border-left: 3px solid #DC2626;">
+        <strong>Описание неисправности:</strong>
+        <p style="margin: 4px 0 0 0;">${r.description}</p>
+      </div>
+      
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px;">
+        <thead>
+          <tr style="background-color: #F8F9FA; border-bottom: 1px solid #DDD;">
+            <th style="padding: 6px; text-align: left; border: 1px solid #DDD;">Вид затрат</th>
+            <th style="padding: 6px; text-align: right; border: 1px solid #DDD;">Сумма (₸)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding: 6px; border: 1px solid #DDD;">Стоимость ремонтных работ (услуги слесарей)</td>
+            <td style="padding: 6px; text-align: right; border: 1px solid #DDD;">${r.laborCost.toLocaleString()} ₸</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px; border: 1px solid #DDD;">Затраты на поврежденные ТМЦ/запчасти</td>
+            <td style="padding: 6px; text-align: right; border: 1px solid #DDD;">${r.damageCost ? r.damageCost.toLocaleString() + ' ₸' : '0 ₸'}</td>
+          </tr>
+          <tr style="font-weight: 700; background-color: #EEE;">
+            <td style="padding: 6px; border: 1px solid #DDD;">Итого стоимость заказ-наряда:</td>
+            <td style="padding: 6px; text-align: right; border: 1px solid #DDD;">${(r.laborCost + (r.damageCost || 0)).toLocaleString()} ₸</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div style="display: flex; justify-content: space-between; border-top: 1px dashed #CCC; padding-top: 12px; font-size: 11px;">
+        <div>
+          <strong>Ремонтная служба:</strong>
+          <div style="margin-top: 8px; color: #DC2626; font-weight: bold; border: 1px solid #DC2626; padding: 2px 6px; border-radius: 4px; display: inline-block;">
+            ${r.status === 'Готово' ? 'РЕМОНТ ЗАВЕРШЕН' : 'В РАБОТЕ'}
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <strong>Ответственный механик:</strong>
+          <div style="margin-top: 8px; font-weight: bold; color: #333;">Котов В. А.</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  closeCompanyModal();
+  openModal("viewDocumentModal");
+}
+
+function openSubrentContractDocument(vehicleId) {
+  const v = db.vehicles.find(x => x.id === vehicleId);
+  if (!v) return;
+  
+  const body = document.getElementById("viewDocumentBody");
+  if (!body) return;
+  
+  body.innerHTML = `
+    <div class="document-view-container" style="font-family: 'Outfit', 'Inter', sans-serif; color: #333; line-height: 1.5;">
+      <div style="text-align: center; border-bottom: 2px solid #8B5CF6; padding-bottom: 12px; margin-bottom: 16px;">
+        <h3 style="font-size: 16px; font-weight: 700; text-transform: uppercase; margin: 0; color: #6D28D9;">Договор субаренды спецтехники</h3>
+        <div style="font-size: 12px; color: #555; margin-top: 4px;">№ Д-СУБ/${v.invNumber}</div>
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 16px;">
+        <span>г. Атырау</span>
+        <span>Действителен до: ${v.ptoDate || '2026-12-31'}</span>
+      </div>
+      
+      <div style="font-size: 12px; margin-bottom: 12px;">
+        <p><strong>Арендодатель (Субарендодатель):</strong> ${v.subrentProvider}, в лице уполномоченного представителя, с одной стороны, и</p>
+        <p><strong>Арендатор:</strong> ТОО «KazBildInvest», в лице Генерального директора Исаева Ж. А., с другой стороны, заключили настоящий договор о нижеследующем:</p>
+      </div>
+      
+      <div style="font-size: 11px; margin-bottom: 16px;">
+        <h5 style="font-weight: 700; margin-bottom: 4px; text-transform: uppercase; color: #6D28D9;">1. Предмет договора</h5>
+        <p>1.1. Арендодатель передает Арендатору во временное платное пользование следующую спецтехнику:</p>
+        <ul style="margin: 4px 0 0 16px; padding: 0;">
+          <li>Наименование: <strong>${v.name}</strong></li>
+          <li>Модель: <strong>${v.model}</strong></li>
+          <li>Госномер: <strong>${v.plate}</strong></li>
+          <li>Инвентарный номер: <strong>${v.invNumber}</strong></li>
+        </ul>
+        
+        <h5 style="font-weight: 700; margin-top: 8px; margin-bottom: 4px; text-transform: uppercase; color: #6D28D9;">2. Финансовые условия</h5>
+        <p>2.1. Стоимость субаренды составляет <strong>${v.subrentRate.toLocaleString()} KZT (тенге) в сутки</strong>.</p>
+        <p>2.2. Расчет производится ежемесячно на основании актов приема-передачи и рапортов работы техники.</p>
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; border-top: 1px dashed #CCC; padding-top: 12px; font-size: 11px; margin-top: 20px;">
+        <div>
+          <strong>Арендодатель (${v.subrentProvider}):</strong>
+          <div style="margin-top: 8px; color: #16A34A; font-weight: bold; border: 1px solid #16A34A; padding: 2px 6px; border-radius: 4px; display: inline-block;">ПОДПИСАНО ЭЦП</div>
+        </div>
+        <div style="text-align: right;">
+          <strong>Арендатор (ТОО KazBildInvest):</strong>
+          <div style="margin-top: 8px; color: #16A34A; font-weight: bold; border: 1px solid #16A34A; padding: 2px 6px; border-radius: 4px; display: inline-block;">ПОДПИСАНО ЭЦП</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  closeCompanyModal();
+  openModal("viewDocumentModal");
+}
+
+function openInsurancePolicyDocument(vehicleId) {
+  const v = db.vehicles.find(x => x.id === vehicleId);
+  if (!v) return;
+  
+  const body = document.getElementById("viewDocumentBody");
+  if (!body) return;
+  
+  body.innerHTML = `
+    <div class="document-view-container" style="font-family: 'Outfit', 'Inter', sans-serif; color: #333; line-height: 1.5;">
+      <div style="text-align: center; border-bottom: 2px solid #D97706; padding-bottom: 12px; margin-bottom: 16px;">
+        <h3 style="font-size: 16px; font-weight: 700; text-transform: uppercase; margin: 0; color: #B45309;">Страховой полис ГПО ВТС / КАСКО</h3>
+        <div style="font-size: 12px; color: #555; margin-top: 4px;">№ POL-${v.invNumber}</div>
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 16px;">
+        <span>г. Алматы</span>
+        <span>Срок действия: до ${v.insuranceDate || '2026-12-31'}</span>
+      </div>
+      
+      <div style="font-size: 12px; margin-bottom: 12px;">
+        <p><strong>Страховщик:</strong> ${v.insuranceProvider || 'АО «СК Евразия»'}</p>
+        <p><strong>Страхователь:</strong> ТОО «KazBildInvest»</p>
+        <p><strong>Объект страхования:</strong> Транспортное средство спецназначения:</p>
+        <ul style="margin: 4px 0 0 16px; padding: 0;">
+          <li>Марка/модель: <strong>${v.name} / ${v.model}</strong></li>
+          <li>Госномер: <strong>${v.plate}</strong></li>
+          <li>VIN: <strong>${v.vin}</strong></li>
+        </ul>
+      </div>
+      
+      <div style="font-size: 11px; margin-bottom: 16px;">
+        <h5 style="font-weight: 700; margin-bottom: 4px; text-transform: uppercase; color: #B45309;">Условия страхования</h5>
+        <p>Страховая премия: <strong>${(v.insuranceCost || 150000).toLocaleString()} KZT</strong>.</p>
+        <p>Лимит ответственности по договору страхования составляет до 20,000,000 KZT при наступлении страхового случая.</p>
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; border-top: 1px dashed #CCC; padding-top: 12px; font-size: 11px; margin-top: 20px;">
+        <div>
+          <strong>Страховщик (${v.insuranceProvider || 'АО «СК Евразия»'}):</strong>
+          <div style="margin-top: 8px; color: #16A34A; font-weight: bold; border: 1px solid #16A34A; padding: 2px 6px; border-radius: 4px; display: inline-block;">ПОДПИСАНО ЭЦП</div>
+        </div>
+        <div style="text-align: right;">
+          <strong>Страхователь (KazBildInvest):</strong>
+          <div style="margin-top: 8px; color: #16A34A; font-weight: bold; border: 1px solid #16A34A; padding: 2px 6px; border-radius: 4px; display: inline-block;">ПОДПИСАНО ЭЦП</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  closeCompanyModal();
+  openModal("viewDocumentModal");
+}
+
+// ----------------------------------------------------
+// ИНТЕРАКТИВНЫЙ ФИНАНСОВЫЙ ГРАФИК
+// ----------------------------------------------------
+
+function changeChartPeriod(period) {
+  document.querySelectorAll(".chart-period-selector button").forEach(btn => {
+    btn.classList.remove("active");
+  });
+  if (period === 'year') document.getElementById("btn-chart-year").classList.add("active");
+  if (period === 'month') document.getElementById("btn-chart-month").classList.add("active");
+  if (period === 'week') document.getElementById("btn-chart-week").classList.add("active");
+  if (period === 'day') document.getElementById("btn-chart-day").classList.add("active");
+  
+  window.activeChartPeriod = period;
+  renderFinancialChart(period);
+}
+
+function renderFinancialChart(period) {
+  const container = document.getElementById("financialChartContainer");
+  if (!container) return;
+  
+  container.innerHTML = "";
+  
+  let labels = [];
+  let revenue = [];
+  let expenses = [];
+  
+  if (period === 'year') {
+    labels = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
+    revenue = [4500000, 5000000, 5800000, 6200000, 7000000, 7800000, 8200000, 8000000, 7500000, 7200000, 6800000, 6500000];
+    expenses = [3200000, 3500000, 3800000, 4000000, 4500000, 4800000, 5000000, 4900000, 4700000, 4500000, 4200000, 4000000];
+  } else if (period === 'month') {
+    labels = ["1-5", "6-10", "11-15", "16-20", "21-25", "26-30"];
+    revenue = [1200000, 1500000, 1800000, 2100000, 1900000, 2300000];
+    expenses = [800000, 1000000, 1200000, 1400000, 1300000, 1500000];
+  } else if (period === 'week') {
+    labels = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+    revenue = [250000, 320000, 280000, 410000, 380000, 150000, 100000];
+    expenses = [180000, 210000, 190000, 250000, 230000, 90000, 60000];
+  } else { // day
+    labels = ["08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00"];
+    revenue = [45000, 60000, 55000, 80000, 70000, 40000, 20000];
+    expenses = [30000, 40000, 38000, 50000, 45000, 25000, 15000];
+  }
+  
+  const containerWidth = container.clientWidth || 600;
+  const containerHeight = 240;
+  const paddingLeft = 60;
+  const paddingRight = 20;
+  const paddingTop = 20;
+  const paddingBottom = 30;
+  
+  const graphWidth = containerWidth - paddingLeft - paddingRight;
+  const graphHeight = containerHeight - paddingTop - paddingBottom;
+  
+  const maxVal = Math.max(...revenue, ...expenses) * 1.15;
+  
+  let svg = `<svg width="${containerWidth}" height="${containerHeight}" style="overflow:visible; font-family:'Inter', sans-serif;">`;
+  
+  svg += `
+    <defs>
+      <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.16" />
+        <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.0" />
+      </linearGradient>
+      <linearGradient id="expGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#FB7185" stop-opacity="0.10" />
+        <stop offset="100%" stop-color="#FB7185" stop-opacity="0.0" />
+      </linearGradient>
+      <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+        <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.25" />
+      </filter>
+      <filter id="glowRev" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="3.5" result="blur" />
+        <feComponentTransfer in="blur" result="glow1">
+          <feFuncA type="linear" slope="0.5" />
+        </feComponentTransfer>
+        <feMerge>
+          <feMergeNode in="glow1" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+      <filter id="glowExp" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="3.5" result="blur" />
+        <feComponentTransfer in="blur" result="glow1">
+          <feFuncA type="linear" slope="0.4" />
+        </feComponentTransfer>
+        <feMerge>
+          <feMergeNode in="glow1" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+  `;
+  
+  const gridLines = 4;
+  for (let i = 0; i <= gridLines; i++) {
+    const val = (maxVal / gridLines) * i;
+    const y = containerHeight - paddingBottom - (graphHeight / gridLines) * i;
+    
+    // Горизонтальные сетки
+    svg += `<line x1="${paddingLeft}" y1="${y}" x2="${containerWidth - paddingRight}" y2="${y}" stroke="rgba(255, 255, 255, 0.06)" stroke-width="0.75" stroke-dasharray="3,3" />`;
+    
+    let valText = "";
+    if (val >= 1000000) valText = (val / 1000000).toFixed(1) + "M ₸";
+    else if (val >= 1000) valText = (val / 1000).toFixed(0) + "k ₸";
+    else valText = val.toFixed(0) + " ₸";
+    
+    svg += `<text x="${paddingLeft - 12}" y="${y + 4}" text-anchor="end" font-size="9.5" font-weight="600" fill="#64748B">${valText}</text>`;
+  }
+  
+  const pointsCount = labels.length;
+  const xStep = graphWidth / (pointsCount - 1);
+  
+  const revPoints = [];
+  const expPoints = [];
+  
+  for (let i = 0; i < pointsCount; i++) {
+    const x = paddingLeft + xStep * i;
+    const revY = containerHeight - paddingBottom - (revenue[i] / maxVal) * graphHeight;
+    const expY = containerHeight - paddingBottom - (expenses[i] / maxVal) * graphHeight;
+    
+    revPoints.push({ x, y: revY, val: revenue[i], label: labels[i] });
+    expPoints.push({ x, y: expY, val: expenses[i], label: labels[i] });
+  }
+  
+  for (let i = 0; i < pointsCount; i++) {
+    const p = revPoints[i];
+    // Вертикальные сетки
+    svg += `<line x1="${p.x}" y1="${paddingTop}" x2="${p.x}" y2="${containerHeight - paddingBottom}" stroke="rgba(255, 255, 255, 0.03)" stroke-width="0.75" stroke-dasharray="3,3" />`;
+    svg += `<text x="${p.x}" y="${containerHeight - 10}" text-anchor="middle" font-size="10" font-weight="600" fill="#64748B">${p.label}</text>`;
+  }
+  
+  const getBezierPathD = (points) => {
+    if (points.length === 0) return "";
+    let d = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i];
+      const p1 = points[i + 1];
+      const cp1x = p0.x + (p1.x - p0.x) * 0.4;
+      const cp1y = p0.y;
+      const cp2x = p0.x + (p1.x - p0.x) * 0.6;
+      const cp2y = p1.y;
+      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1.x} ${p1.y}`;
+    }
+    return d;
+  };
+  
+  const getBezierAreaD = (points) => {
+    const pathD = getBezierPathD(points);
+    if (!pathD) return "";
+    const lastP = points[points.length - 1];
+    const firstP = points[0];
+    return `${pathD} L ${lastP.x} ${containerHeight - paddingBottom} L ${firstP.x} ${containerHeight - paddingBottom} Z`;
+  };
+  
+  svg += `<path d="${getBezierAreaD(revPoints)}" fill="url(#revGrad)" />`;
+  svg += `<path d="${getBezierAreaD(expPoints)}" fill="url(#expGrad)" />`;
+  
+  svg += `<path d="${getBezierPathD(revPoints)}" fill="none" stroke="#38BDF8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" filter="url(#glowRev)" />`;
+  svg += `<path d="${getBezierPathD(expPoints)}" fill="none" stroke="#FB7185" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3,3" filter="url(#glowExp)" />`;
+  
+  svg += `<g id="chartTooltip" style="display:none; pointer-events:none;">
+    <rect id="tooltipBg" x="0" y="0" width="170" height="66" rx="8" fill="#0F172A" fill-opacity="0.9" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" filter="url(#shadow)" />
+    <text id="tooltipTitle" x="12" y="18" font-size="10" font-weight="700" fill="#F8FAFC"></text>
+    <circle id="tooltipRevDot" cx="0" cy="0" r="3" fill="#38BDF8" />
+    <text id="tooltipRev" x="24" y="34" font-size="10.5" font-weight="600" fill="#38BDF8"></text>
+    <circle id="tooltipExpDot" cx="0" cy="0" r="3" fill="#FB7185" />
+    <text id="tooltipExp" x="24" y="50" font-size="10.5" font-weight="600" fill="#FB7185"></text>
+    <line id="tooltipLine" x1="0" y1="${paddingTop}" x2="0" y2="${containerHeight - paddingBottom}" stroke="#38BDF8" stroke-width="1.25" opacity="0.3" filter="url(#glowRev)" />
+  </g>`;
+  
+  for (let i = 0; i < pointsCount; i++) {
+    const rp = revPoints[i];
+    const ep = expPoints[i];
+    
+    // Светящиеся маркеры точек
+    svg += `<circle cx="${rp.x}" cy="${rp.y}" r="6" fill="#38BDF8" fill-opacity="0.2" />`;
+    svg += `<circle cx="${rp.x}" cy="${rp.y}" r="3" fill="#020617" stroke="#38BDF8" stroke-width="2.5" />`;
+    
+    svg += `<circle cx="${ep.x}" cy="${ep.y}" r="5" fill="#FB7185" fill-opacity="0.2" />`;
+    svg += `<circle cx="${ep.x}" cy="${ep.y}" r="2.5" fill="#020617" stroke="#FB7185" stroke-width="2" />`;
+    
+    const triggerWidth = xStep;
+    const triggerX = rp.x - triggerWidth / 2;
+    
+    svg += `
+      <rect 
+        x="${triggerX}" 
+        y="${paddingTop}" 
+        width="${triggerWidth}" 
+        height="${graphHeight}" 
+        fill="transparent" 
+        style="cursor:crosshair;"
+        onmouseover="showChartTooltip('${rp.label}', ${rp.val}, ${ep.val}, ${rp.x}, ${rp.y})"
+        onmouseout="hideChartTooltip()"
+      />
+    `;
+  }
+  
+  svg += `</svg>`;
+  container.innerHTML = svg;
+}
+
+function showChartTooltip(label, revVal, expVal, x, y) {
+  const tooltip = document.getElementById("chartTooltip");
+  const bg = document.getElementById("tooltipBg");
+  const title = document.getElementById("tooltipTitle");
+  const rev = document.getElementById("tooltipRev");
+  const exp = document.getElementById("tooltipExp");
+  const line = document.getElementById("tooltipLine");
+  
+  if (!tooltip || !bg || !title || !rev || !exp || !line) return;
+  
+  title.textContent = label;
+  rev.textContent = `Выручка: ${revVal.toLocaleString()} ₸`;
+  exp.textContent = `Расходы: ${expVal.toLocaleString()} ₸`;
+  
+  const containerWidth = document.getElementById("financialChartContainer").clientWidth || 600;
+  let tx = x + 15;
+  if (tx + 180 > containerWidth) {
+    tx = x - 185;
+  }
+  const ty = 40;
+  
+  bg.setAttribute("x", tx);
+  bg.setAttribute("y", ty);
+  title.setAttribute("x", tx + 12);
+  title.setAttribute("y", ty + 18);
+  
+  const revDot = document.getElementById("tooltipRevDot");
+  const expDot = document.getElementById("tooltipExpDot");
+  if (revDot) {
+    revDot.setAttribute("cx", tx + 14);
+    revDot.setAttribute("cy", ty + 31);
+  }
+  if (expDot) {
+    expDot.setAttribute("cx", tx + 14);
+    expDot.setAttribute("cy", ty + 47);
+  }
+  
+  rev.setAttribute("x", tx + 24);
+  rev.setAttribute("y", ty + 35);
+  exp.setAttribute("x", tx + 24);
+  exp.setAttribute("y", ty + 51);
+  
+  line.setAttribute("x1", x);
+  line.setAttribute("x2", x);
+  
+  tooltip.style.display = "block";
+}
+
+function hideChartTooltip() {
+  const tooltip = document.getElementById("chartTooltip");
+  if (tooltip) tooltip.style.display = "none";
+}
+
