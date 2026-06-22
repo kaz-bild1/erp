@@ -1415,6 +1415,22 @@
 
   </div>
 
+  <!-- МОДАЛЬНОЕ ОКНО: ПРОВЕРКА СПЕЦТЕХНИКИ — ГИС ЕРАП РК -->
+  <div class="modal-overlay" id="vehicleFullCheckModal">
+    <div class="modal-box" style="max-width: 820px; max-height: 90vh;">
+      <div class="modal-header">
+        <span class="modal-title" id="vehCheckModalTitle">Проверка спецтехники — ГИС ЕРАП РК</span>
+        <button class="modal-close-btn" onclick="closeVehicleFullCheckModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 0; overflow-y: auto; max-height: calc(90vh - 120px);" id="vehCheckModalBody">
+        <!-- Заполняется динамически из JS -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeVehicleFullCheckModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
   <!-- МОДАЛЬНОЕ ОКНО: ИИ ЧАТ-БОТ (WHATSAPP ЭМУЛЯТОР) -->
   <div class="modal-overlay" id="chatBotModal">
     <div class="modal-box" style="max-width: 450px;">
@@ -2226,7 +2242,11 @@
       <div class="modal-body" id="viewDocumentBody" style="background:#F1F3F5; padding: 20px;">
         <!-- Наполнение бланка документа из JS -->
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+        <button class="btn-secondary" onclick="printGenericDocument()" style="display: flex; align-items: center; gap: 6px;">
+          <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2.2; fill: none; vertical-align: middle;"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          <span>Печать / Экспорт PDF</span>
+        </button>
         <button class="btn-primary" onclick="closeModal('viewDocumentModal')">Закрыть</button>
       </div>
     </div>

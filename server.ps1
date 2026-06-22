@@ -51,6 +51,7 @@ try {
                 $response.OutputStream.Write($bytes, 0, $bytes.Length)
             }
         } else {
+            Write-Host "--- 404 NOT FOUND: $url (Full Path: $filePath)" -ForegroundColor Red
             $response.StatusCode = 404
             $errBytes = [System.Text.Encoding]::UTF8.GetBytes("File Not Found")
             $response.OutputStream.Write($errBytes, 0, $errBytes.Length)

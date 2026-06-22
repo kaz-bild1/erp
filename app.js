@@ -6797,8 +6797,7 @@ function quickCheckVehicleFines(plate) {
 
 function performKzPlateCheck() {
   const plateInput = document.getElementById("vehiclePlateCheckInput");
-  const container = document.getElementById("plateCheckResultContainer");
-  if (!plateInput || !container) return;
+  if (!plateInput) return;
   
   const rawPlate = plateInput.value.trim();
   if (!rawPlate) {
@@ -6807,205 +6806,330 @@ function performKzPlateCheck() {
   }
   
   showSystemNotification("Запрос в ГИС ЕРАП РК, страховые базы ЕРАИ и ЧС логистики...");
-  container.style.display = "block";
-  container.innerHTML = `
-    <div style="text-align:center; padding: 30px; color: var(--text-secondary);">
-      <svg class="spinner" viewBox="0 0 50 50" style="width:30px; height:30px; margin:0 auto 12px; display:block; stroke:var(--brand-color); stroke-width:4; fill:none; stroke-linecap:round; animation:spin 1s linear infinite;"><circle cx="25" cy="25" r="20"></circle></svg>
-      Выполняется сверка госномера с базами данных Республики Казахстан...
-    </div>
-  `;
+  
+  // Показываем спиннер в инлайн-контейнере
+  const inlineContainer = document.getElementById("plateCheckResultContainer");
+  if (inlineContainer) {
+    inlineContainer.style.display = "block";
+    inlineContainer.innerHTML = `
+      <div style="text-align:center; padding: 20px; color: var(--text-secondary);">
+        <svg class="spinner" viewBox="0 0 50 50" style="width:24px; height:24px; margin:0 auto 8px; display:block; stroke:var(--brand-color); stroke-width:4; fill:none; stroke-linecap:round; animation:spin 1s linear infinite;"><circle cx="25" cy="25" r="20"></circle></svg>
+        Запрос в базы данных РК...
+      </div>
+    `;
+  }
   
   setTimeout(() => {
-    // Ищем машину в нашей базе для детальной информации
     const plateUpper = rawPlate.toUpperCase().replace(/\s+/g, '');
     const vehicle = db.vehicles.find(v => v.plate.toUpperCase().replace(/\s+/g, '') === plateUpper);
     
-    let name = rawPlate;
-    let type = "Внедорожник/Сторонний транспорт";
-    let isOwn = false;
-    let insuranceText = "Не найдено в базе ТОО";
-    let insuranceClass = "badge-neutral";
-    let ptoText = "Нет сведений";
-    let ptoClass = "badge-neutral";
-    let taxText = "Нет сведений";
-    let taxClass = "badge-neutral";
-    let driverText = "Не назначен";
-    let driverClass = "badge-neutral";
-    let fineSum = Math.random() > 0.4 ? Math.floor(Math.random() * 3 + 1) * 14530 : 0;
+    // Открываем модальное окно с полными данными
+    openVehicleFullCheckModal(vehicle, rawPlate);
     
-    if (vehicle) {
-      name = `${vehicle.name} (${vehicle.model})`;
-      type = vehicle.type;
-      isOwn = vehicle.ownerType === "own";
-      
-      // Сроки страховки
-      const insDate = new Date(vehicle.insuranceDate);
-      const today = new Date();
-      const diffTime = insDate - today;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      const checkCheckmark = `<svg viewBox="0 0 24 24" style="width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.5; fill: none; margin-right: 4px; display: inline-block; vertical-align: middle;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-      const checkCross = `<svg viewBox="0 0 24 24" style="width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.5; fill: none; margin-right: 4px; display: inline-block; vertical-align: middle;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-      const checkWarning = `<svg viewBox="0 0 24 24" style="width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.5; fill: none; margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+    // Скрываем инлайн-контейнер
+    if (inlineContainer) {
+      inlineContainer.style.display = "none";
+    }
+  }, 600);
+}
 
-      if (diffDays < 0) {
-        insuranceText = `${checkCross} ПРОСРОЧЕНА (срок истек ${Math.abs(diffDays)} дн. назад | ${vehicle.insuranceDate})`;
-        insuranceClass = "badge-danger";
-      } else if (diffDays <= 15) {
-        insuranceText = `${checkWarning} ИСТЕКАЕТ (осталось ${diffDays} дн. | ${vehicle.insuranceDate})`;
-        insuranceClass = "badge-warning";
-      } else {
-        insuranceText = `${checkCheckmark} Активна (осталось ${diffDays} дн. | до ${vehicle.insuranceDate})`;
-        insuranceClass = "badge-success";
-      }
-      
-      // Сроки ПТО
-      const ptoDate = new Date(vehicle.ptoDate);
-      const ptoDiff = ptoDate - today;
-      const ptoDays = Math.ceil(ptoDiff / (1000 * 60 * 60 * 24));
-      if (ptoDays < 0) {
-        ptoText = `${checkCross} Просрочен ПТО (истек ${Math.abs(ptoDays)} дн. назад)`;
-        ptoClass = "badge-danger";
-      } else {
-        ptoText = `${checkCheckmark} Пройден (до ${vehicle.ptoDate})`;
-        ptoClass = "badge-success";
-      }
-      
-      // Налог
-      if (isOwn) {
-        const taxDate = new Date(vehicle.taxDate || "2026-07-15");
-        const taxDiff = taxDate - today;
-        const taxDays = Math.ceil(taxDiff / (1000 * 60 * 60 * 24));
-        if (taxDays < 0) {
-          taxText = `${checkCross} Задолженность (${(vehicle.taxCost || 120000).toLocaleString()} ₸)`;
-          taxClass = "badge-danger";
-        } else {
-          taxText = `${checkCheckmark} Оплачен (${(vehicle.taxCost || 120000).toLocaleString()} ₸)`;
-          taxClass = "badge-success";
-        }
-      } else {
-        taxText = "Субаренда (оплачивает арендодатель)";
-        taxClass = "badge-neutral";
-      }
-      
-      // Водитель и проверка в ЧС
-      const driver = db.drivers.find(d => d.id === vehicle.driverId);
-      if (driver) {
-        // Проверяем по черному списку по ИИН или имени
-        const blacklisted = db.blacklist.find(b => b.iin === driver.iin || b.name.toLowerCase().includes(driver.name.toLowerCase()));
-        if (blacklisted) {
-          driverText = `${checkWarning} БЛОКИРОВКА: ${driver.name} в Черном списке! (Причина: ${blacklisted.blockReason})`;
-          driverClass = "badge-danger";
-        } else {
-          driverText = `${checkCheckmark} ${driver.name} (ИИН: ${driver.iin || "Нет"}) — Благонадежен`;
-          driverClass = "badge-success";
-        }
-      } else {
-        driverText = "Машинист не назначен на смену!";
-        driverClass = "badge-warning";
-      }
-    } else {
-      // Имитируем случайную проверку для стороннего госномера
-      insuranceText = "Внешняя страховка активна (Казкоммерц-Полис)";
-      insuranceClass = "badge-success";
-      ptoText = "Техосмотр пройден в ЦТО г. Атырау";
-      ptoClass = "badge-success";
-      taxText = "Сведений о задолженности по налогам нет";
-      taxClass = "badge-success";
-      driverText = "Сторонний оператор";
-      driverClass = "badge-neutral";
-    }
-    
-    let fineHtml = "";
-    if (fineSum > 0) {
-      fineHtml = `
-        <div style="background: rgba(220, 38, 38, 0.1); border-left: 4px solid var(--status-danger); padding: 12px; border-radius: 4px; margin-bottom: 12px;">
-          <span style="font-weight:700; color:var(--status-danger); font-size:12px; display:inline-flex; align-items:center; gap:4px;">
-            <svg viewBox="0 0 24 24" style="width:12px; height:12px; stroke:currentColor; stroke-width:2.5; fill:none; display:inline-block;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-            ОБНАРУЖЕНЫ ШТРАФЫ В БАЗЕ ЕРАП РК:
-          </span><br>
-          <span style="font-size:11px;">Найдено 1 предписание по превышению скорости на сумму: <strong>${fineSum.toLocaleString()} ₸</strong>. Рекомендуется удержать при выплатах.</span>
+function openVehicleFullCheckModal(vehicle, rawPlate) {
+  const modal = document.getElementById("vehicleFullCheckModal");
+  const body = document.getElementById("vehCheckModalBody");
+  const title = document.getElementById("vehCheckModalTitle");
+  if (!modal || !body) return;
+  
+  const today = new Date();
+  const checkSvg = `<svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;stroke-width:2.5;fill:none;margin-right:4px;display:inline-block;vertical-align:middle;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+  const crossSvg = `<svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;stroke-width:2.5;fill:none;margin-right:4px;display:inline-block;vertical-align:middle;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+  const warnSvg = `<svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;stroke-width:2.5;fill:none;margin-right:4px;display:inline-block;vertical-align:middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+  
+  if (!vehicle) {
+    title.innerHTML = `Проверка: ${rawPlate}`;
+    body.innerHTML = `
+      <div style="padding: 30px; text-align: center;">
+        <div style="font-size: 48px; margin-bottom: 12px; opacity: 0.3;">
+          <svg viewBox="0 0 24 24" style="width:48px;height:48px;stroke:var(--text-secondary);stroke-width:1.5;fill:none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         </div>
-      `;
-    } else {
-      fineHtml = `
-        <div style="background: rgba(22, 163, 74, 0.1); border-left: 4px solid var(--status-success); padding: 12px; border-radius: 4px; margin-bottom: 12px;">
-          <span style="font-weight:700; color:var(--status-success); font-size:12px; display:inline-flex; align-items:center; gap:4px;">
-            <svg viewBox="0 0 24 24" style="width:12px; height:12px; stroke:currentColor; stroke-width:2.5; fill:none; display:inline-block;"><polyline points="20 6 9 17 4 12"></polyline></svg>
-            АКТИВНЫХ ШТРАФОВ НЕТ:
-          </span><br>
-          <span style="font-size:11px;">Предписаний ПДД и неоплаченных взысканий по ГИС ЕРАП РК не обнаружено.</span>
-        </div>
-      `;
-    }
-    
-    // Формируем блок техпаспорта и VIN
-    let docHtml = '';
-    if (vehicle) {
-      docHtml = `
-        <div style="background: var(--bg-secondary); padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; display: flex; gap: 24px; flex-wrap: wrap; font-size: 11px;">
-          <div>
-            <span style="color:var(--text-secondary); font-size:10px; text-transform:uppercase; font-weight:700;">Номер техпаспорта (СРТС)</span><br>
-            <strong style="font-size:13px; letter-spacing:0.5px;">${vehicle.techPassport || 'Не указан'}</strong>
-          </div>
-          <div>
-            <span style="color:var(--text-secondary); font-size:10px; text-transform:uppercase; font-weight:700;">VIN-код</span><br>
-            <strong style="font-size:13px; font-family:monospace; letter-spacing:0.5px;">${vehicle.vin || 'Не указан'}</strong>
-          </div>
-          <div>
-            <span style="color:var(--text-secondary); font-size:10px; text-transform:uppercase; font-weight:700;">Год выпуска</span><br>
-            <strong style="font-size:13px;">${vehicle.year || '—'}</strong>
-          </div>
-          <div>
-            <span style="color:var(--text-secondary); font-size:10px; text-transform:uppercase; font-weight:700;">Инв. номер</span><br>
-            <strong style="font-size:13px;">${vehicle.invNumber || '—'}</strong>
-          </div>
-        </div>
-      `;
-    } else {
-      docHtml = `
-        <div style="background: var(--bg-secondary); padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; font-size: 11px; color: var(--text-secondary);">
-          <span style="font-size:10px; text-transform:uppercase; font-weight:700;">Техпаспорт / VIN</span><br>
-          Транспортное средство не зарегистрировано в реестре ТОО. Данные техпаспорта недоступны.
-        </div>
-      `;
-    }
-
-    container.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
-        <div>
-          <h4 style="font-size:14px; margin:0;">${name}</h4>
-          <span style="font-size:11px; color:var(--text-secondary);">${type}</span>
-        </div>
-        <span class="badge ${vehicle ? (isOwn ? 'badge-neutral' : 'badge-warning') : 'badge-neutral'}">
-          ${vehicle ? (isOwn ? 'Собственность ТОО' : 'Субаренда') : 'Вне реестра'}
-        </span>
-      </div>
-      
-      ${docHtml}
-      
-      ${fineHtml}
-      
-      <div class="grid-container" style="gap:12px; font-size:11px;">
-        <div class="col-6">
-          <strong>Страховой полис (ЕРАИ):</strong><br>
-          <span class="badge ${insuranceClass}" style="margin-top:4px; display:inline-block; text-align:left; font-size:10px;">${insuranceText}</span>
-        </div>
-        <div class="col-6">
-          <strong>Технический осмотр (ПТО):</strong><br>
-          <span class="badge ${ptoClass}" style="margin-top:4px; display:inline-block; font-size:10px;">${ptoText}</span>
-        </div>
-        <div class="col-6" style="margin-top:8px;">
-          <strong>Налог на транспорт:</strong><br>
-          <span class="badge ${taxClass}" style="margin-top:4px; display:inline-block; font-size:10px;">${taxText}</span>
-        </div>
-        <div class="col-6" style="margin-top:8px;">
-          <strong>Проверка машиниста / ЧС логистов:</strong><br>
-          <span class="badge ${driverClass}" style="margin-top:4px; display:inline-block; text-align:left; font-size:10px;">${driverText}</span>
-        </div>
+        <h3 style="margin:0 0 8px;">Транспорт не найден в реестре ТОО</h3>
+        <p style="color:var(--text-secondary); font-size:12px;">Госномер <strong>${rawPlate}</strong> не зарегистрирован в системе KazBildInvest ERP.<br>Возможно, это стороннее ТС или субарендованная техника без регистрации.</p>
       </div>
     `;
-  }, 800);
+    modal.classList.add("active");
+    return;
+  }
+  
+  // --- ДАННЫЕ АВТОМОБИЛЯ ---
+  const driver = db.drivers.find(d => d.id === vehicle.driverId);
+  const site = db.sites.find(s => s.id === vehicle.currentSiteId);
+  const isOwn = vehicle.ownerType === "own";
+  
+  // Страховка
+  const insDate = new Date(vehicle.insuranceDate);
+  const insDiff = Math.ceil((insDate - today) / 86400000);
+  let insStatus, insClass;
+  if (insDiff < 0) { insStatus = `${crossSvg} ПРОСРОЧЕНА (${Math.abs(insDiff)} дн. назад)`; insClass = "badge-danger"; }
+  else if (insDiff <= 15) { insStatus = `${warnSvg} Истекает (${insDiff} дн.)`; insClass = "badge-warning"; }
+  else { insStatus = `${checkSvg} Активна (${insDiff} дн.)`; insClass = "badge-success"; }
+  
+  // ПТО
+  const ptoDate = new Date(vehicle.ptoDate);
+  const ptoDiff = Math.ceil((ptoDate - today) / 86400000);
+  let ptoStatus, ptoClass;
+  if (ptoDiff < 0) { ptoStatus = `${crossSvg} Просрочен (${Math.abs(ptoDiff)} дн.)`; ptoClass = "badge-danger"; }
+  else { ptoStatus = `${checkSvg} Пройден (до ${vehicle.ptoDate})`; ptoClass = "badge-success"; }
+  
+  // Налог
+  let taxStatus, taxClass;
+  if (isOwn) {
+    const taxDate = new Date(vehicle.taxDate || "2026-07-15");
+    const taxDiff = Math.ceil((taxDate - today) / 86400000);
+    if (taxDiff < 0) { taxStatus = `${crossSvg} Задолженность (${(vehicle.taxCost || 0).toLocaleString()} ₸)`; taxClass = "badge-danger"; }
+    else { taxStatus = `${checkSvg} Оплачен (${(vehicle.taxCost || 0).toLocaleString()} ₸, до ${vehicle.taxDate || '2026-07-15'})`; taxClass = "badge-success"; }
+  } else {
+    taxStatus = "Субаренда (оплачивает арендодатель)"; taxClass = "badge-neutral";
+  }
+  
+  // Водитель
+  let driverStatus, driverClass;
+  if (driver) {
+    const bl = db.blacklist ? db.blacklist.find(b => b.iin === driver.iin || (b.name && b.name.toLowerCase().includes(driver.name.toLowerCase()))) : null;
+    if (bl) { driverStatus = `${warnSvg} БЛОКИРОВКА: ${driver.name} — ${bl.blockReason}`; driverClass = "badge-danger"; }
+    else { driverStatus = `${checkSvg} ${driver.name} (ИИН: ${driver.iin || '—'}) — Благонадёжен`; driverClass = "badge-success"; }
+  } else { driverStatus = "Машинист не назначен"; driverClass = "badge-warning"; }
+  
+  // Штрафы
+  const fineSum = Math.random() > 0.4 ? Math.floor(Math.random() * 3 + 1) * 14530 : 0;
+  
+  // --- ИСТОРИЯ ---
+  // Ремонты
+  const repairs = db.repairs ? db.repairs.filter(r => r.vehicleId === vehicle.id) : [];
+  // ГСМ
+  const fuelLogs = db.fuelLogs ? db.fuelLogs.filter(f => f.vehicleId === vehicle.id) : [];
+  // Табель
+  const timesheets = db.timesheets ? db.timesheets.filter(t => t.vehicleId === vehicle.id) : [];
+  
+  title.innerHTML = `Проверка: ${vehicle.name} — ${vehicle.plate}`;
+  
+  body.innerHTML = `
+    <!-- Шапка с основными данными -->
+    <div style="padding: 16px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 12px;">
+        <div>
+          <h3 style="margin:0; font-size:16px;">${vehicle.name} <span style="font-weight:400; color:var(--text-secondary);">(${vehicle.model})</span></h3>
+          <span style="font-size:12px; color:var(--text-secondary);">${vehicle.type}</span>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <span class="badge ${vehicle.status === 'Работает' ? 'badge-success' : (vehicle.status === 'На ремонте' || vehicle.status === 'Неисправна' ? 'badge-danger' : 'badge-warning')}">${vehicle.status}</span>
+          <span class="badge ${isOwn ? 'badge-neutral' : 'badge-warning'}">${isOwn ? 'Собственность ТОО' : 'Субаренда'}</span>
+        </div>
+      </div>
+      
+      <!-- Документы: 2 ряда по 4 поля -->
+      <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; font-size:11px;">
+        <div style="background:var(--bg-primary); padding:8px 10px; border-radius:6px; border:1px solid var(--border-color);">
+          <div style="color:var(--text-secondary); font-size:9px; text-transform:uppercase; font-weight:700; margin-bottom:2px;">Госномер</div>
+          <strong style="font-size:14px; color:var(--brand-color); font-family:monospace;">${vehicle.plate}</strong>
+        </div>
+        <div style="background:var(--bg-primary); padding:8px 10px; border-radius:6px; border:1px solid var(--border-color);">
+          <div style="color:var(--text-secondary); font-size:9px; text-transform:uppercase; font-weight:700; margin-bottom:2px;">Техпаспорт (СРТС)</div>
+          <strong style="font-size:13px;">${vehicle.techPassport || '—'}</strong>
+        </div>
+        <div style="background:var(--bg-primary); padding:8px 10px; border-radius:6px; border:1px solid var(--border-color);">
+          <div style="color:var(--text-secondary); font-size:9px; text-transform:uppercase; font-weight:700; margin-bottom:2px;">VIN-код</div>
+          <strong style="font-size:11px; font-family:monospace; letter-spacing:0.3px;">${vehicle.vin || '—'}</strong>
+        </div>
+        <div style="background:var(--bg-primary); padding:8px 10px; border-radius:6px; border:1px solid var(--border-color);">
+          <div style="color:var(--text-secondary); font-size:9px; text-transform:uppercase; font-weight:700; margin-bottom:2px;">Инв. номер</div>
+          <strong style="font-size:13px;">${vehicle.invNumber || '—'}</strong>
+        </div>
+        <div style="background:var(--bg-primary); padding:8px 10px; border-radius:6px; border:1px solid var(--border-color);">
+          <div style="color:var(--text-secondary); font-size:9px; text-transform:uppercase; font-weight:700; margin-bottom:2px;">Год выпуска</div>
+          <strong style="font-size:13px;">${vehicle.year || '—'}</strong>
+        </div>
+        <div style="background:var(--bg-primary); padding:8px 10px; border-radius:6px; border:1px solid var(--border-color);">
+          <div style="color:var(--text-secondary); font-size:9px; text-transform:uppercase; font-weight:700; margin-bottom:2px;">Пробег / Моточасы</div>
+          <strong style="font-size:12px;">${(vehicle.mileage || 0).toLocaleString()} км / ${(vehicle.engineHours || 0).toLocaleString()} м/ч</strong>
+        </div>
+        <div style="background:var(--bg-primary); padding:8px 10px; border-radius:6px; border:1px solid var(--border-color);">
+          <div style="color:var(--text-secondary); font-size:9px; text-transform:uppercase; font-weight:700; margin-bottom:2px;">Норма ГСМ</div>
+          <strong style="font-size:13px;">${vehicle.fuelRate || '—'} л/м.ч</strong>
+        </div>
+        <div style="background:var(--bg-primary); padding:8px 10px; border-radius:6px; border:1px solid var(--border-color);">
+          <div style="color:var(--text-secondary); font-size:9px; text-transform:uppercase; font-weight:700; margin-bottom:2px;">Объект</div>
+          <strong style="font-size:12px;">${site ? site.name : 'Вне геозоны'}</strong>
+        </div>
+      </div>
+      
+      ${!isOwn ? `
+      <div style="margin-top:10px; background: rgba(217,119,6,0.08); border:1px solid rgba(217,119,6,0.2); border-radius:6px; padding:8px 10px; font-size:11px;">
+        <strong style="color:#D97706;">Субаренда:</strong> ${vehicle.subrentProvider || 'Партнёр'} — <strong>${(vehicle.subrentRate || 0).toLocaleString()} ₸/сут</strong>
+      </div>` : ''}
+    </div>
+    
+    <!-- Табы -->
+    <div style="display:flex; border-bottom:2px solid var(--border-color); background:var(--bg-primary);" id="vehCheckTabs">
+      <button class="veh-check-tab active" onclick="switchVehCheckTab('statuses')" style="flex:1; padding:10px 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; border:none; background:none; cursor:pointer; border-bottom:2px solid var(--brand-color); margin-bottom:-2px; color:var(--brand-color);">Проверки</button>
+      <button class="veh-check-tab" onclick="switchVehCheckTab('repairs')" style="flex:1; padding:10px 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; border:none; background:none; cursor:pointer; color:var(--text-secondary);">Ремонты (${repairs.length})</button>
+      <button class="veh-check-tab" onclick="switchVehCheckTab('fuel')" style="flex:1; padding:10px 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; border:none; background:none; cursor:pointer; color:var(--text-secondary);">ГСМ (${fuelLogs.length})</button>
+      <button class="veh-check-tab" onclick="switchVehCheckTab('timesheet')" style="flex:1; padding:10px 8px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; border:none; background:none; cursor:pointer; color:var(--text-secondary);">Табель (${timesheets.length})</button>
+    </div>
+    
+    <!-- Содержимое табов -->
+    <div id="vehCheckTabContent" style="padding: 16px 20px;">
+      <!-- Таб: Проверки (по умолчанию) -->
+      <div id="vehCheckPane-statuses">
+        ${fineSum > 0 ? `
+        <div style="background: rgba(220,38,38,0.08); border-left:4px solid var(--status-danger); padding:10px 14px; border-radius:4px; margin-bottom:14px;">
+          <strong style="color:var(--status-danger); font-size:12px;">${warnSvg} ОБНАРУЖЕНЫ ШТРАФЫ В БАЗЕ ЕРАП РК:</strong><br>
+          <span style="font-size:11px;">Найдено 1 предписание по превышению скорости на сумму: <strong>${fineSum.toLocaleString()} ₸</strong>. Рекомендуется удержать при выплатах.</span>
+        </div>` : `
+        <div style="background: rgba(22,163,74,0.08); border-left:4px solid var(--status-success); padding:10px 14px; border-radius:4px; margin-bottom:14px;">
+          <strong style="color:var(--status-success); font-size:12px;">${checkSvg} АКТИВНЫХ ШТРАФОВ НЕТ</strong><br>
+          <span style="font-size:11px;">Предписаний ПДД и неоплаченных взысканий по ГИС ЕРАП РК не обнаружено.</span>
+        </div>`}
+        
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+          <div style="border:1px solid var(--border-color); border-radius:6px; padding:10px 14px;">
+            <div style="font-size:11px; font-weight:700; margin-bottom:6px;">Страховой полис (ЕРАИ)</div>
+            <span class="badge ${insClass}" style="font-size:10px; display:inline-block;">${insStatus}</span>
+            <div style="font-size:10px; color:var(--text-secondary); margin-top:4px;">Страховщик: ${vehicle.insuranceProvider || '—'}<br>Стоимость: ${(vehicle.insuranceCost || 0).toLocaleString()} ₸ / до ${vehicle.insuranceDate}</div>
+          </div>
+          <div style="border:1px solid var(--border-color); border-radius:6px; padding:10px 14px;">
+            <div style="font-size:11px; font-weight:700; margin-bottom:6px;">Технический осмотр (ПТО)</div>
+            <span class="badge ${ptoClass}" style="font-size:10px; display:inline-block;">${ptoStatus}</span>
+            <div style="font-size:10px; color:var(--text-secondary); margin-top:4px;">ПТО: ${vehicle.ptoDate || '—'}<br>ЦТО: ${vehicle.ctoDate || '—'}</div>
+          </div>
+          <div style="border:1px solid var(--border-color); border-radius:6px; padding:10px 14px;">
+            <div style="font-size:11px; font-weight:700; margin-bottom:6px;">Транспортный налог</div>
+            <span class="badge ${taxClass}" style="font-size:10px; display:inline-block;">${taxStatus}</span>
+          </div>
+          <div style="border:1px solid var(--border-color); border-radius:6px; padding:10px 14px;">
+            <div style="font-size:11px; font-weight:700; margin-bottom:6px;">Проверка машиниста / ЧС</div>
+            <span class="badge ${driverClass}" style="font-size:10px; display:inline-block; text-align:left;">${driverStatus}</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Таб: Ремонты -->
+      <div id="vehCheckPane-repairs" style="display:none;">
+        ${repairs.length > 0 ? `
+        <div class="table-wrapper" style="max-height:300px; overflow-y:auto;">
+          <table class="clean-table" style="font-size:11px;">
+            <thead><tr><th>Дата</th><th>Описание</th><th>Статус</th><th>Запчасти</th><th>Стоимость</th><th>По вине</th></tr></thead>
+            <tbody>
+              ${repairs.map(r => {
+                const rSite = db.sites ? db.sites.find(s => s.id === r.siteId) : null;
+                const partsList = r.partsRequested ? r.partsRequested.map(p => p.name).join(', ') : '—';
+                const totalCost = (r.damageCost || 0) + (r.laborCost || 0);
+                return `
+                <tr>
+                  <td style="white-space:nowrap;">${r.createdAt}</td>
+                  <td><strong>${r.description}</strong><br><span style="color:var(--text-secondary); font-size:10px;">Объект: ${rSite ? rSite.name : '—'} | Подрядчик: ${r.contractorName || '—'}</span></td>
+                  <td><span class="badge ${r.status === 'Готово' ? 'badge-success' : (r.status === 'Ремонт' ? 'badge-warning' : 'badge-neutral')}" style="font-size:9px;">${r.status}</span></td>
+                  <td style="font-size:10px;">${partsList}</td>
+                  <td style="font-weight:700;">${totalCost.toLocaleString()} ₸</td>
+                  <td>${r.faultByDriver ? '<span class="badge badge-danger" style="font-size:9px;">Да</span>' : '<span class="badge badge-success" style="font-size:9px;">Нет</span>'}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>` : '<div style="text-align:center; padding:30px; color:var(--text-secondary);">Ремонтных заявок для данного ТС не обнаружено.</div>'}
+      </div>
+      
+      <!-- Таб: ГСМ -->
+      <div id="vehCheckPane-fuel" style="display:none;">
+        ${fuelLogs.length > 0 ? `
+        <div class="table-wrapper" style="max-height:300px; overflow-y:auto;">
+          <table class="clean-table" style="font-size:11px;">
+            <thead><tr><th>Дата</th><th>Время</th><th>Водитель</th><th>Тип топлива</th><th>Литры</th><th>Стоимость</th><th>Карта</th></tr></thead>
+            <tbody>
+              ${fuelLogs.map(f => {
+                const fDriver = db.drivers ? db.drivers.find(d => d.id === f.driverId) : null;
+                return `
+                <tr>
+                  <td>${f.date}</td>
+                  <td>${f.time}</td>
+                  <td>${fDriver ? fDriver.name : '—'}</td>
+                  <td>${f.fuelType}</td>
+                  <td style="font-weight:700;">${f.liters} л</td>
+                  <td style="font-weight:700;">${(f.cost || 0).toLocaleString()} ₸</td>
+                  <td><code style="font-size:10px;">${f.fuelCard || '—'}</code></td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top:10px; font-size:11px; color:var(--text-secondary); border-top:1px solid var(--border-color); padding-top:8px;">
+          Итого: <strong>${fuelLogs.reduce((s,f) => s + (f.liters || 0), 0)} л</strong> на <strong>${fuelLogs.reduce((s,f) => s + (f.cost || 0), 0).toLocaleString()} ₸</strong>
+        </div>` : '<div style="text-align:center; padding:30px; color:var(--text-secondary);">Записей о заправках для данного ТС не обнаружено.</div>'}
+      </div>
+      
+      <!-- Таб: Табель -->
+      <div id="vehCheckPane-timesheet" style="display:none;">
+        ${timesheets.length > 0 ? timesheets.map(ts => {
+          const tsDriver = db.drivers ? db.drivers.find(d => d.id === vehicle.driverId) : null;
+          const workDays = Object.values(ts.dailyStatus || {}).filter(s => s === 'W').length;
+          const repairDays = Object.values(ts.dailyStatus || {}).filter(s => s === 'R').length;
+          const offDays = Object.values(ts.dailyStatus || {}).filter(s => s === 'O').length;
+          const idleDays = Object.values(ts.dailyStatus || {}).filter(s => s === 'I').length;
+          return `
+          <div style="border:1px solid var(--border-color); border-radius:6px; padding:12px 14px; margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <strong style="font-size:12px;">Табель за: ${ts.month}</strong>
+              <div style="display:flex; gap:4px;">
+                <span class="badge ${ts.mechanicApproved ? 'badge-success' : 'badge-neutral'}" style="font-size:9px;">Механик ${ts.mechanicApproved ? '✓' : '—'}</span>
+                <span class="badge ${ts.hrApproved ? 'badge-success' : 'badge-neutral'}" style="font-size:9px;">HR ${ts.hrApproved ? '✓' : '—'}</span>
+                <span class="badge ${ts.directorApproved ? 'badge-success' : 'badge-neutral'}" style="font-size:9px;">Директор ${ts.directorApproved ? '✓' : '—'}</span>
+              </div>
+            </div>
+            <div style="display:flex; gap:16px; font-size:11px;">
+              <div>Водитель: <strong>${tsDriver ? tsDriver.name : '—'}</strong></div>
+              <div>Явки: <strong style="color:var(--status-success);">${workDays}</strong></div>
+              <div>Ремонт: <strong style="color:#b45309;">${repairDays}</strong></div>
+              <div>Выходные: <strong style="color:#475569;">${offDays}</strong></div>
+              <div>Простой: <strong style="color:#991B1B;">${idleDays}</strong></div>
+            </div>
+          </div>`;
+        }).join('') : '<div style="text-align:center; padding:30px; color:var(--text-secondary);">Табельных записей для данного ТС не обнаружено.</div>'}
+      </div>
+    </div>
+  `;
+  
+  modal.classList.add("active");
+  applyPremiumStylesAndDecorators();
+}
+
+function switchVehCheckTab(tabName) {
+  // Скрыть все панели
+  ['statuses', 'repairs', 'fuel', 'timesheet'].forEach(name => {
+    const pane = document.getElementById('vehCheckPane-' + name);
+    if (pane) pane.style.display = 'none';
+  });
+  // Показать выбранную
+  const activePane = document.getElementById('vehCheckPane-' + tabName);
+  if (activePane) activePane.style.display = 'block';
+  
+  // Обновить стили табов
+  const tabsContainer = document.getElementById('vehCheckTabs');
+  if (tabsContainer) {
+    tabsContainer.querySelectorAll('button').forEach(btn => {
+      btn.style.borderBottom = '2px solid transparent';
+      btn.style.color = 'var(--text-secondary)';
+      btn.style.marginBottom = '-2px';
+    });
+    const idx = { statuses: 0, repairs: 1, fuel: 2, timesheet: 3 }[tabName] || 0;
+    const activeBtn = tabsContainer.querySelectorAll('button')[idx];
+    if (activeBtn) {
+      activeBtn.style.borderBottom = '2px solid var(--brand-color)';
+      activeBtn.style.color = 'var(--brand-color)';
+    }
+  }
+}
+
+function closeVehicleFullCheckModal() {
+  const modal = document.getElementById("vehicleFullCheckModal");
+  if (modal) modal.classList.remove("active");
 }
 
 // ----------------------------------------------------
@@ -7460,6 +7584,46 @@ function printContractDocument(contractId) {
             seal.innerText = "ПОДПИСАНО\\nТОО KBI";
             firstStamp.appendChild(seal);
           }
+          window.onload = function() { window.print(); window.close(); }
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+function printGenericDocument() {
+  const docBody = document.getElementById("viewDocumentBody");
+  if (!docBody) return;
+  
+  const printWindow = window.open('', '_blank', 'width=800,height=900');
+  if (!printWindow) {
+    showSystemNotification("Пожалуйста, разрешите всплывающие окна для печати!");
+    return;
+  }
+  
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Печать документа</title>
+        <style>
+          body { font-family: 'Outfit', 'Inter', sans-serif; padding: 40px; color: #0f172a; line-height: 1.5; background: #fff; }
+          .document-view-container { max-width: 800px; margin: 0 auto; }
+          button { display: none !important; }
+          ul, ol { padding-left: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
+          table th, table td { padding: 8px; border: 1px solid #cbd5e1; text-align: left; }
+          table th { background-color: #f8fafc; font-weight: bold; }
+          .badge { border: 1px solid #cbd5e1; padding: 2px 6px; border-radius: 4px; display: inline-block; font-size: 10px; font-weight: bold; }
+          .badge-success { color: #16a34a; border-color: #16a34a; background-color: #f0fdf4; }
+          .badge-danger { color: #dc2626; border-color: #dc2626; background-color: #fef2f2; }
+          .badge-warning { color: #d97706; border-color: #d97706; background-color: #fffbeb; }
+          .badge-neutral { color: #475569; border-color: #cbd5e1; background-color: #f8fafc; }
+        </style>
+      </head>
+      <body>
+        ${docBody.innerHTML}
+        <script>
           window.onload = function() { window.print(); window.close(); }
         </script>
       </body>
