@@ -1159,6 +1159,13 @@ const initialData = {
       isSubrent: true,
       status: "Активен"
     }
+  ],
+
+  // Список должников (дебиторка)
+  debtors: [
+    { id: "deb_1", companyName: "ТОО «АтырауНефть»", debtAmount: 1850000, delayDays: 14, paymentStageDays: 1 },
+    { id: "deb_2", companyName: "ТОО «Каспий Спец Техника»", debtAmount: 920000, delayDays: 5, paymentStageDays: 0 },
+    { id: "deb_3", companyName: "ТОО «ЮгЛогистик»", debtAmount: 3200000, delayDays: 28, paymentStageDays: 2 }
   ]
 };
 

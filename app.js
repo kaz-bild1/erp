@@ -23,6 +23,7 @@ if (!db.bankBalances) db.bankBalances = initialData.bankBalances || [];
 if (!db.safetyCertRequests) db.safetyCertRequests = initialData.safetyCertRequests || [];
 if (!db.materialsWriteOffs) db.materialsWriteOffs = initialData.materialsWriteOffs || [];
 if (!db.contracts) db.contracts = initialData.contracts || [];
+if (!db.debtors) db.debtors = initialData.debtors || [];
 if (!db.gpsAlerts) {
   db.gpsAlerts = [
     { id: "alert_1", vehicleId: "v101", type: "geofence", message: "Автокран Zoomlion (714 ADE 06) покинул геозону объекта Карабатан без путевого листа!", time: "12:10", status: "active" },
