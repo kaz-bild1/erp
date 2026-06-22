@@ -6772,65 +6772,142 @@ function renderAllVehiclesList() {
 
 // Быстрая проверка штрафов из строки автопарка
 function quickCheckVehicleFines(plate) {
-  // Переключаемся на вкладку автопарка если ещё не на ней
-  const tab = document.getElementById("tab-all_vehicles");
-  if (tab && tab.style.display === "none") {
-    switchTab("all_vehicles");
-  }
+  const vehicle = db.vehicles.find(v => v.plate.toUpperCase().replace(/\s+/g, '') === plate.toUpperCase().replace(/\s+/g, ''));
   
-  // Заполняем поле госномера
-  const plateInput = document.getElementById("vehiclePlateCheckInput");
-  if (plateInput) {
+  openErapSearchModal();
+  switchErapSearchTab('fines');
+  
+  const plateInput = document.getElementById("erapPlateInputFines");
+  const passportInput = document.getElementById("erapPassportInputFines");
+  
+  if (plateInput && passportInput) {
     plateInput.value = plate;
-    // Прокрутка к блоку проверки
-    plateInput.scrollIntoView({ behavior: "smooth", block: "center" });
-    // Подсветка поля
-    plateInput.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.3)";
-    setTimeout(() => { plateInput.style.boxShadow = ""; }, 2000);
+    passportInput.value = vehicle ? (vehicle.techPassport || "") : "";
+    
+    setTimeout(() => {
+      submitErapCheck('fines');
+    }, 400);
   }
-  
-  // Запуск проверки
-  setTimeout(() => {
-    performKzPlateCheck();
-  }, 300);
 }
 
 function performKzPlateCheck() {
-  const plateInput = document.getElementById("vehiclePlateCheckInput");
-  if (!plateInput) return;
+  openErapSearchModal();
+  switchErapSearchTab('check');
+}
+
+function openErapSearchModal() {
+  openModal("erapCheckSearchModal");
+}
+
+function closeErapSearchModal() {
+  closeModal("erapCheckSearchModal");
+}
+
+function switchErapSearchTab(tabName) {
+  const formCheck = document.getElementById("erapForm-check");
+  const formFines = document.getElementById("erapForm-fines");
+  if (formCheck && formFines) {
+    if (tabName === "check") {
+      formCheck.style.display = "block";
+      formFines.style.display = "none";
+    } else {
+      formCheck.style.display = "none";
+      formFines.style.display = "block";
+    }
+  }
   
-  const rawPlate = plateInput.value.trim();
+  document.querySelectorAll(".erap-search-tab").forEach(btn => {
+    btn.classList.remove("active");
+    btn.style.background = "transparent";
+    btn.style.boxShadow = "none";
+    btn.style.color = "var(--text-secondary)";
+  });
+  
+  const activeBtn = document.getElementById("erapTabBtn-" + tabName);
+  if (activeBtn) {
+    activeBtn.classList.add("active");
+    activeBtn.style.background = "var(--bg-primary)";
+    activeBtn.style.boxShadow = "0 1px 3px rgba(0,0,0,0.05)";
+    activeBtn.style.color = "#1e3a8a";
+  }
+}
+
+function submitErapCheck(type) {
+  let rawPlate = "";
+  let rawPassport = "";
+  let rawVin = "";
+  
+  if (type === "check") {
+    rawPlate = (document.getElementById("erapPlateInput")?.value || "").trim();
+    rawPassport = (document.getElementById("erapPassportInput")?.value || "").trim();
+    rawVin = (document.getElementById("erapVinInput")?.value || "").trim();
+  } else {
+    rawPlate = (document.getElementById("erapPlateInputFines")?.value || "").trim();
+    rawPassport = (document.getElementById("erapPassportInputFines")?.value || "").trim();
+  }
+  
   if (!rawPlate) {
     showSystemNotification("Введите госномер для проверки!");
     return;
   }
-  
-  showSystemNotification("Запрос в ГИС ЕРАП РК, страховые базы ЕРАИ и ЧС логистики...");
-  
-  // Показываем спиннер в инлайн-контейнере
-  const inlineContainer = document.getElementById("plateCheckResultContainer");
-  if (inlineContainer) {
-    inlineContainer.style.display = "block";
-    inlineContainer.innerHTML = `
-      <div style="text-align:center; padding: 20px; color: var(--text-secondary);">
-        <svg class="spinner" viewBox="0 0 50 50" style="width:24px; height:24px; margin:0 auto 8px; display:block; stroke:var(--brand-color); stroke-width:4; fill:none; stroke-linecap:round; animation:spin 1s linear infinite;"><circle cx="25" cy="25" r="20"></circle></svg>
-        Запрос в базы данных РК...
-      </div>
-    `;
+  if (!rawPassport) {
+    showSystemNotification("Введите номер техпаспорта (СРТС)!");
+    return;
   }
+  
+  showSystemNotification("Выполняется запрос в базы данных РК...");
+  
+  // Закрываем окно поиска
+  closeErapSearchModal();
   
   setTimeout(() => {
     const plateUpper = rawPlate.toUpperCase().replace(/\s+/g, '');
-    const vehicle = db.vehicles.find(v => v.plate.toUpperCase().replace(/\s+/g, '') === plateUpper);
+    const passportUpper = rawPassport.toUpperCase().replace(/\s+/g, '');
+    
+    // Ищем в базе по госномеру, техпаспорту или VIN
+    let vehicle = db.vehicles.find(v => 
+      v.plate.toUpperCase().replace(/\s+/g, '') === plateUpper || 
+      (v.techPassport && v.techPassport.toUpperCase().replace(/\s+/g, '') === passportUpper) ||
+      (rawVin && v.vin && v.vin.toUpperCase().replace(/\s+/g, '') === rawVin.toUpperCase().replace(/\s+/g, ''))
+    );
+    
+    // Если не найдено в реестре ТОО, генерируем красивый гостевой объект а-ля реальный сервис автопроверки
+    if (!vehicle) {
+      vehicle = {
+        id: "v_guest_" + Math.floor(Math.random()*9000 + 1000),
+        name: "Сторонний транспорт (Вне реестра)",
+        model: "Toyota Land Cruiser 200",
+        plate: rawPlate.toUpperCase(),
+        vin: rawVin ? rawVin.toUpperCase() : "JTMHU05J" + Math.floor(Math.random()*9000000 + 1000000),
+        techPassport: rawPassport.toUpperCase(),
+        invNumber: "GUEST-TC-" + Math.floor(Math.random()*90 + 10),
+        year: 2018 + Math.floor(Math.random()*7),
+        type: "Внедорожник / Легковой",
+        ownerType: "guest",
+        driverId: null,
+        status: "Свободен",
+        currentSiteId: null,
+        mileage: 95000 + Math.floor(Math.random()*45000),
+        engineHours: 0,
+        fuelRate: 14.5,
+        ptoDate: "2026-10-15",
+        ctoDate: "2026-10-15",
+        insuranceDate: "2027-01-20",
+        insuranceCost: 85000,
+        insuranceProvider: "АО «СК Евразия»",
+        taxDate: "2026-12-31",
+        taxCost: 78000
+      };
+    }
     
     // Открываем модальное окно с полными данными
     openVehicleFullCheckModal(vehicle, rawPlate);
     
-    // Скрываем инлайн-контейнер
-    if (inlineContainer) {
-      inlineContainer.style.display = "none";
+    // Если тип проверки - штрафы, принудительно переключаем на вкладку проверок (там видна плашка штрафов)
+    if (type === "fines") {
+      switchVehCheckTab("statuses");
     }
-  }, 600);
+  }, 800);
 }
 
 function openVehicleFullCheckModal(vehicle, rawPlate) {

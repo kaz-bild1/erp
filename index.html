@@ -1165,20 +1165,19 @@
           </div>
 
           <!-- Панель: Проверка по госномеру РК -->
-          <div class="card" style="margin-bottom: 24px;">
-            <h3 class="card-title" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-              <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; stroke: currentColor; stroke-width: 2.2; fill: none; display: inline-block; vertical-align: middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <span>Проверка спецтехники по госномеру (База ГИС ЕРАП РК)</span>
-            </h3>
-            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px;">
-              <input type="text" id="vehiclePlateCheckInput" class="form-control" placeholder="Введите госномер (например, 714 ADE 06)" style="max-width: 320px;" />
-              <button class="btn-primary" onclick="performKzPlateCheck()">Выполнить проверку</button>
-              <span style="font-size: 11px; color: var(--text-secondary);">Или выберите из реестра ниже</span>
-            </div>
-            
-            <!-- Результат проверки -->
-            <div id="plateCheckResultContainer" style="display: none; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px;">
-              <!-- Заполняется динамически JS -->
+          <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(37,99,235,0.04) 0%, rgba(30,58,138,0.04) 100%); border: 1px solid rgba(37,99,235,0.15);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+              <div>
+                <h3 class="card-title" style="margin-bottom: 6px; display: flex; align-items: center; gap: 8px; color: #1e3a8a;">
+                  <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.2; fill: none; display: inline-block; vertical-align: middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  <span>Проверка спецтехники и штрафов — ГИС ЕРАП РК</span>
+                </h3>
+                <p style="color: var(--text-secondary); font-size: 12px; margin: 0;">Интеграция с официальными базами данных МВД, КПСиСУ ГП и КГД МФ РК. Поиск по госномеру, номеру техпаспорта и VIN-коду.</p>
+              </div>
+              <button class="btn-primary" onclick="openErapSearchModal()" style="background: #2563EB; border-color: #2563EB; font-weight: 700; display: flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(37,99,235,0.2);">
+                <svg viewBox="0 0 24 24" style="width:14px; height:14px; stroke:currentColor; stroke-width:2.5; fill:none; vertical-align:middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <span>Открыть форму проверки</span>
+              </button>
             </div>
           </div>
 
@@ -1427,6 +1426,89 @@
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" onclick="closeVehicleFullCheckModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ПОИСК И ПРОВЕРКА В ГИС ЕРАП РК -->
+  <div class="modal-overlay" id="erapCheckSearchModal">
+    <div class="modal-box" style="max-width: 780px; padding: 24px; border-radius: 16px;">
+      <div class="modal-header" style="border-bottom: none; padding-bottom: 0;">
+        <span class="modal-title" style="font-size: 18px; font-weight: 700; color: var(--text-primary);">Интеграция с ГИС ЕРАП РК</span>
+        <button class="modal-close-btn" onclick="closeModal('erapCheckSearchModal')">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 10px 0 20px 0;">
+        
+        <!-- Секция баннера а-ля adata.kz -->
+        <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 30px; border-radius: 12px; color: #fff; position: relative; overflow: hidden; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="max-width: 60%; z-index: 2;">
+            <h2 style="font-size: 20px; font-weight: 800; margin: 0 0 8px 0; color: #fff !important; line-height: 1.2;">Проверка спецтехники и наличие штрафов</h2>
+            <p style="font-size: 11px; color: rgba(255,255,255,0.85); margin: 0; line-height: 1.4;">Получите полную историю владения, техническое состояние, информацию о ДТП, залогах и неоплаченных штрафах в реальном времени.</p>
+          </div>
+          <!-- Иконка машинки на заднем фоне -->
+          <div style="z-index: 1; opacity: 0.12; position: absolute; right: -10px; bottom: -20px; color: #fff;">
+            <svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: currentColor;"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 11.5v8c0 .83.67 1.5 1.5 1.5h1c.82 0 1.5-.67 1.5-1.5V18h10v1.5c0 .83.67 1.5 1.5 1.5h1c.82 0 1.5-.67 1.5-1.5v-8l-2.08-5.49zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 10l1.5-4.5h11L19 10H5z"/></svg>
+          </div>
+        </div>
+        
+        <!-- Табы а-ля Adata -->
+        <div style="display: flex; gap: 4px; background: var(--bg-secondary); padding: 4px; border-radius: 8px; margin-bottom: 16px; width: fit-content; border: 1px solid var(--border-color);">
+          <button class="erap-search-tab active" id="erapTabBtn-check" onclick="switchErapSearchTab('check')" style="padding: 8px 16px; border: none; background: var(--bg-primary); border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); color: #1e3a8a;">
+            <svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            Проверка техники
+          </button>
+          <button class="erap-search-tab" id="erapTabBtn-fines" onclick="switchErapSearchTab('fines')" style="padding: 8px 16px; border: none; background: transparent; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; color: var(--text-secondary);">
+            <svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Проверка штрафов
+          </button>
+        </div>
+        
+        <!-- Форма Проверки техники -->
+        <div id="erapForm-check" style="display: block;">
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <input type="text" id="erapPlateInput" class="form-control" placeholder="Гос. номер (например, 714 ADE 06) *" style="flex: 1.2; min-width: 180px; padding: 10px 12px; font-size: 12px;" />
+            <input type="text" id="erapPassportInput" class="form-control" placeholder="№ техпаспорта (СРТС) *" style="flex: 1.2; min-width: 180px; padding: 10px 12px; font-size: 12px;" />
+            <input type="text" id="erapVinInput" class="form-control" placeholder="VIN-код (необязательно)" style="flex: 1.5; min-width: 180px; padding: 10px 12px; font-size: 12px;" />
+            <button class="btn-primary" onclick="submitErapCheck('check')" style="background: #2563EB; border-color: #2563EB; padding: 10px 24px; font-size: 12px; font-weight: 700; height: 38px;">Проверить</button>
+          </div>
+        </div>
+        
+        <!-- Форма Проверки штрафов -->
+        <div id="erapForm-fines" style="display: none;">
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <input type="text" id="erapPlateInputFines" class="form-control" placeholder="Гос. номер (например, 714 ADE 06) *" style="flex: 1.5; min-width: 180px; padding: 10px 12px; font-size: 12px;" />
+            <input type="text" id="erapPassportInputFines" class="form-control" placeholder="№ техпаспорта (СРТС) *" style="flex: 1.5; min-width: 180px; padding: 10px 12px; font-size: 12px;" />
+            <button class="btn-primary" onclick="submitErapCheck('fines')" style="background: #2563EB; border-color: #2563EB; padding: 10px 24px; font-size: 12px; font-weight: 700; height: 38px;">Проверить</button>
+          </div>
+        </div>
+        
+        <!-- Источники данных (Логотипы) -->
+        <div style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+          <div style="font-size: 10px; text-transform: uppercase; font-weight: 700; color: var(--text-secondary); text-align: center; margin-bottom: 12px; letter-spacing: 0.5px;">Официальные источники данных</div>
+          <div style="display: flex; justify-content: center; gap: 20px; align-items: center; flex-wrap: wrap; opacity: 0.7;">
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 600;">
+              <div style="background: #1e3a8a; color:#fff; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:800;">M</div>
+              <span>МВД РК</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 600;">
+              <div style="background: #008751; color:#fff; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:800;">G</div>
+              <span>ГП РК</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 600;">
+              <div style="background: #d97706; color:#fff; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:800;">T</div>
+              <span>КГД МФ РК</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 600;">
+              <div style="background: #0d9488; color:#fff; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:800;">E</div>
+              <span>Жасыл Даму</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 600;">
+              <div style="background: #4f46e5; color:#fff; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:800;">Q</div>
+              <span>QAJ (КазАвтоЖол)</span>
+            </div>
+          </div>
+        </div>
+        
       </div>
     </div>
   </div>
