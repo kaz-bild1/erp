@@ -1971,3 +1971,33 @@ button:active, .menu-item:active, .kpi-card:active, .vehicle-list-item:active, .
   pointer-events: none;
 }
 
+/* @media print for seamless document printing without window.open */
+@media print {
+  body > *:not(#print-section) {
+    display: none !important;
+  }
+  #print-section {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    padding: 20px !important;
+    margin: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  #print-section button, 
+  #print-section .modal-footer, 
+  #print-section .modal-header,
+  #print-section .btn-primary,
+  #print-section .btn-secondary {
+    display: none !important;
+  }
+}
+
+

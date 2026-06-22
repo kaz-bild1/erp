@@ -516,8 +516,35 @@ function generateKpPrint(dealId) {
   openModal("kpPrintModal");
 }
 
-function printKp() {
+function printHtmlContent(htmlContent, additionalStyles = '') {
+  let printSec = document.getElementById("print-section");
+  if (!printSec) {
+    printSec = document.createElement("div");
+    printSec.id = "print-section";
+    document.body.appendChild(printSec);
+  }
+  
+  let stylesHtml = '';
+  if (additionalStyles) {
+    stylesHtml = `<style>${additionalStyles}</style>`;
+  }
+  
+  printSec.innerHTML = stylesHtml + htmlContent;
   window.print();
+  setTimeout(() => {
+    if (printSec && printSec.parentNode) {
+      printSec.remove();
+    }
+  }, 1000);
+}
+
+function printKp() {
+  const kpContent = document.getElementById("kpPrintView");
+  if (kpContent) {
+    printHtmlContent(kpContent.innerHTML);
+  } else {
+    window.print();
+  }
 }
 
 function siteIdToDistance(siteId) {
@@ -7628,83 +7655,58 @@ function printContractDocument(contractId) {
   const doc = document.getElementById("a4-printed-contract");
   if (!doc) return;
   
-  // Открытие окна для печати
-  const printWindow = window.open('', '_blank', 'width=800,height=900');
-  printWindow.document.write(`
-    <html>
-      <head>
-        <title>Печать договора</title>
-        <style>
-          body { font-family: sans-serif; padding: 20px; }
-          .a4-print-document { background: #fff; border: none; box-shadow: none; max-width: 100%; margin: 0; padding: 0; }
-          .a4-header { border-bottom: 2px solid #000; text-align: center; padding-bottom: 12px; margin-bottom: 20px; }
-          .a4-title { font-size: 16px; font-weight: bold; text-transform: uppercase; margin-top: 10px; }
-          .a4-meta-table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
-          .a4-meta-table td { padding: 6px; border: 1px solid #000; font-size: 10px; }
-          .a4-body { font-size: 11px; line-height: 1.4; text-align: justify; }
-          .a4-footer { display: flex; justify-content: space-between; margin-top: 40px; font-size: 11px; }
-          .a4-stamp-box { position: relative; width: 200px; height: 100px; border-bottom: 1px solid #000; display: flex; align-items: flex-end; }
-          .seal-blue { border: 2px solid #1d4ed8; color: #1d4ed8; border-radius: 50%; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; font-size: 9px; transform: rotate(-15deg); font-weight: bold; position: absolute; top: 10px; left: 60px; opacity: 0.8; }
-        </style>
-      </head>
-      <body>
-        ${doc.innerHTML}
-        <script>
-          // Добавляем штамп печати
-          const footers = document.getElementsByClassName("a4-footer");
-          if(footers.length > 0) {
-            const firstStamp = footers[0].getElementsByClassName("a4-stamp-box")[0];
-            const seal = document.createElement("div");
-            seal.className = "seal-blue";
-            seal.innerText = "ПОДПИСАНО\\nТОО KBI";
-            firstStamp.appendChild(seal);
-          }
-          window.onload = function() { window.print(); window.close(); }
-        </script>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
+  // Clone doc to not affect the on-screen preview
+  const clone = doc.cloneNode(true);
+  
+  // Add the seal stamp
+  const footers = clone.getElementsByClassName("a4-footer");
+  if (footers.length > 0) {
+    const firstStamp = footers[0].getElementsByClassName("a4-stamp-box")[0];
+    if (firstStamp) {
+      if (!firstStamp.querySelector(".seal-blue")) {
+        const seal = document.createElement("div");
+        seal.className = "seal-blue";
+        seal.innerText = "ПОДПИСАНО\nТОО KBI";
+        firstStamp.appendChild(seal);
+      }
+    }
+  }
+  
+  const stylesExtra = `
+    .a4-print-document { background: #fff; border: none; box-shadow: none; max-width: 100%; margin: 0; padding: 0; }
+    .a4-header { border-bottom: 2px solid #000; text-align: center; padding-bottom: 12px; margin-bottom: 20px; }
+    .a4-title { font-size: 16px; font-weight: bold; text-transform: uppercase; margin-top: 10px; }
+    .a4-meta-table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
+    .a4-meta-table td { padding: 6px; border: 1px solid #000; font-size: 10px; }
+    .a4-body { font-size: 11px; line-height: 1.4; text-align: justify; }
+    .a4-footer { display: flex; justify-content: space-between; margin-top: 40px; font-size: 11px; }
+    .a4-stamp-box { position: relative; width: 200px; height: 100px; border-bottom: 1px solid #000; display: flex; align-items: flex-end; }
+    .seal-blue { border: 2px solid #1d4ed8; color: #1d4ed8; border-radius: 50%; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; font-size: 9px; transform: rotate(-15deg); font-weight: bold; position: absolute; top: 10px; left: 60px; opacity: 0.8; white-space: pre-line; }
+  `;
+  
+  printHtmlContent(clone.innerHTML, stylesExtra);
 }
 
 function printGenericDocument() {
   const docBody = document.getElementById("viewDocumentBody");
   if (!docBody) return;
   
-  const printWindow = window.open('', '_blank', 'width=800,height=900');
-  if (!printWindow) {
-    showSystemNotification("Пожалуйста, разрешите всплывающие окна для печати!");
-    return;
-  }
+  const stylesExtra = `
+    body { font-family: 'Outfit', 'Inter', sans-serif; padding: 40px; color: #0f172a; line-height: 1.5; background: #fff; }
+    .document-view-container { max-width: 800px; margin: 0 auto; }
+    button { display: none !important; }
+    ul, ol { padding-left: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
+    table th, table td { padding: 8px; border: 1px solid #cbd5e1; text-align: left; }
+    table th { background-color: #f8fafc; font-weight: bold; }
+    .badge { border: 1px solid #cbd5e1; padding: 2px 6px; border-radius: 4px; display: inline-block; font-size: 10px; font-weight: bold; }
+    .badge-success { color: #16a34a; border-color: #16a34a; background-color: #f0fdf4; }
+    .badge-danger { color: #dc2626; border-color: #dc2626; background-color: #fef2f2; }
+    .badge-warning { color: #d97706; border-color: #d97706; background-color: #fffbeb; }
+    .badge-neutral { color: #475569; border-color: #cbd5e1; background-color: #f8fafc; }
+  `;
   
-  printWindow.document.write(`
-    <html>
-      <head>
-        <title>Печать документа</title>
-        <style>
-          body { font-family: 'Outfit', 'Inter', sans-serif; padding: 40px; color: #0f172a; line-height: 1.5; background: #fff; }
-          .document-view-container { max-width: 800px; margin: 0 auto; }
-          button { display: none !important; }
-          ul, ol { padding-left: 20px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
-          table th, table td { padding: 8px; border: 1px solid #cbd5e1; text-align: left; }
-          table th { background-color: #f8fafc; font-weight: bold; }
-          .badge { border: 1px solid #cbd5e1; padding: 2px 6px; border-radius: 4px; display: inline-block; font-size: 10px; font-weight: bold; }
-          .badge-success { color: #16a34a; border-color: #16a34a; background-color: #f0fdf4; }
-          .badge-danger { color: #dc2626; border-color: #dc2626; background-color: #fef2f2; }
-          .badge-warning { color: #d97706; border-color: #d97706; background-color: #fffbeb; }
-          .badge-neutral { color: #475569; border-color: #cbd5e1; background-color: #f8fafc; }
-        </style>
-      </head>
-      <body>
-        ${docBody.innerHTML}
-        <script>
-          window.onload = function() { window.print(); window.close(); }
-        </script>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
+  printHtmlContent(docBody.innerHTML, stylesExtra);
 }
 
 // ============================================================================
