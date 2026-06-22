@@ -1037,10 +1037,11 @@
 
         <!-- 10. ТАБ: НАСТРОЙКИ СИСТЕМЫ -->
         <section id="tab-settings" class="tab-pane">
+          <!-- Header card -->
           <div class="card" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
             <div>
-              <h3>Панель финансового и материального учета</h3>
-              <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Управление банковскими счетами, курсами валют, налогами, авансами поставщикам и договорами.</p>
+              <h3>Администрирование и настройки системы</h3>
+              <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Управление ролями, аудит действий пользователей, системная информация и импорт/экспорт данных.</p>
             </div>
             <div style="display: flex; gap: 8px;">
               <button class="btn-hold-confirm btn-primary" data-action="resetDemo">
@@ -1055,79 +1056,45 @@
           </div>
 
           <div class="grid-container" style="gap: 20px; align-items: start;">
-            <!-- Левая колонка: Финансы, Банки, Договоры -->
+            <!-- Левая колонка: Системная информация, Роли -->
             <div class="col-6" style="display: flex; flex-direction: column; gap: 20px;">
-              <!-- Блок: Банковские счета и Курсы валют -->
+              <!-- Блок: Информация о системе -->
               <div class="card" style="margin-bottom: 0;">
-                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">Остатки на счетах и курсы валют</h4>
-                <div class="grid-container" style="gap: 12px; margin-bottom: 16px;">
-                  <div class="col-6" style="background: var(--bg-secondary); padding: 12px; border-radius: 6px;">
-                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Halyk Bank (KZT)</span>
-                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
-                      <input type="number" id="balanceKztInput" class="form-control" style="font-size: 14px; font-weight: 700; padding: 4px 8px;" onchange="updateBankBalancesState()" />
-                      <span>₸</span>
-                    </div>
+                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">Информация о системе</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div style="background: var(--bg-secondary); padding: 12px; border-radius: 6px;">
+                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Версия</span>
+                    <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">KazBildInvest ERP v3.0</div>
                   </div>
-                  <div class="col-6" style="background: var(--bg-secondary); padding: 12px; border-radius: 6px;">
-                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">ForteBank (USD)</span>
-                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
-                      <input type="number" id="balanceUsdInput" class="form-control" style="font-size: 14px; font-weight: 700; padding: 4px 8px;" onchange="updateBankBalancesState()" />
-                      <span>$</span>
-                    </div>
+                  <div style="background: var(--bg-secondary); padding: 12px; border-radius: 6px;">
+                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Дата запуска</span>
+                    <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">2026-01-15</div>
                   </div>
-                </div>
-
-                <!-- Конвертер валют и Курсы -->
-                <div style="border-top: 1px solid var(--border-color); padding-top: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                  <div style="font-size: 11px; color: var(--text-secondary);">
-                    <span>Курсы Нацбанка РК: </span>
-                    <strong style="margin-right: 8px;">USD: <span id="rateUsdDisplay">448.50</span> ₸</strong>
-                    <strong>RUB: <span id="rateRubDisplay">5.12</span> ₸</strong>
+                  <div style="background: var(--bg-secondary); padding: 12px; border-radius: 6px;">
+                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Всего пользователей</span>
+                    <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">12</div>
                   </div>
-                  <button class="btn-secondary" style="font-size: 10px; padding: 4px 8px;" onclick="simulateCurrencyUpdate()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg><span>Обновить курсы</span></button>
+                  <div style="background: var(--bg-secondary); padding: 12px; border-radius: 6px;">
+                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Лицензия</span>
+                    <div style="font-size: 13px; font-weight: 700; margin-top: 4px;">Корпоративная (до 50 пользователей)</div>
+                  </div>
                 </div>
               </div>
 
-              <!-- Блок: Авансы поставщикам -->
+              <!-- Блок: Роли и доступ -->
               <div class="card" style="margin-bottom: 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                  <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Авансы поставщикам (Предоплаты)</h4>
-                  <button class="btn-secondary" style="font-size: 11px; padding: 4px 8px;" onclick="openSupplierAdvanceModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Новый аванс</span></button>
-                </div>
-                <div class="table-wrapper" style="max-height: 180px; overflow-y: auto;">
+                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Роли и уровни доступа</h4>
+                <div class="table-wrapper" style="max-height: 250px; overflow-y: auto;">
                   <table class="clean-table" style="font-size: 11px;">
                     <thead>
                       <tr>
-                        <th>Поставщик</th>
-                        <th>Дата</th>
-                        <th>Сумма (₸)</th>
-                        <th>Назначение</th>
-                      </tr>
-                    </thead>
-                    <tbody id="supplierAdvancesTableBody">
-                      <!-- Из JS -->
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <!-- Блок: Договоры спецтехники (Реестр менеджера) -->
-              <div class="card" style="margin-bottom: 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                  <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Реестр Договоров Менеджера</h4>
-                  <button class="btn-primary" style="font-size: 11px; padding: 4px 8px;" onclick="openAddContractModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Добавить договор</span></button>
-                </div>
-                <div class="table-wrapper" style="max-height: 220px; overflow-y: auto;">
-                  <table class="clean-table" style="font-size: 11px;">
-                    <thead>
-                      <tr>
-                        <th>Договор / Компания</th>
-                        <th>Сроки / Техника</th>
-                        <th>Контакты хозяина / бухгалтера</th>
+                        <th>Роль</th>
+                        <th>Описание</th>
+                        <th>Доступные модули</th>
                         <th>Статус</th>
                       </tr>
                     </thead>
-                    <tbody id="contractsTableBody">
+                    <tbody id="adminRolesTableBody">
                       <!-- Из JS -->
                     </tbody>
                   </table>
@@ -1135,73 +1102,52 @@
               </div>
             </div>
 
-            <!-- Правая колонка: Налог на транспорт, ТМЦ, Заявки ТБ -->
+            <!-- Правая колонка: Аудит, Импорт/Экспорт -->
             <div class="col-6" style="display: flex; flex-direction: column; gap: 20px;">
-              <!-- Блок: Налог на транспорт (Основные средства) -->
+              <!-- Блок: Журнал аудита -->
               <div class="card" style="margin-bottom: 0;">
-                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Налог на транспорт (Основные средства)</h4>
-                <div class="table-wrapper" style="max-height: 200px; overflow-y: auto;">
+                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Журнал аудита (последние действия)</h4>
+                <div class="table-wrapper" style="max-height: 250px; overflow-y: auto;">
                   <table class="clean-table" style="font-size: 11px;">
                     <thead>
                       <tr>
-                        <th>Техника</th>
-                        <th>Госномер</th>
-                        <th>Налог (₸)</th>
-                        <th>Срок оплаты</th>
-                        <th>Статус оплаты</th>
+                        <th>Дата/Время</th>
+                        <th>Пользователь</th>
+                        <th>Действие</th>
+                        <th>Модуль</th>
                       </tr>
                     </thead>
-                    <tbody id="vehicleTaxTableBody">
+                    <tbody id="adminAuditLogBody">
                       <!-- Из JS -->
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              <!-- Блок: Складской учет материалов (Приход / Списание) -->
+              <!-- Блок: Импорт / Экспорт данных -->
               <div class="card" style="margin-bottom: 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                  <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Журнал прихода и списания материалов</h4>
-                  <button class="btn-secondary" style="font-size: 11px; padding: 4px 8px;" onclick="openMaterialLogModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Движение ТМЦ</span></button>
-                </div>
-                <div class="table-wrapper" style="max-height: 180px; overflow-y: auto;">
-                  <table class="clean-table" style="font-size: 11px;">
-                    <thead>
-                      <tr>
-                        <th>Дата / Тип</th>
-                        <th>Наименование ТМЦ</th>
-                        <th>Кол-во</th>
-                        <th>Поставщик / Назначение</th>
-                        <th>Сумма (₸)</th>
-                      </tr>
-                    </thead>
-                    <tbody id="materialsLogTableBody">
-                      <!-- Из JS -->
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <!-- Блок: Заявки на корочки ТБ -->
-              <div class="card" style="margin-bottom: 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                  <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Заявки на оформление ТБ корочек</h4>
-                  <button class="btn-secondary" style="font-size: 11px; padding: 4px 8px;" onclick="openOrderSafetyCertModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Заказать ТБ</span></button>
-                </div>
-                <div class="table-wrapper" style="max-height: 180px; overflow-y: auto;">
-                  <table class="clean-table" style="font-size: 11px;">
-                    <thead>
-                      <tr>
-                        <th>Сотрудник</th>
-                        <th>Техника</th>
-                        <th>Дата заявки</th>
-                        <th>Статус</th>
-                      </tr>
-                    </thead>
-                    <tbody id="safetyCertTableBody">
-                      <!-- Из JS -->
-                    </tbody>
-                  </table>
+                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">Импорт / Экспорт данных</h4>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    <button class="btn-secondary" style="font-size: 11px; padding: 6px 12px;" onclick="exportFleetCSV()">
+                      <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                      <span>Экспорт автопарка (CSV)</span>
+                    </button>
+                    <button class="btn-secondary" style="font-size: 11px; padding: 6px 12px;" onclick="exportTimesheetCSV()">
+                      <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                      <span>Экспорт табеля (CSV)</span>
+                    </button>
+                    <button class="btn-secondary" style="font-size: 11px; padding: 6px 12px;" onclick="exportFinanceCSV()">
+                      <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                      <span>Экспорт финансов (CSV)</span>
+                    </button>
+                  </div>
+                  <div style="border-top: 1px solid var(--border-color); padding-top: 10px;">
+                    <button class="btn-primary" style="font-size: 11px; padding: 6px 12px;" onclick="importDataJSON()">
+                      <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                      <span>Импорт данных (JSON)</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1346,15 +1292,15 @@
               <div class="card" style="margin-bottom: 0;">
                 <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">Расчетные счета и курсы валют</h4>
                 <div class="grid-container" style="gap: 12px; margin-bottom: 16px;">
-                  <div class="col-6" style="background: var(--bg-secondary); padding: 12px; border-radius: 6px;">
-                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Halyk Bank (KZT)</span>
+                  <div class="col-6" style="background: rgba(0, 166, 81, 0.08); border: 1px solid rgba(0, 166, 81, 0.25); border-radius: 8px; padding: 12px;">
+                    <span style="font-size: 10px; color: #00A651; text-transform: uppercase; font-weight: 700;">Halyk Bank (KZT)</span>
                     <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
                       <input type="number" id="finBalanceKztInput" class="form-control" style="font-size: 14px; font-weight: 700; padding: 4px 8px;" onchange="updateFinanceBalancesState()" />
                       <span>₸</span>
                     </div>
                   </div>
-                  <div class="col-6" style="background: var(--bg-secondary); padding: 12px; border-radius: 6px;">
-                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">ForteBank (USD)</span>
+                  <div class="col-6" style="background: rgba(0, 61, 165, 0.08); border: 1px solid rgba(0, 61, 165, 0.25); border-radius: 8px; padding: 12px;">
+                    <span style="font-size: 10px; color: #003DA5; text-transform: uppercase; font-weight: 700;">ForteBank (USD)</span>
                     <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
                       <input type="number" id="finBalanceUsdInput" class="form-control" style="font-size: 14px; font-weight: 700; padding: 4px 8px;" onchange="updateFinanceBalancesState()" />
                       <span>$</span>

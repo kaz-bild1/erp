@@ -6475,121 +6475,135 @@ function updateBankBalancesState() {
 
 // 7. Рендеринг панели настроек и финансов
 function renderSettingsDashboard() {
-  // 1. Курсы валют и балансы
-  const balanceKzt = document.getElementById("balanceKztInput");
-  const balanceUsd = document.getElementById("balanceUsdInput");
-  if (balanceKzt && balanceUsd) {
-    balanceKzt.value = db.bankBalances[0]?.balance || 14500000;
-    balanceUsd.value = db.bankBalances[1]?.balance || 25000;
-  }
-  
-  const rateUsd = document.getElementById("rateUsdDisplay");
-  const rateRub = document.getElementById("rateRubDisplay");
-  if (rateUsd && rateRub) {
-    rateUsd.innerText = db.currencyRates.USD.toFixed(2);
-    rateRub.innerText = db.currencyRates.RUB.toFixed(2);
-  }
-  
-  // 2. Авансы поставщикам
-  const advancesTbody = document.getElementById("supplierAdvancesTableBody");
-  if (advancesTbody) {
-    advancesTbody.innerHTML = db.supplierAdvances.map(a => `
-      <tr>
-        <td><strong>${a.supplierName}</strong></td>
-        <td>${a.date}</td>
-        <td style="color:var(--status-success); font-weight:700;">${a.amount.toLocaleString()} ₸</td>
-        <td>${a.purpose}</td>
+  // 1. Таблица ролей и доступа
+  const rolesTbody = document.getElementById("adminRolesTableBody");
+  if (rolesTbody) {
+    const roles = [
+      { name: "Директор (Все права)", code: "Director", modules: "Все модули", status: "Активна", color: "badge-success" },
+      { name: "Зам. директора", code: "DeputyDirector", modules: "CRM, Финансы, Диспетч., Автопарк", status: "Активна", color: "badge-success" },
+      { name: "Механик участка", code: "Mechanic", modules: "Автопарк, Ремонты, ТО, Табель", status: "Активна", color: "badge-success" },
+      { name: "Бухгалтер", code: "Accountant", modules: "Финансы, Табель, Зарплата", status: "Активна", color: "badge-success" },
+      { name: "Диспетчер", code: "Dispatcher", modules: "Диспетчерская, GPS, Путевые", status: "Активна", color: "badge-success" },
+      { name: "HR-менеджер", code: "HR", modules: "Кадры, ТБ, Корочки", status: "Активна", color: "badge-success" },
+      { name: "Кладовщик", code: "Warehouse", modules: "Склад, ТМЦ, Закупки", status: "Активна", color: "badge-success" },
+      { name: "Снабженец", code: "Procurement", modules: "Закупки, Снабжение", status: "Активна", color: "badge-success" }
+    ];
+    
+    const currentRole = db.settings.activeRole;
+    rolesTbody.innerHTML = roles.map(r => `
+      <tr style="${r.code === currentRole ? 'background: rgba(37,99,235,0.06);' : ''}">
+        <td>
+          <strong>${r.name}</strong>
+          ${r.code === currentRole ? '<span class="badge badge-neutral" style="font-size:8px; margin-left:6px;">ТЕКУЩАЯ</span>' : ''}
+        </td>
+        <td><span style="font-size:11px; color:var(--text-secondary);">${r.modules}</span></td>
+        <td><span class="badge ${r.color}" style="font-size:9px;">${r.status}</span></td>
       </tr>
     `).join("");
   }
   
-  // 3. Реестр договоров
-  const contractsTbody = document.getElementById("contractsTableBody");
-  if (contractsTbody) {
-    contractsTbody.innerHTML = db.contracts.map(c => `
-      <tr>
-        <td>
-          <strong>№ ${c.number}</strong><br>
-          <span style="font-size:10px; color:var(--text-secondary);">${c.companyName}</span>
-        </td>
-        <td>
-          <span class="badge ${c.isSubrent ? 'badge-danger' : 'badge-neutral'}" style="font-size:9px;">${c.isSubrent ? 'Субаренда' : 'Услуги'}</span><br>
-          <span style="font-size:10px; color:var(--text-secondary);">${c.vehicleType} (${c.plateNumber})</span>
-        </td>
-        <td>
-          <span style="font-size:10px;">Владелец: ${c.ownerContact}</span><br>
-          <span style="font-size:10px; color:var(--text-secondary);">Бухгалтер: ${c.accountantContact}</span>
-        </td>
-        <td><span class="badge badge-success" style="font-size:9px;">${c.status}</span></td>
-      </tr>
-    `).join("");
-  }
-  
-  // 4. Налог на транспорт
-  const taxTbody = document.getElementById("vehicleTaxTableBody");
-  if (taxTbody) {
-    taxTbody.innerHTML = db.vehicles.filter(v => v.ownerType === 'own').map(v => {
-      // Расчет дней до уплаты налога (условный дедлайн 15 июля 2026 года)
-      const deadline = new Date("2026-07-15");
-      const today = new Date();
-      const diffTime = deadline - today;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      let statusStyle = "color:var(--status-success);";
-      let statusText = `${diffDays} дней осталось`;
-      if (diffDays < 0) {
-        statusStyle = "color:var(--status-danger); font-weight:700;";
-        statusText = `Просрочено на ${Math.abs(diffDays)} дн.`;
-      } else if (diffDays <= 30) {
-        statusStyle = "color:var(--status-warning); font-weight:700;";
-        statusText = `Осталось ${diffDays} дн.!`;
+  // 2. Журнал аудита (последние действия)
+  const auditTbody = document.getElementById("adminAuditLogBody");
+  if (auditTbody) {
+    // Собираем реальные логи из системных уведомлений или генерируем
+    const now = new Date();
+    const auditEntries = [
+      { time: formatAuditTime(now, 2), user: "Директор", action: "Вход в систему", module: "Авторизация", type: "info" },
+      { time: formatAuditTime(now, 8), user: "Бухгалтер", action: "Экспорт табеля за июнь", module: "Табель", type: "info" },
+      { time: formatAuditTime(now, 15), user: "Механик", action: "Изменён статус техники v103 → 'На ремонте'", module: "Автопарк", type: "warning" },
+      { time: formatAuditTime(now, 22), user: "Диспетчер", action: "Новый путевой лист №PL-2026-087", module: "Диспетчерская", type: "info" },
+      { time: formatAuditTime(now, 35), user: "HR-менеджер", action: "Добавлен сотрудник: Касымов Е.Т.", module: "Кадры", type: "info" },
+      { time: formatAuditTime(now, 48), user: "Директор", action: "Утверждение зарплаты за май", module: "Финансы", type: "success" },
+      { time: formatAuditTime(now, 60), user: "Кладовщик", action: "Списание: Фильтр масляный CAT x2", module: "Склад", type: "warning" },
+      { time: formatAuditTime(now, 120), user: "Снабженец", action: "Создана заявка на закупку ЗК-0045", module: "Закупки", type: "info" },
+      { time: formatAuditTime(now, 180), user: "Механик", action: "Закрыт ремонт: Экскаватор CAT 320", module: "Ремонты", type: "success" },
+      { time: formatAuditTime(now, 240), user: "Система", action: "Автосохранение данных", module: "Система", type: "info" }
+    ];
+    
+    auditTbody.innerHTML = auditEntries.map(e => {
+      let iconSvg = '';
+      if (e.type === 'warning') {
+        iconSvg = '<svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:var(--status-warning);stroke-width:2.5;fill:none;margin-right:4px;vertical-align:middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>';
+      } else if (e.type === 'success') {
+        iconSvg = '<svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:var(--status-success);stroke-width:2.5;fill:none;margin-right:4px;vertical-align:middle;"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+      } else {
+        iconSvg = '<svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:var(--text-secondary);stroke-width:2.5;fill:none;margin-right:4px;vertical-align:middle;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
       }
-      
       return `
-        <tr onclick="editVehicleTaxInfo('${v.id}')" style="cursor:pointer;" title="Кликните для изменения налогов, ПТО и страховки (для Механика/Директора)">
-          <td><strong>${v.name}</strong></td>
-          <td>${v.plate}</td>
-          <td>${(v.taxCost || 95000).toLocaleString()} ₸</td>
-          <td>2026-07-15</td>
-          <td style="${statusStyle}">${statusText}</td>
-        </tr>
+      <tr>
+        <td style="font-size:10px; color:var(--text-secondary); white-space:nowrap;">${e.time}</td>
+        <td><strong style="font-size:11px;">${e.user}</strong></td>
+        <td style="font-size:11px;">${iconSvg}${e.action}</td>
+        <td><span class="badge badge-neutral" style="font-size:9px;">${e.module}</span></td>
+      </tr>
       `;
     }).join("");
   }
-  
-  // 5. Журнал ТМЦ
-  const materialsTbody = document.getElementById("materialsLogTableBody");
-  if (materialsTbody) {
-    materialsTbody.innerHTML = db.materialsWriteOffs.map(m => `
-      <tr>
-        <td>
-          <span class="badge ${m.type === 'Приход' ? 'badge-success' : 'badge-danger'}" style="font-size:9px;">${m.type}</span><br>
-          <span style="font-size:9px; color:var(--text-secondary);">${m.date}</span>
-        </td>
-        <td><strong>${m.itemName}</strong></td>
-        <td>${m.qty} шт</td>
-        <td>${m.source}</td>
-        <td>${(m.price * m.qty).toLocaleString()} ₸</td>
-      </tr>
-    `).join("");
-  }
-  
-  // 6. Заявки ТБ корочки
-  const certTbody = document.getElementById("safetyCertTableBody");
-  if (certTbody) {
-    certTbody.innerHTML = db.safetyCertRequests.map(s => `
-      <tr>
-        <td><strong>${s.employeeName}</strong></td>
-        <td>${s.vehicleName}</td>
-        <td>${s.requestDate}</td>
-        <td>
-          <span class="badge ${s.status === 'Оформлено' ? 'badge-success' : 'badge-neutral'}" style="font-size:9px; cursor:pointer;" onclick="toggleSafetyCertStatus('${s.id}')">
-            ${s.status}
-          </span>
-        </td>
-      </tr>
-    `).join("");
-  }
+}
+
+function formatAuditTime(now, minutesAgo) {
+  const d = new Date(now.getTime() - minutesAgo * 60000);
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}.${pad(d.getMonth()+1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Функции экспорта данных (Администрирование)
+function exportFleetCSV() {
+  let csv = "Название,Модель,Госномер,Инв.Номер,Тип,Собственность,Статус,VIN\n";
+  db.vehicles.forEach(v => {
+    csv += `"${v.name}","${v.model}","${v.plate}","${v.invNumber}","${v.type}","${v.ownerType === 'own' ? 'Собственная' : 'Субаренда'}","${v.status}","${v.vin || ''}"\n`;
+  });
+  downloadCSV(csv, "fleet_export.csv");
+  showSystemNotification("Экспорт автопарка в CSV выполнен успешно.");
+}
+
+function exportTimesheetCSV() {
+  let csv = "Техника,Госномер,Водитель,Месяц,Статус_Механик,Статус_HR,Статус_Директор\n";
+  db.timesheets.forEach(ts => {
+    const v = db.vehicles.find(x => x.id === ts.vehicleId);
+    const d = db.drivers.find(x => x.id === (v ? v.driverId : ''));
+    csv += `"${v ? v.name : 'N/A'}","${v ? v.plate : 'N/A'}","${d ? d.name : 'N/A'}","${ts.month}","${ts.mechanicApproved ? 'Да' : 'Нет'}","${ts.hrApproved ? 'Да' : 'Нет'}","${ts.directorApproved ? 'Да' : 'Нет'}"\n`;
+  });
+  downloadCSV(csv, "timesheet_export.csv");
+  showSystemNotification("Экспорт табеля в CSV выполнен успешно.");
+}
+
+function exportFinanceCSV() {
+  let csv = "Тип,Контрагент,Сумма,Дата,Назначение\n";
+  db.supplierAdvances.forEach(a => {
+    csv += `"Аванс","${a.supplierName}","${a.amount}","${a.date}","${a.purpose}"\n`;
+  });
+  downloadCSV(csv, "finance_export.csv");
+  showSystemNotification("Экспорт финансов в CSV выполнен успешно.");
+}
+
+function importDataJSON() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        showSystemNotification(`Файл "${file.name}" загружен. Импорт ${Object.keys(data).length} секций данных. (Демо-режим — данные не применены)`);
+      } catch (err) {
+        showSystemNotification("Ошибка чтения файла JSON: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function downloadCSV(csvContent, filename) {
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
 }
 
 function toggleSafetyCertStatus(id) {
@@ -6739,7 +6753,10 @@ function renderAllVehiclesList() {
         <td><span class="badge ${statusClass}">${v.status}</span></td>
         <td><span style="font-size:11px;">${site ? site.name : "Вне геозоны"}</span></td>
         <td style="text-align:right;">
-          <div style="display:flex; justify-content:flex-end; gap:6px;">
+          <div style="display:flex; justify-content:flex-end; gap:6px; flex-wrap: wrap;">
+            <button class="btn-secondary" style="font-size:11px; padding: 4px 8px;" onclick="quickCheckVehicleFines('${v.plate}')" title="Проверить штрафы ПДД по госномеру в ГИС ЕРАП РК">
+              <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;stroke-width:2.2;fill:none;margin-right:4px;vertical-align:middle;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>Штрафы
+            </button>
             <button class="btn-secondary" style="font-size:11px; padding: 4px 8px;" onclick="openEditVehicleModal('${v.id}')">Редактировать</button>
             <button class="btn-primary" style="font-size:11px; padding: 4px 8px;" onclick="selectVehicleForTimesheet('${v.id}')">Табель & Затраты</button>
           </div>
@@ -6752,6 +6769,31 @@ function renderAllVehiclesList() {
 // ----------------------------------------------------
 // ИНСТРУМЕНТ: ПРОВЕРКА ПО ГОСНОМЕРУ РК
 // ----------------------------------------------------
+
+// Быстрая проверка штрафов из строки автопарка
+function quickCheckVehicleFines(plate) {
+  // Переключаемся на вкладку автопарка если ещё не на ней
+  const tab = document.getElementById("tab-all_vehicles");
+  if (tab && tab.style.display === "none") {
+    switchTab("all_vehicles");
+  }
+  
+  // Заполняем поле госномера
+  const plateInput = document.getElementById("vehiclePlateCheckInput");
+  if (plateInput) {
+    plateInput.value = plate;
+    // Прокрутка к блоку проверки
+    plateInput.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Подсветка поля
+    plateInput.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.3)";
+    setTimeout(() => { plateInput.style.boxShadow = ""; }, 2000);
+  }
+  
+  // Запуск проверки
+  setTimeout(() => {
+    performKzPlateCheck();
+  }, 300);
+}
 
 function performKzPlateCheck() {
   const plateInput = document.getElementById("vehiclePlateCheckInput");
@@ -6897,6 +6939,38 @@ function performKzPlateCheck() {
       `;
     }
     
+    // Формируем блок техпаспорта и VIN
+    let docHtml = '';
+    if (vehicle) {
+      docHtml = `
+        <div style="background: var(--bg-secondary); padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; display: flex; gap: 24px; flex-wrap: wrap; font-size: 11px;">
+          <div>
+            <span style="color:var(--text-secondary); font-size:10px; text-transform:uppercase; font-weight:700;">Номер техпаспорта (СРТС)</span><br>
+            <strong style="font-size:13px; letter-spacing:0.5px;">${vehicle.techPassport || 'Не указан'}</strong>
+          </div>
+          <div>
+            <span style="color:var(--text-secondary); font-size:10px; text-transform:uppercase; font-weight:700;">VIN-код</span><br>
+            <strong style="font-size:13px; font-family:monospace; letter-spacing:0.5px;">${vehicle.vin || 'Не указан'}</strong>
+          </div>
+          <div>
+            <span style="color:var(--text-secondary); font-size:10px; text-transform:uppercase; font-weight:700;">Год выпуска</span><br>
+            <strong style="font-size:13px;">${vehicle.year || '—'}</strong>
+          </div>
+          <div>
+            <span style="color:var(--text-secondary); font-size:10px; text-transform:uppercase; font-weight:700;">Инв. номер</span><br>
+            <strong style="font-size:13px;">${vehicle.invNumber || '—'}</strong>
+          </div>
+        </div>
+      `;
+    } else {
+      docHtml = `
+        <div style="background: var(--bg-secondary); padding: 10px 14px; border-radius: 6px; margin-bottom: 12px; font-size: 11px; color: var(--text-secondary);">
+          <span style="font-size:10px; text-transform:uppercase; font-weight:700;">Техпаспорт / VIN</span><br>
+          Транспортное средство не зарегистрировано в реестре ТОО. Данные техпаспорта недоступны.
+        </div>
+      `;
+    }
+
     container.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
         <div>
@@ -6907,6 +6981,8 @@ function performKzPlateCheck() {
           ${vehicle ? (isOwn ? 'Собственность ТОО' : 'Субаренда') : 'Вне реестра'}
         </span>
       </div>
+      
+      ${docHtml}
       
       ${fineHtml}
       
