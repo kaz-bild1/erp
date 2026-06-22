@@ -6774,19 +6774,17 @@ function renderAllVehiclesList() {
 function quickCheckVehicleFines(plate) {
   const vehicle = db.vehicles.find(v => v.plate.toUpperCase().replace(/\s+/g, '') === plate.toUpperCase().replace(/\s+/g, ''));
   
-  openErapSearchModal();
-  switchErapSearchTab('fines');
-  
-  const plateInput = document.getElementById("erapPlateInputFines");
-  const passportInput = document.getElementById("erapPassportInputFines");
-  
-  if (plateInput && passportInput) {
-    plateInput.value = plate;
-    passportInput.value = vehicle ? (vehicle.techPassport || "") : "";
-    
-    setTimeout(() => {
-      submitErapCheck('fines');
-    }, 400);
+  if (vehicle) {
+    // Открываем модальное окно с полными данными сразу без открытия промежуточного поиска!
+    openVehicleFullCheckModal(vehicle, plate);
+    // Принудительно включаем вкладку проверок (где отображаются штрафы)
+    switchVehCheckTab("statuses");
+  } else {
+    // Если машины нет в базе, тогда открываем модалку поиска
+    openErapSearchModal();
+    switchErapSearchTab('fines');
+    const plateInput = document.getElementById("erapPlateInputFines");
+    if (plateInput) plateInput.value = plate;
   }
 }
 
