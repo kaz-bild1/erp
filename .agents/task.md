@@ -1,0 +1,6 @@
+- [x] Fully color CRM Kanban cards using the stage branding color as background and borders, removing the left-border line and using high-contrast white text styles.
+- [x] Implement the Simple / Idle status (`П` - Простой) in `cycleTimesheetDayStatus()` so it cycles: `Я` -> `Р` -> `В` -> `П` -> `Я`.
+- [x] Add soft red background and text coloring for the Simple status cell (`П`) in `renderTimesheetGrid()`.
+- [x] Audit and replace text emojis with premium vector inline SVGs inside static HTML buttons, dynamic list cards, plate checks, and task overdue labels.
+- [x] Remove the task overdue text pseudo-element from CSS, rendering it as a premium warning SVG badge instead.
+- [x] Fix the local server crash on `HEAD` requests in `server.ps1` by skipping output stream writes for HEAD requests.

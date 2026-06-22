@@ -2,36 +2,38 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root[data-theme="light"] {
-  --bg-primary: #F8F9FA;
-  --bg-secondary: #F1F3F5;
+  --bg-primary: #F8FAFC;
+  --bg-secondary: #F1F5F9;
   --bg-card: #FFFFFF;
-  --border-color: #E9ECEF;
-  --text-primary: #1A1B1F;
-  --text-secondary: #6C757D;
+  --border-color: #E2E8F0;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
   --brand-color: #2563EB; /* Premium Swiss Royal Blue */
   --brand-hover: #1D4ED8;
   --accent-color: #9B1C1C; /* Premium crimson */
   --status-success: #16A34A;
   --status-danger: #DC2626;
   --status-warning: #D97706;
-  --shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+  --shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  --brand-gradient: linear-gradient(135deg, #2563EB, #1D4ED8);
   --map-filter: none;
 }
 
 :root[data-theme="dark"] {
-  --bg-primary: #0F1012;
-  --bg-secondary: #161719;
-  --bg-card: #1D1E22;
-  --border-color: #2D2E32;
-  --text-primary: #ECEFF1;
-  --text-secondary: #90A4AE;
+  --bg-primary: #0B0F19;
+  --bg-secondary: #111827;
+  --bg-card: #1F2937;
+  --border-color: #374151;
+  --text-primary: #F9FAFB;
+  --text-secondary: #9CA3AF;
   --brand-color: #3B82F6; /* Bright royal blue in dark mode */
   --brand-hover: #2563EB;
-  --accent-color: #E05252;
+  --accent-color: #EF4444;
   --status-success: #22C55E;
   --status-danger: #EF4444;
   --status-warning: #F59E0B;
-  --shadow: 0 4px 12px rgba(0,0,0,0.2);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --brand-gradient: linear-gradient(135deg, #3B82F6, #2563EB);
   --map-filter: invert(100%) hue-rotate(180deg) grayscale(80%) contrast(90%);
 }
 
@@ -772,7 +774,7 @@ body.dark-theme .whatsapp-message.bot {
 }
 
 .modal-header {
-  padding: 20px 24px;
+  padding: 18px 24px;
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
@@ -783,39 +785,38 @@ body.dark-theme .whatsapp-message.bot {
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.3px;
+  color: var(--text-primary);
 }
 
 .modal-close-btn {
   background: transparent;
-  border: 2px solid #2563EB;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
+  border: none !important;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
   cursor: pointer;
-  color: #2563EB;
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
-  font-weight: 500;
-  line-height: 0.8;
-  padding: 0 0 2px 0; /* slight vertical adjustment for &times; centering */
+  padding: 0;
   margin: 0;
   box-sizing: border-box;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
 }
 
 .modal-close-btn:hover {
-  background-color: rgba(37, 99, 235, 0.08);
-  transform: scale(1.08);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+  background-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .modal-close-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   stroke: currentColor;
-  stroke-width: 2.5;
+  stroke-width: 2.2;
 }
 
 .modal-body {
@@ -825,12 +826,58 @@ body.dark-theme .whatsapp-message.bot {
 }
 
 .modal-footer {
-  padding: 16px 24px;
+  padding: 14px 24px;
   border-top: 1px solid var(--border-color);
   display: flex;
   justify-content: flex-end;
   gap: 12px;
   background-color: var(--bg-secondary);
+}
+
+/* Modal Footer Buttons styling */
+.modal-footer .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand-gradient) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.modal-footer .btn-primary:hover {
+  opacity: 0.9;
+}
+
+.modal-footer .btn-primary svg {
+  margin-right: 6px;
+  flex-shrink: 0;
+  stroke-width: 2px !important;
+}
+
+.modal-footer .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modal-footer .btn-secondary:hover {
+  background-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
 }
 
 
@@ -1069,19 +1116,21 @@ body.dark-theme .whatsapp-message.bot {
 
 .kanban-column {
   background-color: var(--bg-secondary);
-  border: 2px dashed transparent;
-  border-radius: 10px;
-  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 14px;
   min-height: 500px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  transition: border-color 0.25s ease, background-color 0.25s ease;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow);
 }
 
 .kanban-column.drag-over {
   border-color: var(--brand-color);
-  background-color: rgba(37, 99, 235, 0.05);
+  background-color: rgba(37, 99, 235, 0.03);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 
 .kanban-column-header {
@@ -1131,15 +1180,6 @@ body.dark-theme .whatsapp-message.bot {
 /* Оранжевая подсветка для просроченных задач */
 .task-card.overdue {
   border-left: 4px solid var(--status-warning);
-}
-
-.task-card.overdue::before {
-  content: "⚠️ ПРОСРОЧЕНО";
-  font-size: 8px;
-  font-weight: 700;
-  color: var(--status-warning);
-  letter-spacing: 0.5px;
-  margin-bottom: 2px;
 }
 
 .task-card-title {
@@ -1248,18 +1288,100 @@ body.dark-theme .whatsapp-message.bot {
    МОДЕРНИЗАЦИЯ: АДАПТИВНОСТЬ И ОТЗЫВЧИВОСТЬ
    ========================================== */
 
-/* Стилизация CRM Kanban Board (7 стадий) */
+/* Premium Corporate Kanban Board & CRM Styles */
 #kanbanBoard {
   display: flex !important;
   overflow-x: auto;
-  gap: 12px;
-  padding-bottom: 12px;
+  gap: 14px;
+  padding: 4px 4px 16px 4px;
+  scroll-behavior: smooth;
 }
 
-#kanbanBoard > .col-2 {
-  flex: 0 0 280px;
-  max-width: 280px;
-  grid-column: auto !important;
+#kanbanBoard > .crm-column {
+  flex: 0 0 290px;
+  max-width: 290px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  min-height: 480px;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow);
+}
+
+#kanbanBoard > .crm-column.drag-over {
+  border-color: var(--brand-color);
+  background-color: rgba(37, 99, 235, 0.03);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.crm-column-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  letter-spacing: 0.5px;
+}
+
+.crm-column-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  border: 1px solid currentColor;
+  background-color: transparent !important;
+}
+
+.crm-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 14px;
+  margin-bottom: 0;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.crm-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.crm-card-company {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.crm-card-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.crm-card-footer {
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.crm-card-price {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-primary);
 }
 
 /* Бургер-кнопка меню */
@@ -1451,3 +1573,401 @@ body.dark-theme .whatsapp-message.bot {
   border-color: #38BDF8 !important;
   box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
 }
+
+/* --- WOW MAP MARKERS & TAGS --- */
+@keyframes markerPulseOwn {
+  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(37, 99, 235, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+@keyframes markerPulseSub {
+  0% { box-shadow: 0 0 0 0 rgba(156, 39, 176, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(156, 39, 176, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(156, 39, 176, 0); }
+}
+@keyframes markerPulseRep {
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
+.marker-pulse-own {
+  background: var(--brand-color);
+  animation: markerPulseOwn 1.8s infinite;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.6);
+}
+
+.marker-pulse-subrent {
+  background: #9C27B0;
+  animation: markerPulseSub 1.8s infinite;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 8px rgba(156, 39, 176, 0.6);
+}
+
+.marker-pulse-repair {
+  background: var(--status-danger);
+  animation: markerPulseRep 1.8s infinite;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 8px rgba(220, 38, 38, 0.6);
+}
+
+.vehicle-label-tag {
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(4px);
+  color: #ffffff !important;
+  font-family: 'Inter', sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* --- TACTILE FEEDBACK & CLICK PROTECTION --- */
+button, .menu-item, .kpi-card, .vehicle-list-item, .kanban-column .card, .btn-chart-neon {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease !important;
+}
+
+button:active, .menu-item:active, .kpi-card:active, .vehicle-list-item:active, .kanban-column .card:active {
+  transform: scale(0.96) !important;
+}
+
+/* Ensure contrast for dark buttons and text colors */
+.btn-primary, .btn-primary *,
+.btn-danger, .btn-danger *,
+.btn-success, .btn-success *,
+.btn-hold-confirm, .btn-hold-confirm *,
+.btn-double-confirm-pending, .btn-double-confirm-pending * {
+  color: #ffffff !important;
+}
+
+.btn-primary svg, .btn-danger svg, .btn-success svg, .btn-hold-confirm svg, .btn-double-confirm-pending svg {
+  stroke: #ffffff !important;
+}
+
+.btn-secondary {
+  color: var(--text-primary) !important;
+  background-color: var(--bg-secondary) !important;
+}
+
+.btn-secondary:hover {
+  background-color: var(--bg-card) !important;
+  border-color: var(--brand-color) !important;
+}
+
+/* Geo-zones Wow Effect (Leaflet map polygons) */
+@keyframes neonPulse {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 24; }
+}
+
+.leaflet-interactive {
+  filter: drop-shadow(0 0 6px currentColor);
+  stroke-dasharray: 8, 4;
+  animation: neonPulse 8s linear infinite;
+  transition: all 0.3s ease;
+}
+
+.leaflet-interactive:hover {
+  stroke-dasharray: none;
+  fill-opacity: 0.25 !important;
+  stroke-width: 3px !important;
+}
+
+/* Glassmorphic Leaflet Popups */
+.leaflet-popup-content-wrapper {
+  background: rgba(30, 41, 59, 0.8) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #f8fafc !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3) !important;
+  padding: 4px;
+}
+
+.leaflet-popup-tip {
+  background: rgba(30, 41, 59, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+:root[data-theme="light"] .leaflet-popup-content-wrapper {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+}
+
+:root[data-theme="light"] .leaflet-popup-tip {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Concentric rings for vehicle markers */
+@keyframes pulseRing {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.marker-pulse-own, .marker-pulse-subrent, .marker-pulse-repair {
+  position: relative;
+}
+
+.marker-pulse-own::after {
+  content: '';
+  position: absolute;
+  top: -6px; left: -6px; right: -6px; bottom: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--brand-color);
+  animation: pulseRing 1.8s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  pointer-events: none;
+}
+
+.marker-pulse-subrent::after {
+  content: '';
+  position: absolute;
+  top: -6px; left: -6px; right: -6px; bottom: -6px;
+  border-radius: 50%;
+  border: 2px solid #9C27B0;
+  animation: pulseRing 1.8s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  pointer-events: none;
+}
+
+.marker-pulse-repair::after {
+  content: '';
+  position: absolute;
+  top: -6px; left: -6px; right: -6px; bottom: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--status-danger);
+  animation: pulseRing 1.8s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  pointer-events: none;
+}
+
+/* --- TACTILE CLICK PROTECTION & HOLD-TO-CONFIRM --- */
+.btn-hold-confirm {
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.btn-hold-confirm .hold-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: rgba(255, 255, 255, 0.25);
+  transition: width 0.1s linear;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.btn-hold-confirm.holding .hold-progress {
+  width: 100%;
+  transition: width 1.2s linear;
+}
+
+.btn-hold-confirm * {
+  position: relative;
+  z-index: 2;
+}
+
+.btn-double-confirm-pending {
+  background-color: var(--status-warning) !important;
+  border-color: var(--status-warning) !important;
+  color: #ffffff !important;
+  animation: buttonPulseAlert 1.5s infinite;
+}
+
+@keyframes buttonPulseAlert {
+  0% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(217, 119, 6, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
+}
+
+/* --- SWISS UX INFO PANEL --- */
+.ux-info-panel {
+  background: rgba(37, 99, 235, 0.05);
+  border-left: 4px solid var(--brand-color);
+  padding: 14px 18px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--text-primary);
+}
+
+.ux-info-panel.warning {
+  background: rgba(217, 119, 6, 0.05);
+  border-left-color: var(--status-warning);
+}
+
+.ux-info-panel.success {
+  background: rgba(22, 163, 74, 0.05);
+  border-left-color: var(--status-success);
+}
+
+.ux-info-panel svg {
+  width: 18px;
+  height: 18px;
+  stroke: var(--brand-color);
+  fill: none;
+  stroke-width: 1.75;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.ux-info-panel.warning svg {
+  stroke: var(--status-warning);
+}
+
+.ux-info-panel.success svg {
+  stroke: var(--status-success);
+}
+
+/* Styles for Individual Timesheet grids */
+.indiv-timesheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.indiv-day-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.indiv-day-card.work {
+  border-left: 3px solid var(--status-success);
+}
+
+.indiv-day-card.off {
+  border-left: 3px solid var(--text-secondary);
+}
+
+.indiv-day-card.repair {
+  border-left: 3px solid var(--status-danger);
+}
+
+.indiv-day-card.idle {
+  border-left: 3px solid var(--status-warning);
+}
+
+.indiv-day-num {
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Printable A4 invoice or contract form */
+.a4-print-document {
+  background: #ffffff;
+  color: #0f172a;
+  padding: 40px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  font-family: 'Inter', sans-serif;
+  line-height: 1.6;
+  max-width: 800px;
+  margin: 20px auto;
+  border: 1px solid #e2e8f0;
+}
+
+.a4-print-document * {
+  color: #0f172a !important;
+}
+
+.a4-header {
+  border-bottom: 2px solid #0f172a;
+  padding-bottom: 20px;
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.a4-title {
+  font-size: 18px;
+  font-weight: 800;
+  text-transform: uppercase;
+  margin-top: 12px;
+}
+
+.a4-meta-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 24px;
+}
+
+.a4-meta-table td {
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  font-size: 12px;
+}
+
+.a4-body {
+  font-size: 13px;
+  text-align: justify;
+}
+
+.a4-footer {
+  margin-top: 40px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.a4-stamp-box {
+  position: relative;
+  width: 180px;
+  height: 120px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-bottom: 1px solid #000;
+  font-style: italic;
+}
+
+.a4-seal-img {
+  position: absolute;
+  top: -10px;
+  left: 20px;
+  width: 110px;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.a4-facsimile-img {
+  position: absolute;
+  top: 10px;
+  left: 40px;
+  width: 90px;
+  opacity: 0.85;
+  pointer-events: none;
+}
+

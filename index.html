@@ -31,71 +31,91 @@
       <nav class="menu-group">
         <div class="menu-group-title">Операции</div>
         <button class="menu-item active" onclick="switchTab('dashboard')">
-          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
           Дашборд и Аналитика
         </button>
         <button class="menu-item" onclick="switchTab('crm')">
-          <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           CRM и Продажи
         </button>
         <button class="menu-item" onclick="switchTab('dispatch')">
-          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           Диспетчеризация
         </button>
         <button class="menu-item" onclick="switchTab('tasks')">
-          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           Задачи и поручения
         </button>
         <button class="menu-item" onclick="switchTab('gps')">
-          <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
           GPS-Мониторинг
         </button>
         <button class="menu-item" onclick="switchTab('dispatcher_hub')">
-          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
           Диспетчер / Логист
         </button>
       </nav>
 
       <nav class="menu-group">
         <div class="menu-group-title">Ресурсы</div>
+        <button class="menu-item" onclick="switchTab('all_vehicles')">
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><rect x="1" y="3" width="15" height="13" rx="2" ry="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          Реестр Автопарка
+        </button>
+        <button class="menu-item" onclick="switchTab('timesheet')">
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>
+          Табель учета времени
+        </button>
+        <button class="menu-item" onclick="switchTab('staff')">
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+          Сотрудники (База)
+        </button>
         <button class="menu-item" onclick="switchTab('fuel')">
-          <svg viewBox="0 0 24 24"><path d="M3 22V2h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H3z"/><path d="M17 6h4v4h-4z"/><circle cx="10" cy="11" r="3"/></svg>
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><path d="M3 22V2h11a3 3 0 0 1 3 3v17H3z"/><path d="M17 6h4v4h-4z"/><circle cx="8.5" cy="10.5" r="2.5"/></svg>
           Учет ГСМ
         </button>
         <button class="menu-item" onclick="switchTab('warehouse')">
-          <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
           Склад и Логистика
         </button>
         <button class="menu-item" onclick="switchTab('purchasing_hub')">
-          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
           Снабжение / Закупки
         </button>
         <button class="menu-item" onclick="switchTab('repairs')">
-          <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
           Ремонты и ТО
         </button>
         <button class="menu-item" onclick="switchTab('hr')">
-          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           HR и Безопасность
         </button>
       </nav>
 
       <nav class="menu-group">
-        <div class="menu-group-title">Настройки</div>
+        <div class="menu-group-title">Финансы и Настройки</div>
+        <button class="menu-item" onclick="switchTab('contracts_registry')">
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Реестр Договоров
+        </button>
+        <button class="menu-item" onclick="switchTab('finance_treasury')">
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"/><line x1="12" y1="18" x2="12" y2="18.01"/><line x1="17" y1="8" x2="17" y2="8.01"/><path d="M2 10h20"/></svg>
+          Финансы и Касса
+        </button>
         <button class="menu-item" onclick="switchTab('companies')">
-          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 3v18"/><path d="M15 3v18"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
-          Компании (Реестр)
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 3v18"/><path d="M15 3v18"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
+          Контрагенты
         </button>
         <button class="menu-item" onclick="switchTab('settings')">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          Настройки системы
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Администрирование
         </button>
       </nav>
       
       <!-- Блок ИИ чат-бота WhatsApp внизу меню -->
       <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-color);">
         <button class="menu-item" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); color: var(--status-success);" onclick="openChatBotModal()">
-          <svg viewBox="0 0 24 24" style="stroke: var(--status-success);"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <svg viewBox="0 0 24 24" style="fill: none; stroke: var(--status-success); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
           WhatsApp: ИИ-Логист
         </button>
       </div>
@@ -116,6 +136,8 @@
             <span style="color: var(--text-secondary);">Роль:</span>
             <select id="roleSelector" class="select-clean" onchange="changeActiveRole()">
               <option value="Director">Директор (Все права)</option>
+              <option value="DeputyDirector">Зам. директора (Все права + заявки)</option>
+              <option value="Manager">Менеджер по договорам</option>
               <option value="Dispatcher">Логист / Диспетчер</option>
               <option value="Warehouse">Заведующий складом</option>
               <option value="Mechanic">Механик</option>
@@ -279,7 +301,16 @@
               <h3>Воронка продаж и заказов спецтехники</h3>
               <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Сквозной процесс от лида до АВР</p>
             </div>
-            <button class="btn-primary" onclick="openCreateDealModal()">+ Добавить заказ</button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-secondary" onclick="undoLastCrmMove()">
+                <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; margin-right: 6px; vertical-align: middle;"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>
+                <span>Отменить перемещение</span>
+              </button>
+              <button class="btn-primary" onclick="openCreateDealModal()" style="background: var(--brand-gradient); border: none;">
+                <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Добавить заказ</span>
+              </button>
+            </div>
           </div>
 
           <!-- Воронка продаж по стадиям (Канбан) -->
@@ -339,7 +370,7 @@
               <h3>Задачи и поручения спецтехнике</h3>
               <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Контроль выполнения ремонтов, ТО, инструктажей ТБ и SLA. Перетаскивание карточек закрывает задачи.</p>
             </div>
-            <button class="btn-primary" onclick="openCreateTaskModal()">+ Добавить задачу</button>
+            <button class="btn-primary" onclick="openCreateTaskModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Добавить задачу</span></button>
           </div>
 
           <div class="kanban-tasks-board">
@@ -430,6 +461,10 @@
                     <button class="btn-secondary" style="font-size: 12px; justify-content: center; padding: 8px;" onclick="simulateGeofenceExit()">Спровоцировать побег из геозоны</button>
                     <button class="btn-secondary" style="font-size: 12px; justify-content: center; padding: 8px;" onclick="simulateIdling()">Симулировать простой (>3ч)</button>
                     <button class="btn-primary" style="font-size: 12px; justify-content: center; padding: 8px;" onclick="toggleGpsMovementSimulation()">Вкл/Выкл Движение по карте</button>
+                    <button class="btn-primary" style="font-size: 12px; justify-content: center; padding: 8px; background-color: var(--status-success); border-color: var(--status-success);" onclick="checkKzTrafficFines()">
+                      <svg viewBox="0 0 24 24" style="width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; display: inline-block; vertical-align: middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                      <span>Проверить штрафы ПДД РК</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -440,9 +475,21 @@
 
         <!-- NEW. ТАБ: ДИСПЕТЧЕР / ЛОГИСТ -->
         <section id="tab-dispatcher_hub" class="tab-pane">
-          <div class="card" style="margin-bottom: 24px;">
-            <h3>Рабочее место Диспетчера (Логистика и Безопасность)</h3>
-            <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Управление парком техники на 5 объектах, оперативное реагирование на нарушения геозон/простоя и связь с машинистами.</p>
+          <div class="card" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div>
+              <h3>Рабочее место Диспетчера (Логистика и Безопасность)</h3>
+              <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Управление парком техники на 5 объектах, оперативное реагирование на нарушения геозон/простоя и связь с машинистами.</p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-primary" onclick="openAddVehicleModal()">
+                <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Добавить технику</span>
+              </button>
+              <button class="btn-primary" style="background-color: var(--status-success); border-color: var(--status-success);" onclick="checkKzTrafficFines()">
+                <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <span>Проверить штрафы ПДД РК</span>
+              </button>
+            </div>
           </div>
 
           <div class="grid-container">
@@ -557,8 +604,8 @@
               <button class="btn-secondary" id="wh-level-board" onclick="switchWarehouseLevel('board')">Бортовой запас (В машинах)</button>
             </div>
             <div style="display: flex; gap: 8px;">
-              <button class="btn-secondary" onclick="openReceivePartModal()">+ Приход ТМЦ</button>
-              <button class="btn-secondary" onclick="openTransferPartModal()">→ Перемещение</button>
+              <button class="btn-secondary" onclick="openReceivePartModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Приход ТМЦ</span></button>
+              <button class="btn-secondary" onclick="openTransferPartModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg><span>Перемещение</span></button>
               <button class="btn-primary" onclick="openRequisitionModal()">Оформить Заявку ТМЦ</button>
             </div>
           </div>
@@ -633,7 +680,7 @@
               <div class="card" style="height: 480px; display: flex; flex-direction: column; padding: 16px; margin-bottom: 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                   <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Заказы поставщикам и цены</h4>
-                  <button class="btn-primary" style="font-size: 11px; padding: 4px 8px;" onclick="openCreateSupplyOrderModal()">+ Новый заказ</button>
+                  <button class="btn-primary" style="font-size: 11px; padding: 4px 8px;" onclick="openCreateSupplyOrderModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Новый заказ</span></button>
                 </div>
                 <div style="flex-grow: 1; overflow-y: auto;">
                   <table class="clean-table" style="font-size: 12px;" id="purchasingOrdersTable">
@@ -736,7 +783,7 @@
               <h3>Реестр сотрудников и Контроль допусков</h3>
               <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Отслеживание анкет, договоров МО и сроков действия справок/корочек ТБ с блокировкой рейсов</p>
             </div>
-            <button class="btn-primary" onclick="openCreateEmployeeModal()">+ Добавить сотрудника</button>
+            <button class="btn-primary" onclick="openCreateEmployeeModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Добавить сотрудника</span></button>
           </div>
 
           <div class="table-wrapper card" style="padding: 0; margin-bottom: 24px;">
@@ -843,7 +890,7 @@
                 <input type="text" id="companySearchInput" class="form-control" placeholder="Поиск контрагента по БИН, названию, городу, типу техники..." oninput="renderCompanies()" />
               </div>
               <div class="col-6" style="display:flex; justify-content:flex-end;">
-                <button class="btn-primary" onclick="openCreateCompanyModal()">+ Добавить контрагента</button>
+                <button class="btn-primary" onclick="openCreateCompanyModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Добавить контрагента</span></button>
               </div>
             </div>
 
@@ -863,15 +910,555 @@
         </section>
 
 
+        <!-- 11. ТАБ: ТАБЕЛЬ УЧЕТА ВРЕМЕНИ -->
+        <section id="tab-timesheet" class="tab-pane">
+          <div class="card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px;">
+            <div>
+              <h3>Табель учета рабочего времени техники и водителей</h3>
+              <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Ежедневный учет выходов, ремонтов и дежурств по каждой машине с историей замен машинистов.</p>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <select id="timesheetMonthSelect" class="form-control" style="width: auto; font-size: 13px;" onchange="renderTimesheetGrid()">
+                <option value="2026-06">Июнь 2026</option>
+                <option value="2026-05">Май 2026</option>
+              </select>
+              <button class="btn-secondary" onclick="exportTimesheetToExcel()">
+                <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; margin-right: 6px; vertical-align: middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span>Экспорт в Excel (CSV)</span>
+              </button>
+              <button class="btn-primary" onclick="exportSubrentTimesheet()" style="background: var(--brand-gradient); border: none;">
+                <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; margin-right: 6px; vertical-align: middle;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                <span>Единый табель субаренды</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Цепочка согласования табеля -->
+          <div class="card" style="margin-bottom: 24px;">
+            <h4 style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; color: var(--text-secondary);">Статус и цепочка согласования табеля</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+              <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                <div class="approval-step" id="ts-step-mechanic" style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: var(--bg-secondary);">
+                  <span class="badge badge-neutral" id="ts-badge-mechanic">?</span> 1. Механик
+                </div>
+                <div class="approval-step" id="ts-step-hr" style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: var(--bg-secondary);">
+                  <span class="badge badge-neutral" id="ts-badge-hr">?</span> 2. HR-Специалист
+                </div>
+                <div class="approval-step" id="ts-step-director" style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: var(--bg-secondary);">
+                  <span class="badge badge-neutral" id="ts-badge-director">?</span> 3. Директор
+                </div>
+              </div>
+              <div id="timesheetApprovalActions">
+                <!-- Заполняется динамически кнопками в зависимости от роли -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Табличная сетка табеля -->
+          <div class="card" style="padding: 0;">
+            <div class="table-wrapper" style="overflow-x: auto; max-width: 100%;">
+              <table class="clean-table" id="timesheetTableGrid" style="font-size: 11px; text-align: center; white-space: nowrap;">
+                <!-- Динамически рендерится из JS -->
+              </table>
+            </div>
+            <div style="padding: 12px; border-top: 1px solid var(--border-color); display: flex; gap: 16px; font-size: 11px; color: var(--text-secondary);">
+              <span><strong>Я</strong> - Явка / Работа (10ч)</span>
+              <span><strong>Р</strong> - Ремонт</span>
+              <span><strong>В</strong> - Выходной</span>
+              <span><strong>П</strong> - Простой</span>
+              <span><span style="color: var(--brand-color); font-weight: 700;">*</span> - Была замена водителя в этот день</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 12. ТАБ: СОТРУДНИКИ (БАЗА) -->
+        <section id="tab-staff" class="tab-pane">
+          <div class="card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px;">
+            <div>
+              <h3>Единый реестр персонала и допусков</h3>
+              <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Управление личными делами машинистов, инженеров, контрагентов с удобным делением по разделам.</p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-secondary" onclick="openCreateEmployeeModal()">
+                <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Добавить сотрудника</span>
+              </button>
+              <button class="btn-secondary" style="border-color: var(--status-danger); color: var(--status-danger);" onclick="openAddBlacklistModal()">
+                <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: var(--status-danger); stroke-width: 2; fill: none; margin-right: 6px; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                <span>В черный список</span>
+              </button>
+              <button class="btn-primary" onclick="exportStaffToExcel()" style="background: var(--brand-gradient); border: none;">
+                <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; margin-right: 6px; vertical-align: middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span>Экспорт базы (Excel)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Фильтр категорий сотрудников -->
+          <div class="card" style="margin-bottom: 24px;">
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+              <span style="font-weight: 600; font-size: 13px;">Разделы:</span>
+              <button class="btn-secondary active" id="btn-staff-all" onclick="filterStaffTab('all')">Все сотрудники</button>
+              <button class="btn-secondary" id="btn-staff-admin" onclick="filterStaffTab('admin')">Администрация / ИТР</button>
+              <button class="btn-secondary" id="btn-staff-drivers" onclick="filterStaffTab('drivers')">Машинисты (Штат)</button>
+              <button class="btn-secondary" id="btn-staff-subrent" onclick="filterStaffTab('subrent')">Машинисты (Субаренда)</button>
+              <button class="btn-secondary" id="btn-staff-blacklist" onclick="filterStaffTab('blacklist')" style="color: var(--status-danger);">Чёрный список (ЧС)</button>
+              
+              <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
+                <input type="text" id="staffSearchInput" class="form-control" placeholder="Поиск по ФИО, ИИН, Должности..." style="width: 250px; font-size: 12px; padding: 6px 12px;" oninput="renderStaffGrid()" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Сетка сотрудников -->
+          <div class="card" style="padding: 0;">
+            <div class="table-wrapper">
+              <table class="clean-table" id="staffTable" style="font-size: 12px;">
+                <thead>
+                  <tr>
+                    <th>ФИО / ИИН</th>
+                    <th>Должность / Тип</th>
+                    <th>Категория / Права</th>
+                    <th>Контакты / Телефон</th>
+                    <th>Допуски (Медосмотр, ТБ)</th>
+                    <th>Место проживания</th>
+                    <th>Статус</th>
+                    <th>Действие</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Заполняется динамически -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+
         <!-- 10. ТАБ: НАСТРОЙКИ СИСТЕМЫ -->
         <section id="tab-settings" class="tab-pane">
-          <div class="card" style="max-width: 600px;">
-            <h3 class="card-title">Управление базами данных и отладка</h3>
-            <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 24px;">Для ознакомления с логикой вы можете восстановить стандартный демонстрационный пакет ТОО KazBildInvest в памяти вашего браузера.</p>
+          <div class="card" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div>
+              <h3>Панель финансового и материального учета</h3>
+              <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Управление банковскими счетами, курсами валют, налогами, авансами поставщикам и договорами.</p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-hold-confirm btn-primary" data-action="resetDemo">
+                <span class="hold-progress"></span>
+                <span>Перезагрузить демо-данные</span>
+              </button>
+              <button class="btn-hold-confirm btn-secondary" data-action="clearCache" style="color: var(--status-danger); border-color: var(--status-danger);">
+                <span class="hold-progress"></span>
+                <span>Очистить кэш (Браузер)</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid-container" style="gap: 20px; align-items: start;">
+            <!-- Левая колонка: Финансы, Банки, Договоры -->
+            <div class="col-6" style="display: flex; flex-direction: column; gap: 20px;">
+              <!-- Блок: Банковские счета и Курсы валют -->
+              <div class="card" style="margin-bottom: 0;">
+                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">Остатки на счетах и курсы валют</h4>
+                <div class="grid-container" style="gap: 12px; margin-bottom: 16px;">
+                  <div class="col-6" style="background: var(--bg-secondary); padding: 12px; border-radius: 6px;">
+                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Halyk Bank (KZT)</span>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                      <input type="number" id="balanceKztInput" class="form-control" style="font-size: 14px; font-weight: 700; padding: 4px 8px;" onchange="updateBankBalancesState()" />
+                      <span>₸</span>
+                    </div>
+                  </div>
+                  <div class="col-6" style="background: var(--bg-secondary); padding: 12px; border-radius: 6px;">
+                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">ForteBank (USD)</span>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                      <input type="number" id="balanceUsdInput" class="form-control" style="font-size: 14px; font-weight: 700; padding: 4px 8px;" onchange="updateBankBalancesState()" />
+                      <span>$</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Конвертер валют и Курсы -->
+                <div style="border-top: 1px solid var(--border-color); padding-top: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                  <div style="font-size: 11px; color: var(--text-secondary);">
+                    <span>Курсы Нацбанка РК: </span>
+                    <strong style="margin-right: 8px;">USD: <span id="rateUsdDisplay">448.50</span> ₸</strong>
+                    <strong>RUB: <span id="rateRubDisplay">5.12</span> ₸</strong>
+                  </div>
+                  <button class="btn-secondary" style="font-size: 10px; padding: 4px 8px;" onclick="simulateCurrencyUpdate()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg><span>Обновить курсы</span></button>
+                </div>
+              </div>
+
+              <!-- Блок: Авансы поставщикам -->
+              <div class="card" style="margin-bottom: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Авансы поставщикам (Предоплаты)</h4>
+                  <button class="btn-secondary" style="font-size: 11px; padding: 4px 8px;" onclick="openSupplierAdvanceModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Новый аванс</span></button>
+                </div>
+                <div class="table-wrapper" style="max-height: 180px; overflow-y: auto;">
+                  <table class="clean-table" style="font-size: 11px;">
+                    <thead>
+                      <tr>
+                        <th>Поставщик</th>
+                        <th>Дата</th>
+                        <th>Сумма (₸)</th>
+                        <th>Назначение</th>
+                      </tr>
+                    </thead>
+                    <tbody id="supplierAdvancesTableBody">
+                      <!-- Из JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Блок: Договоры спецтехники (Реестр менеджера) -->
+              <div class="card" style="margin-bottom: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Реестр Договоров Менеджера</h4>
+                  <button class="btn-primary" style="font-size: 11px; padding: 4px 8px;" onclick="openAddContractModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Добавить договор</span></button>
+                </div>
+                <div class="table-wrapper" style="max-height: 220px; overflow-y: auto;">
+                  <table class="clean-table" style="font-size: 11px;">
+                    <thead>
+                      <tr>
+                        <th>Договор / Компания</th>
+                        <th>Сроки / Техника</th>
+                        <th>Контакты хозяина / бухгалтера</th>
+                        <th>Статус</th>
+                      </tr>
+                    </thead>
+                    <tbody id="contractsTableBody">
+                      <!-- Из JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Правая колонка: Налог на транспорт, ТМЦ, Заявки ТБ -->
+            <div class="col-6" style="display: flex; flex-direction: column; gap: 20px;">
+              <!-- Блок: Налог на транспорт (Основные средства) -->
+              <div class="card" style="margin-bottom: 0;">
+                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Налог на транспорт (Основные средства)</h4>
+                <div class="table-wrapper" style="max-height: 200px; overflow-y: auto;">
+                  <table class="clean-table" style="font-size: 11px;">
+                    <thead>
+                      <tr>
+                        <th>Техника</th>
+                        <th>Госномер</th>
+                        <th>Налог (₸)</th>
+                        <th>Срок оплаты</th>
+                        <th>Статус оплаты</th>
+                      </tr>
+                    </thead>
+                    <tbody id="vehicleTaxTableBody">
+                      <!-- Из JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Блок: Складской учет материалов (Приход / Списание) -->
+              <div class="card" style="margin-bottom: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Журнал прихода и списания материалов</h4>
+                  <button class="btn-secondary" style="font-size: 11px; padding: 4px 8px;" onclick="openMaterialLogModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Движение ТМЦ</span></button>
+                </div>
+                <div class="table-wrapper" style="max-height: 180px; overflow-y: auto;">
+                  <table class="clean-table" style="font-size: 11px;">
+                    <thead>
+                      <tr>
+                        <th>Дата / Тип</th>
+                        <th>Наименование ТМЦ</th>
+                        <th>Кол-во</th>
+                        <th>Поставщик / Назначение</th>
+                        <th>Сумма (₸)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="materialsLogTableBody">
+                      <!-- Из JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Блок: Заявки на корочки ТБ -->
+              <div class="card" style="margin-bottom: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Заявки на оформление ТБ корочек</h4>
+                  <button class="btn-secondary" style="font-size: 11px; padding: 4px 8px;" onclick="openOrderSafetyCertModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Заказать ТБ</span></button>
+                </div>
+                <div class="table-wrapper" style="max-height: 180px; overflow-y: auto;">
+                  <table class="clean-table" style="font-size: 11px;">
+                    <thead>
+                      <tr>
+                        <th>Сотрудник</th>
+                        <th>Техника</th>
+                        <th>Дата заявки</th>
+                        <th>Статус</th>
+                      </tr>
+                    </thead>
+                    <tbody id="safetyCertTableBody">
+                      <!-- Из JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- NEW. ТАБ: РЕЕСТР АВТОПАРКА -->
+        <section id="tab-all_vehicles" class="tab-pane">
+          <!-- Swiss Info Panel -->
+          <div class="ux-info-panel">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <div>
+              <strong>Единый реестр автопарка ТОО KazBildInvest.</strong> Здесь вы можете просмотреть весь перечень собственной и арендованной спецтехники, добавить новую субарендную или собственную технику, провести детальное редактирование параметров, проверить ТС по госномеру в базах РК, а также просмотреть индивидуальный табель работы и затраты (топливо, ремонты, амортизация) по выбранным датам.
+            </div>
+          </div>
+
+          <!-- Панель: Проверка по госномеру РК -->
+          <div class="card" style="margin-bottom: 24px;">
+            <h3 class="card-title" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; stroke: currentColor; stroke-width: 2.2; fill: none; display: inline-block; vertical-align: middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <span>Проверка спецтехники по госномеру (База ГИС ЕРАП РК)</span>
+            </h3>
+            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px;">
+              <input type="text" id="vehiclePlateCheckInput" class="form-control" placeholder="Введите госномер (например, 714 ADE 06)" style="max-width: 320px;" />
+              <button class="btn-primary" onclick="performKzPlateCheck()">Выполнить проверку</button>
+              <span style="font-size: 11px; color: var(--text-secondary);">Или выберите из реестра ниже</span>
+            </div>
             
-            <div style="display: flex; gap: 12px;">
-              <button class="btn-primary" onclick="resetDemoData()">Перезагрузить демо-данные</button>
-              <button class="btn-secondary" onclick="clearSystemCache()" style="color: var(--status-danger); border-color: var(--status-danger);">Очистить кэш (Браузер)</button>
+            <!-- Результат проверки -->
+            <div id="plateCheckResultContainer" style="display: none; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px;">
+              <!-- Заполняется динамически JS -->
+            </div>
+          </div>
+
+          <!-- Списки и фильтры реестра -->
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <h3 style="font-size: 14px; font-weight: 600; margin: 0;">Список спецтехники в реестре</h3>
+                <input type="text" id="allVehiclesSearch" class="form-control" placeholder="Поиск по госномеру/названию..." style="width: 220px; font-size: 12px; padding: 6px 10px;" oninput="renderAllVehiclesList()" />
+                <select id="allVehiclesOwnerFilter" class="select-clean" style="font-size: 12px; padding: 5px 10px;" onchange="renderAllVehiclesList()">
+                  <option value="all">Все формы владения</option>
+                  <option value="own">Собственная техника</option>
+                  <option value="subrent">Субаренда (Аренда)</option>
+                </select>
+              </div>
+              <button class="btn-primary" onclick="openAddVehicleModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Добавить технику</span></button>
+            </div>
+
+            <div class="table-wrapper">
+              <table class="clean-table" id="allVehiclesTable">
+                <thead>
+                  <tr>
+                    <th>Наименование спецтехники</th>
+                    <th>Госномер</th>
+                    <th>Инвентарный №</th>
+                    <th>Владение</th>
+                    <th>Машинист</th>
+                    <th>Текущий статус</th>
+                    <th>Объект</th>
+                    <th style="text-align: right;">Действия</th>
+                  </tr>
+                </thead>
+                <tbody id="allVehiclesTableBody">
+                  <!-- Заполняется динамически JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Детальный табель и затраты по выбранному ТС -->
+          <div id="individualVehicleTimesheetWrapper" class="card" style="display: none; margin-top: 24px;">
+            <!-- Заполняется динамически JS при выборе техники -->
+          </div>
+        </section>
+
+        <!-- NEW. ТАБ: РЕЕСТР ДОГОВОРОВ -->
+        <section id="tab-contracts_registry" class="tab-pane">
+          <!-- Swiss Info Panel -->
+          <div class="ux-info-panel">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <div>
+              <strong>Реестр Договоров и Шаблонов ТОО KazBildInvest.</strong> Раздел предназначен для Менеджера по договорам. Здесь вы можете вести реестр договоров спецтехники с поставщиками (субаренда) и заказчиками (клиенты), добавлять новые соглашения, а также использовать автоматический Конструктор Договоров для автозаполнения шаблонов реквизитами контрагентов.
+            </div>
+          </div>
+
+          <!-- Панель конструктора и реестра -->
+          <div class="grid-container" style="gap: 20px; align-items: start;">
+            <!-- Левая колонка: Список договоров -->
+            <div class="col-7 card">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 class="card-title" style="margin: 0;">Зарегистрированные договоры спецтехники</h3>
+                <button class="btn-primary" onclick="openAddContractModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Внести договор</span></button>
+              </div>
+              
+              <div class="table-wrapper">
+                <table class="clean-table" style="font-size: 12px;">
+                  <thead>
+                    <tr>
+                      <th>Номер / Контрагент</th>
+                      <th>Вид / Техника</th>
+                      <th>Сроки действия</th>
+                      <th>Статус</th>
+                      <th style="text-align: right;">Печать</th>
+                    </tr>
+                  </thead>
+                  <tbody id="contractsTabTableBody">
+                    <!-- Заполняется динамически JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Правая колонка: Конструктор шаблонов -->
+            <div class="col-5 card" id="contractTemplateConstructorCard">
+              <h3 class="card-title">Конструктор и предпросмотр шаблонов договоров</h3>
+              <p style="color: var(--text-secondary); font-size: 11px; margin-bottom: 12px;">Выберите договор в списке слева или начните заполнение нового, чтобы увидеть автозаполнение шаблона с синей печатью.</p>
+              
+              <div id="contractPreviewContainer" style="border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; background: var(--bg-secondary); max-height: 480px; overflow-y: auto;">
+                <div style="text-align: center; color: var(--text-secondary); padding: 40px 10px; font-size: 12px;">
+                  Выберите договор из таблицы для генерации и печати печатной формы
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- NEW. ТАБ: ФИНАНСЫ И КАЗНАЧЕЙСТВО -->
+        <section id="tab-finance_treasury" class="tab-pane">
+          <!-- Swiss Info Panel -->
+          <div class="ux-info-panel">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <div>
+              <strong>Панель Финансового и Материального учета (Казначейство).</strong> Раздел предназначен для Руководства и Бухгалтерии. Содержит сведения об остатках на расчетных счетах, курсах валют, оплаченных налогах на спецтехнику, дебиторской и кредиторской задолженности. Позволяет отправлять клиентам структурированные оповещения (дебиторские напоминания) о просроченных счетах.
+            </div>
+          </div>
+
+          <div class="grid-container" style="gap: 20px; align-items: start;">
+            <!-- Левая колонка: Банки, Авансы, Налоги -->
+            <div class="col-6" style="display: flex; flex-direction: column; gap: 20px;">
+              <!-- Остатки на счетах -->
+              <div class="card" style="margin-bottom: 0;">
+                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px;">Расчетные счета и курсы валют</h4>
+                <div class="grid-container" style="gap: 12px; margin-bottom: 16px;">
+                  <div class="col-6" style="background: var(--bg-secondary); padding: 12px; border-radius: 6px;">
+                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">Halyk Bank (KZT)</span>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                      <input type="number" id="finBalanceKztInput" class="form-control" style="font-size: 14px; font-weight: 700; padding: 4px 8px;" onchange="updateFinanceBalancesState()" />
+                      <span>₸</span>
+                    </div>
+                  </div>
+                  <div class="col-6" style="background: var(--bg-secondary); padding: 12px; border-radius: 6px;">
+                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700;">ForteBank (USD)</span>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                      <input type="number" id="finBalanceUsdInput" class="form-control" style="font-size: 14px; font-weight: 700; padding: 4px 8px;" onchange="updateFinanceBalancesState()" />
+                      <span>$</span>
+                    </div>
+                  </div>
+                </div>
+                <div style="border-top: 1px solid var(--border-color); padding-top: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                  <div style="font-size: 11px; color: var(--text-secondary);">
+                    <span>Курсы НБ РК: </span>
+                    <strong style="margin-right: 8px;">USD: <span id="finRateUsdDisplay">448.50</span> ₸</strong>
+                    <strong>RUB: <span id="finRateRubDisplay">5.12</span> ₸</strong>
+                  </div>
+                  <button class="btn-secondary" style="font-size: 10px; padding: 4px 8px;" onclick="simulateCurrencyUpdate()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg><span>Обновить курсы</span></button>
+                </div>
+              </div>
+
+              <!-- Авансы поставщикам -->
+              <div class="card" style="margin-bottom: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Выданные авансы поставщикам</h4>
+                  <button class="btn-secondary" style="font-size: 11px; padding: 4px 8px;" onclick="openSupplierAdvanceModal()"><svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px; vertical-align: middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg><span>Новый аванс</span></button>
+                </div>
+                <div class="table-wrapper" style="max-height: 180px; overflow-y: auto;">
+                  <table class="clean-table" style="font-size: 11px;">
+                    <thead>
+                      <tr>
+                        <th>Поставщик</th>
+                        <th>Дата</th>
+                        <th>Сумма (₸)</th>
+                        <th>Назначение</th>
+                      </tr>
+                    </thead>
+                    <tbody id="finSupplierAdvancesTableBody">
+                      <!-- JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Налог на транспорт -->
+              <div class="card" style="margin-bottom: 0;">
+                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Транспортный налог (Собственная техника)</h4>
+                <div class="table-wrapper" style="max-height: 200px; overflow-y: auto;">
+                  <table class="clean-table" style="font-size: 11px;">
+                    <thead>
+                      <tr>
+                        <th>Техника</th>
+                        <th>Госномер</th>
+                        <th>Сумма налога</th>
+                        <th>Срок оплаты</th>
+                        <th>Статус</th>
+                      </tr>
+                    </thead>
+                    <tbody id="finTransportTaxTableBody">
+                      <!-- JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Правая колонка: Дебиторская и Кредиторская задолженность -->
+            <div class="col-6" style="display: flex; flex-direction: column; gap: 20px;">
+              <!-- Accounts Payable (Кредиторы) -->
+              <div class="card" style="margin-bottom: 0;">
+                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Кредиторская задолженность (Счета к оплате)</h4>
+                <div class="table-wrapper" style="max-height: 200px; overflow-y: auto;">
+                  <table class="clean-table" style="font-size: 11px;">
+                    <thead>
+                      <tr>
+                        <th>Контрагент</th>
+                        <th>Назначение счета</th>
+                        <th>Сумма долга</th>
+                        <th>Срок оплаты</th>
+                        <th>Действие</th>
+                      </tr>
+                    </thead>
+                    <tbody id="finAccountsPayableTableBody">
+                      <!-- JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Accounts Receivable (Дебиторы) -->
+              <div class="card" style="margin-bottom: 0;">
+                <h4 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Дебиторская задолженность (Долги клиентов)</h4>
+                <div class="table-wrapper" style="max-height: 200px; overflow-y: auto;">
+                  <table class="clean-table" style="font-size: 11px;">
+                    <thead>
+                      <tr>
+                        <th>Заказчик</th>
+                        <th>Сумма долга (₸)</th>
+                        <th>Просрочка</th>
+                        <th>Статус уведомления</th>
+                        <th>Напомнить</th>
+                      </tr>
+                    </thead>
+                    <tbody id="finAccountsReceivableTableBody">
+                      <!-- JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -985,7 +1572,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" onclick="closeModal('dealDetailsModal')">Закрыть</button>
-        <button class="btn-primary" id="dealActionBtn">Действие</button>
+        <div id="dealActionBtn" style="display: inline-flex; gap: 12px;"></div>
       </div>
     </div>
   </div>
@@ -1711,6 +2298,480 @@
       </div>
       <div class="modal-footer">
         <button class="btn-primary" onclick="closeModal('dashboardDetailModal')">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ДОБАВЛЕНИЕ В ЧЕРНЫЙ СПИСОК -->
+  <div class="modal-overlay" id="addBlacklistModal">
+    <div class="modal-box" style="max-width: 480px;">
+      <div class="modal-header">
+        <span class="modal-title">Внесение сотрудника в Черный список (ЧС)</span>
+        <button class="modal-close-btn" onclick="closeModal('addBlacklistModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="blacklistForm">
+          <div class="form-group">
+            <label class="form-label">ФИО сотрудника</label>
+            <input type="text" id="blName" class="form-control" placeholder="Иванов И. И." required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">ИИН</label>
+            <input type="text" id="blIin" class="form-control" placeholder="12-значный ИИН" required />
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Должность</label>
+              <input type="text" id="blPosition" class="form-control" placeholder="Машинист автокрана" required />
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Категория</label>
+              <select id="blCategory" class="form-control">
+                <option value="собственный">Штатный сотрудник</option>
+                <option value="сторонний">Сторонний (Субаренда)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Причина блокировки</label>
+            <textarea id="blReason" class="form-control" style="height: 60px;" placeholder="Напр. Слив ГСМ, пьянство..." required></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Дополнительные примечания</label>
+            <textarea id="blNotes" class="form-control" style="height: 60px;" placeholder="Детали инцидента..."></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('addBlacklistModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitAddBlacklist()">Внести в ЧС</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ДОБАВЛЕНИЕ ТЕХНИКИ -->
+  <div class="modal-overlay" id="addVehicleModal">
+    <div class="modal-box" style="max-width: 500px;">
+      <div class="modal-header">
+        <span class="modal-title">Добавление транспортного средства</span>
+        <button class="modal-close-btn" onclick="closeModal('addVehicleModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="addVehicleForm">
+          <div class="form-group">
+            <label class="form-label">Наименование техники</label>
+            <input type="text" id="newVehName" class="form-control" placeholder="Гусеничный экскаватор CAT 320" required />
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Модель</label>
+              <input type="text" id="newVehModel" class="form-control" placeholder="320 GC" required />
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Госномер</label>
+              <input type="text" id="newVehPlate" class="form-control" placeholder="8823 AT 06" required />
+            </div>
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Тип техники</label>
+              <select id="newVehType" class="form-control">
+                <option value="Автокран">Автокран</option>
+                <option value="Экскаватор">Экскаватор</option>
+                <option value="Самосвал">Самосвал</option>
+                <option value="Погрузчик">Погрузчик</option>
+                <option value="Автовышка">Автовышка</option>
+                <option value="Манипулятор">Манипулятор</option>
+                <option value="Бульдозер">Бульдозер</option>
+              </select>
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Собственность</label>
+              <select id="newVehOwnerType" class="form-control" onchange="toggleAddVehicleSubrentFields()">
+                <option value="own">Собственная техника</option>
+                <option value="subrent">Субаренда (Аренда у партнеров)</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Инвентарный номер</label>
+              <input type="text" id="newVehInv" class="form-control" placeholder="KBI-EX-09" required />
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Год выпуска</label>
+              <input type="number" id="newVehYear" class="form-control" value="2023" required />
+            </div>
+          </div>
+          <div id="addVehicleSubrentFields" style="display: none; border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 12px;">
+            <div class="grid-container" style="gap: 16px;">
+              <div class="col-6 form-group">
+                <label class="form-label">Арендодатель (Поставщик)</label>
+                <input type="text" id="newVehSubrentProvider" class="form-control" placeholder="ТОО Каспий Спец Техника" />
+              </div>
+              <div class="col-6 form-group">
+                <label class="form-label">Стоимость аренды (в сутки, ₸)</label>
+                <input type="number" id="newVehSubrentRate" class="form-control" placeholder="150000" />
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" onclick="submitAddVehicle()">Сохранить технику</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: РЕДАКТИРОВАНИЕ ТЕХНИКИ -->
+  <div class="modal-overlay" id="editVehicleModal">
+    <div class="modal-box" style="max-width: 550px;">
+      <div class="modal-header">
+        <span class="modal-title">Редактирование спецтехники</span>
+        <button class="modal-close-btn" onclick="closeModal('editVehicleModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="editVehicleForm">
+          <input type="hidden" id="editVehId" />
+          <div class="form-group">
+            <label class="form-label">Наименование техники</label>
+            <input type="text" id="editVehName" class="form-control" required />
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Модель</label>
+              <input type="text" id="editVehModel" class="form-control" required />
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Госномер</label>
+              <input type="text" id="editVehPlate" class="form-control" required />
+            </div>
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Тип техники</label>
+              <select id="editVehType" class="form-control">
+                <option value="Автокран">Автокран</option>
+                <option value="Экскаватор">Экскаватор</option>
+                <option value="Самосвал">Самосвал</option>
+                <option value="Погрузчик">Погрузчик</option>
+                <option value="Автовышка">Автовышка</option>
+                <option value="Манипулятор">Манипулятор</option>
+                <option value="Бульдозер">Бульдозер</option>
+              </select>
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Собственность</label>
+              <select id="editVehOwnerType" class="form-control" onchange="toggleEditVehicleSubrentFields()">
+                <option value="own">Собственная техника</option>
+                <option value="subrent">Субаренда (Аренда у партнеров)</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Инвентарный номер</label>
+              <input type="text" id="editVehInv" class="form-control" required />
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Год выпуска</label>
+              <input type="number" id="editVehYear" class="form-control" required />
+            </div>
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Назначенный машинист</label>
+              <select id="editVehDriver" class="form-control">
+                <!-- Заполняется JS -->
+              </select>
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Текущий статус</label>
+              <select id="editVehStatus" class="form-control">
+                <option value="Работает">Работает</option>
+                <option value="Свободна">Свободна</option>
+                <option value="В пути">В пути</option>
+                <option value="На ТО">На ТО</option>
+                <option value="На ремонте">На ремонте</option>
+                <option value="Неисправна">Неисправна</option>
+              </select>
+            </div>
+          </div>
+          
+          <!-- Специфичные поля субаренды -->
+          <div id="editVehicleSubrentFields" style="display: none; border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 12px;">
+            <div class="grid-container" style="gap: 16px;">
+              <div class="col-6 form-group">
+                <label class="form-label">Арендодатель (Поставщик)</label>
+                <input type="text" id="editVehSubrentProvider" class="form-control" />
+              </div>
+              <div class="col-6 form-group">
+                <label class="form-label">Стоимость аренды (в сутки, ₸)</label>
+                <input type="number" id="editVehSubrentRate" class="form-control" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Специфичные поля собственной техники -->
+          <div id="editVehicleOwnFields" style="display: none; border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 12px;">
+            <div class="grid-container" style="gap: 16px;">
+              <div class="col-6 form-group">
+                <label class="form-label">Налог на транспорт (₸/год)</label>
+                <input type="number" id="editVehTaxCost" class="form-control" />
+              </div>
+              <div class="col-6 form-group">
+                <label class="form-label">Срок налога (ГГГГ-ММ-ДД)</label>
+                <input type="date" id="editVehTaxDate" class="form-control" />
+              </div>
+            </div>
+            <div class="grid-container" style="gap: 16px;">
+              <div class="col-6 form-group">
+                <label class="form-label">Срок техосмотра ПТО</label>
+                <input type="date" id="editVehPtoDate" class="form-control" />
+              </div>
+              <div class="col-6 form-group">
+                <label class="form-label">Срок техосмотра ЧТО</label>
+                <input type="date" id="editVehCtoDate" class="form-control" />
+              </div>
+            </div>
+            <div class="grid-container" style="gap: 16px;">
+              <div class="col-6 form-group">
+                <label class="form-label">Страховая компания</label>
+                <input type="text" id="editVehInsProvider" class="form-control" />
+              </div>
+              <div class="col-6 form-group">
+                <label class="form-label">Срок страховки</label>
+                <input type="date" id="editVehInsDate" class="form-control" />
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('editVehicleModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitEditVehicle()">Сохранить изменения</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ЗАЯВКА НА ТБ КОРОЧКИ -->
+  <div class="modal-overlay" id="orderSafetyCertModal">
+    <div class="modal-box" style="max-width: 450px;">
+      <div class="modal-header">
+        <span class="modal-title">Заявка на оформление корочек ТБ / ОТ</span>
+        <button class="modal-close-btn" onclick="closeModal('orderSafetyCertModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="safetyCertForm">
+          <div class="form-group">
+            <label class="form-label">ФИО сотрудника</label>
+            <select id="scEmployeeSelect" class="form-control"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Тип спецтехники</label>
+            <input type="text" id="scVehicleName" class="form-control" placeholder="Автокран Zoomlion 25t" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Необходимые допуски</label>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+              <label><input type="checkbox" id="scCheckTb" checked> Техника безопасности (ТБ)</label>
+              <label><input type="checkbox" id="scCheckOt" checked> Охрана труда (ОТ)</label>
+              <label><input type="checkbox" id="scCheckPtm"> Пожарно-технический минимум (ПТМ)</label>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('orderSafetyCertModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitSafetyCertRequest()">Создать заявку</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ДОБАВЛЕНИЕ ДОГОВОРА -->
+  <div class="modal-overlay" id="addContractModal">
+    <div class="modal-box" style="max-width: 500px;">
+      <div class="modal-header">
+        <span class="modal-title">Внесение договора спецтехники</span>
+        <button class="modal-close-btn" onclick="closeModal('addContractModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="contractForm">
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Номер договора</label>
+              <input type="text" id="cntNum" class="form-control" placeholder="Д-06/2026-99" required />
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Вид договора</label>
+              <select id="cntIsSubrent" class="form-control" onchange="autoGenerateContractTemplate()">
+                <option value="false">Договор с клиентом (Заказчик)</option>
+                <option value="true">Договор субаренды (Поставщик)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Контрагент (Компания)</label>
+            <input type="text" id="cntCompany" class="form-control" placeholder="ТОО АтырауНефть" required oninput="autoGenerateContractTemplate()" />
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Дата составления</label>
+              <input type="date" id="cntStart" class="form-control" required />
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Дата окончания</label>
+              <input type="date" id="cntEnd" class="form-control" required />
+            </div>
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Вид техники</label>
+              <input type="text" id="cntVehType" class="form-control" placeholder="Автокран, Самосвал" required />
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Госномер техники</label>
+              <input type="text" id="cntPlate" class="form-control" placeholder="714 ADE 06" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Контакты Хозяина (Арендодателя)</label>
+            <input type="text" id="cntOwner" class="form-control" placeholder="+7 701 111 2233" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Контакты бухгалтера контрагента</label>
+            <input type="text" id="cntAccountant" class="form-control" placeholder="+7 7122 30 40 50" required />
+          </div>
+          <div class="form-group" style="margin-top: 12px; padding: 12px; background: rgba(37,99,235,0.05); border-radius: 6px;">
+            <label style="font-weight: 700; font-size: 11px; text-transform: uppercase; color: var(--brand-color); display: block; margin-bottom: 6px;">Сгенерированный шаблон договора</label>
+            <textarea id="cntTemplateText" class="form-control" style="height: 100px; font-size: 11px; background: #fff;" readonly></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('addContractModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitAddContract()">Сохранить договор</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ПРИХОД / СПИСАНИЕ МАТЕРИАЛОВ -->
+  <div class="modal-overlay" id="addMaterialLogModal">
+    <div class="modal-box" style="max-width: 450px;">
+      <div class="modal-header">
+        <span class="modal-title">Приход или списание ТМЦ</span>
+        <button class="modal-close-btn" onclick="closeModal('addMaterialLogModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="materialLogForm">
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Тип операции</label>
+              <select id="mwoType" class="form-control" onchange="updateMaterialSubmitButton()">
+                <option value="Приход">Приход на склад (Поставка)</option>
+                <option value="Списание">Списание со склада (Расход)</option>
+              </select>
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Наименование ТМЦ</label>
+              <input type="text" id="mwoItem" class="form-control" placeholder="Фильтр масляный CAT" required />
+            </div>
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Количество</label>
+              <input type="number" id="mwoQty" class="form-control" min="1" value="1" required />
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Цена (₸)</label>
+              <input type="number" id="mwoPrice" class="form-control" placeholder="18500" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Поставщик / Назначение списания</label>
+            <input type="text" id="mwoSource" class="form-control" placeholder="Напр. ТОО Борусан Машинери или Под ТО-2" required />
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('addMaterialLogModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitAddMaterialLog()" id="mwoSubmitBtn">Зафиксировать</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: АВАНС ПОСТАВЩИКУ -->
+  <div class="modal-overlay" id="addSupplierAdvanceModal">
+    <div class="modal-box" style="max-width: 450px;">
+      <div class="modal-header">
+        <span class="modal-title">Оформление аванса поставщику</span>
+        <button class="modal-close-btn" onclick="closeModal('addSupplierAdvanceModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="supplierAdvanceForm">
+          <div class="form-group">
+            <label class="form-label">Наименование поставщика</label>
+            <input type="text" id="saSupplier" class="form-control" placeholder="ТОО Helios OIL" required />
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Сумма аванса (₸)</label>
+              <input type="number" id="saAmount" class="form-control" placeholder="1000000" required />
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Дата платежа</label>
+              <input type="date" id="saDate" class="form-control" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Назначение платежа</label>
+            <input type="text" id="saPurpose" class="form-control" placeholder="Предоплата за дизельное топливо" required />
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('addSupplierAdvanceModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitSupplierAdvance()">Выдать аванс</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО: ПОТЕНЦИАЛЬНЫЙ ПОСТАВЩИК -->
+  <div class="modal-overlay" id="addPotentialSupplierModal">
+    <div class="modal-box" style="max-width: 450px;">
+      <div class="modal-header">
+        <span class="modal-title">Добавление потенциального поставщика</span>
+        <button class="modal-close-btn" onclick="closeModal('addPotentialSupplierModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="potentialSupplierForm">
+          <div class="form-group">
+            <label class="form-label">Название компании</label>
+            <input type="text" id="psName" class="form-control" placeholder="ТОО СпецГидравликаАтырау" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Контакты / Телефон</label>
+            <input type="text" id="psContact" class="form-control" placeholder="+7 701 555 4433" required />
+          </div>
+          <div class="grid-container" style="gap: 16px;">
+            <div class="col-6 form-group">
+              <label class="form-label">Город</label>
+              <input type="text" id="psCity" class="form-control" placeholder="Атырау" required />
+            </div>
+            <div class="col-6 form-group">
+              <label class="form-label">Рейтинг (1-5)</label>
+              <input type="number" id="psRating" class="form-control" min="1" max="5" step="0.1" value="5.0" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Категория поставляемых товаров/услуг</label>
+            <input type="text" id="psCategory" class="form-control" placeholder="Напр. Запчасти CAT, ремонт гидромоторов" required />
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('addPotentialSupplierModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitPotentialSupplier()">Сохранить</button>
       </div>
     </div>
   </div>

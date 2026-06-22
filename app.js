@@ -14,6 +14,15 @@ if (!db.companies) db.companies = initialData.companies || [];
 if (!db.tasks) db.tasks = initialData.tasks || [];
 if (!db.driverMessages) db.driverMessages = initialData.driverMessages || [];
 if (!db.supplyOrders) db.supplyOrders = initialData.supplyOrders || [];
+if (!db.potentialSuppliers) db.potentialSuppliers = initialData.potentialSuppliers || [];
+if (!db.blacklist) db.blacklist = initialData.blacklist || [];
+if (!db.timesheets) db.timesheets = initialData.timesheets || [];
+if (!db.supplierAdvances) db.supplierAdvances = initialData.supplierAdvances || [];
+if (!db.currencyRates) db.currencyRates = initialData.currencyRates || { USD: 448.50, EUR: 480.20, RUB: 5.12 };
+if (!db.bankBalances) db.bankBalances = initialData.bankBalances || [];
+if (!db.safetyCertRequests) db.safetyCertRequests = initialData.safetyCertRequests || [];
+if (!db.materialsWriteOffs) db.materialsWriteOffs = initialData.materialsWriteOffs || [];
+if (!db.contracts) db.contracts = initialData.contracts || [];
 if (!db.gpsAlerts) {
   db.gpsAlerts = [
     { id: "alert_1", vehicleId: "v101", type: "geofence", message: "Автокран Zoomlion (714 ADE 06) покинул геозону объекта Карабатан без путевого листа!", time: "12:10", status: "active" },
@@ -96,8 +105,13 @@ function switchTab(tabId) {
     purchasing_hub: "Снабжение и Закупки (Панель Снабженца)",
     repairs: "Ремонты и ТО спецтехники",
     hr: "HR-Модуль и Допуски",
+    timesheet: "Табель учета времени спецтехники и водителей",
+    staff: "Единый реестр персонала ТОО KazBildInvest",
     companies: "Реестр контрагентов",
-    settings: "Настройки ERP"
+    all_vehicles: "Реестр Автопарка и Учет Затрат",
+    contracts_registry: "Реестр договоров и Конструктор шаблонов",
+    finance_treasury: "Финансы, Казначейство и Взаиморасчеты",
+    settings: "Администрирование и сброс системы"
   };
   document.getElementById("pageTitleDisplay").innerText = titles[tabId] || "Панель управления";
   
@@ -115,6 +129,18 @@ function switchTab(tabId) {
     renderDispatcherHub();
   } else if (tabId === 'purchasing_hub') {
     renderPurchasingHub();
+  } else if (tabId === 'timesheet') {
+    renderTimesheetGrid();
+  } else if (tabId === 'staff') {
+    renderStaffGrid();
+  } else if (tabId === 'all_vehicles') {
+    renderAllVehicles();
+  } else if (tabId === 'contracts_registry') {
+    renderContractsRegistry();
+  } else if (tabId === 'finance_treasury') {
+    renderFinanceTreasury();
+  } else if (tabId === 'settings') {
+    renderSettingsDashboard();
   }
 }
 
@@ -142,18 +168,18 @@ function applyRolePermissions() {
         item.style.display = "none";
       }
     } else if (role === "Mechanic") {
-      // Ремонты, ТО, Склад, Компании, Задачи
-      if (!clickAttr.includes("repairs") && !clickAttr.includes("warehouse") && !clickAttr.includes("companies") && !clickAttr.includes("tasks")) {
+      // Ремонты, ТО, Склад, Компании, Задачи, Табель, Автопарк
+      if (!clickAttr.includes("repairs") && !clickAttr.includes("warehouse") && !clickAttr.includes("companies") && !clickAttr.includes("tasks") && !clickAttr.includes("timesheet") && !clickAttr.includes("all_vehicles")) {
         item.style.display = "none";
       }
     } else if (role === "HR") {
-      // Только HR, Документы, Настройки
-      if (!clickAttr.includes("hr") && !clickAttr.includes("settings")) {
+      // Только HR, Документы, Настройки, Табель, Сотрудники, Автопарк
+      if (!clickAttr.includes("hr") && !clickAttr.includes("settings") && !clickAttr.includes("timesheet") && !clickAttr.includes("staff") && !clickAttr.includes("all_vehicles")) {
         item.style.display = "none";
       }
     } else if (role === "Dispatcher") {
-      // Только CRM, Диспетчеризация, GPS, ГСМ, Задачи, Пульт Диспетчера
-      if (!clickAttr.includes("crm") && !clickAttr.includes("dispatch") && !clickAttr.includes("gps") && !clickAttr.includes("fuel") && !clickAttr.includes("tasks") && !clickAttr.includes("dispatcher_hub")) {
+      // Только CRM, Диспетчеризация, GPS, ГСМ, Задачи, Пульт Диспетчера, Табель, Автопарк
+      if (!clickAttr.includes("crm") && !clickAttr.includes("dispatch") && !clickAttr.includes("gps") && !clickAttr.includes("fuel") && !clickAttr.includes("tasks") && !clickAttr.includes("dispatcher_hub") && !clickAttr.includes("timesheet") && !clickAttr.includes("all_vehicles")) {
         item.style.display = "none";
       }
     } else if (role === "Purchaser") {
@@ -162,24 +188,34 @@ function applyRolePermissions() {
         item.style.display = "none";
       }
     } else if (role === "Accountant") {
-      // Только Дашборд, CRM, HR, Компании, Настройки
-      if (!clickAttr.includes("dashboard") && !clickAttr.includes("crm") && !clickAttr.includes("hr") && !clickAttr.includes("companies") && !clickAttr.includes("settings")) {
+      // Только Дашборд, CRM, HR, Компании, Настройки, Табель, Сотрудники, Финансы, Договоры, Автопарк
+      if (!clickAttr.includes("dashboard") && !clickAttr.includes("crm") && !clickAttr.includes("hr") && !clickAttr.includes("companies") && !clickAttr.includes("settings") && !clickAttr.includes("timesheet") && !clickAttr.includes("staff") && !clickAttr.includes("finance_treasury") && !clickAttr.includes("contracts_registry") && !clickAttr.includes("all_vehicles")) {
         item.style.display = "none";
       }
+    } else if (role === "Manager") {
+      // Только CRM, Диспетчеризация, Задачи, HR, Компании, Настройки, Табель, Сотрудники, Договоры, Автопарк
+      if (!clickAttr.includes("crm") && !clickAttr.includes("dispatch") && !clickAttr.includes("tasks") && !clickAttr.includes("hr") && !clickAttr.includes("companies") && !clickAttr.includes("settings") && !clickAttr.includes("timesheet") && !clickAttr.includes("staff") && !clickAttr.includes("contracts_registry") && !clickAttr.includes("all_vehicles")) {
+        item.style.display = "none";
+      }
+    } else if (role === "DeputyDirector") {
+      // Все права доступны (как у Директора)
+      // Ничего не скрываем
     }
   });
 
   // Автоматический редирект на разрешенную вкладку, если текущая скрыта
   const activePane = document.querySelector(".tab-pane.active");
-  const activeTabId = activePane.id.replace("tab-", "");
-  const activeMenuBtn = Array.from(allMenuItems).find(btn => btn.style.display !== "none" && btn.getAttribute("onclick").includes(activeTabId));
-  
-  if (!activeMenuBtn) {
-    // Найти первую доступную кнопку
-    const firstAvailable = Array.from(allMenuItems).find(btn => btn.style.display !== "none");
-    if (firstAvailable) {
-      const targetId = firstAvailable.getAttribute("onclick").match(/'([^']+)'/)[1];
-      switchTab(targetId);
+  if (activePane) {
+    const activeTabId = activePane.id.replace("tab-", "");
+    const activeMenuBtn = Array.from(allMenuItems).find(btn => btn.style.display !== "none" && btn.getAttribute("onclick").includes(activeTabId));
+    
+    if (!activeMenuBtn) {
+      // Найти первую доступную кнопку
+      const firstAvailable = Array.from(allMenuItems).find(btn => btn.style.display !== "none");
+      if (firstAvailable) {
+        const targetId = firstAvailable.getAttribute("onclick").match(/'([^']+)'/)[1];
+        switchTab(targetId);
+      }
     }
   }
 }
@@ -206,16 +242,13 @@ function renderCrmKanban() {
   
   stages.forEach(stage => {
     const col = document.createElement("div");
-    col.className = "col-2 card kanban-column";
-    col.style.padding = "12px";
-    col.style.minHeight = "400px";
-    col.style.backgroundColor = "var(--bg-secondary)";
+    col.className = "crm-column";
     col.style.borderTop = `4px solid ${stage.color}`;
     
     col.innerHTML = `
-      <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: ${stage.color}; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+      <div class="crm-column-header" style="color: ${stage.color};">
         <span>${stage.name}</span>
-        <span style="padding: 2px 6px; border-radius: 4px; background-color: ${stage.badgeBg}; color: ${stage.color}; font-size: 10px; font-weight: 700;">${db.deals.filter(d => d.stage === stage.id).length}</span>
+        <span class="crm-column-badge" style="color: ${stage.color};">${db.deals.filter(d => d.stage === stage.id).length}</span>
       </div>
       <div class="kanban-cards-wrapper" style="display: flex; flex-direction: column; gap: 10px;" id="stage-${stage.id}"></div>
     `;
@@ -230,12 +263,11 @@ function renderCrmKanban() {
     const wrapper = col.querySelector(".kanban-cards-wrapper");
     db.deals.filter(d => d.stage === stage.id).forEach(deal => {
       const card = document.createElement("div");
-      card.className = "card";
+      card.className = "crm-card";
       card.id = `deal-card-${deal.id}`;
-      card.style.padding = "12px";
-      card.style.marginBottom = "0";
-      card.style.cursor = "pointer";
-      card.style.borderLeft = `3px solid ${stage.color}`;
+      card.style.backgroundColor = stage.color;
+      card.style.borderColor = stage.color;
+      card.style.color = "#ffffff";
       
       // Make card draggable
       card.draggable = true;
@@ -246,12 +278,14 @@ function renderCrmKanban() {
       const siteName = site ? site.name : "Неизвестно";
       
       card.innerHTML = `
-        <div style="font-weight: 600; font-size: 13px;">${deal.companyName}</div>
-        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Объект: ${siteName}</div>
-        <div style="font-size: 11px; color: var(--text-secondary);">Сроки: ${deal.startDate} - ${deal.endDate}</div>
-        <div style="margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-weight: 700; font-size: 12px;">${deal.price.toLocaleString()} ₸</span>
-          <span class="badge ${deal.contractSigned ? 'badge-success' : 'badge-danger'}" style="font-size: 8px; padding: 2px 4px;">
+        <div class="crm-card-company" style="color: #ffffff !important;">${deal.companyName}</div>
+        <div class="crm-card-meta" style="color: rgba(255, 255, 255, 0.85) !important;">
+          <div style="color: rgba(255, 255, 255, 0.85) !important;">Объект: ${siteName}</div>
+          <div style="color: rgba(255, 255, 255, 0.85) !important;">Сроки: ${deal.startDate} - ${deal.endDate}</div>
+        </div>
+        <div class="crm-card-footer">
+          <span class="crm-card-price" style="color: #ffffff !important;">${deal.price.toLocaleString()} ₸</span>
+          <span class="badge ${deal.contractSigned ? 'badge-success' : 'badge-danger'}" style="font-size: 8px; padding: 2px 4px; background-color: rgba(255, 255, 255, 0.25) !important; color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.4) !important;">
             ${deal.contractSigned ? 'Договор подписан' : 'Без договора'}
           </span>
         </div>
@@ -295,12 +329,19 @@ function handleDealDrop(e, newStage) {
   const deal = db.deals.find(d => d.id === dealId);
   if (!deal) return;
 
+  const oldStage = deal.stage;
+  if (oldStage === newStage) return;
+
   // Validation: Without contract, transition to "Назначение" or later is blocked
   const restrictedStages = ["Назначение", "Выполнение работ", "Закрытие заказа", "Оплата"];
   if (restrictedStages.includes(newStage) && !deal.contractSigned) {
     showSystemNotification(`Ошибка: Перевод сделки "${deal.companyName}" на этап "${newStage}" заблокирован. Сначала необходимо подписать договор.`);
     return;
   }
+
+  // Track history for Undo
+  window.crmHistory = window.crmHistory || [];
+  window.crmHistory.push({ dealId: deal.id, oldStage: oldStage });
 
   deal.stage = newStage;
   saveState();
@@ -827,8 +868,13 @@ function initMap() {
   
   window.map = L.map('map-container').setView(centralKaz, 8);
   
-  // Светлый слой по умолчанию
-  window.lightTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  // Динамический выбор слоя по теме
+  const theme = document.documentElement.getAttribute("data-theme") || "light";
+  const mapUrl = theme === 'dark'
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+    
+  window.lightTiles = L.tileLayer(mapUrl, {
     attribution: '&copy; CartoDB'
   }).addTo(window.map);
   
@@ -853,16 +899,20 @@ function initMap() {
     const lat = site ? site.lat + (Math.random() - 0.5) * 0.05 : 47.116;
     const lng = site ? site.lng + (Math.random() - 0.5) * 0.05 : 52.848;
     
-    // Цвет маркера
-    let color = 'blue';
-    if (v.ownerType === 'subrent') color = 'purple';
-    if (v.status === 'На ремонте' || v.status === 'Неисправна') color = 'red';
+    let pulseClass = 'marker-pulse-own';
+    if (v.ownerType === 'subrent') pulseClass = 'marker-pulse-subrent';
+    if (v.status === 'На ремонте' || v.status === 'Неисправна') pulseClass = 'marker-pulse-repair';
     
     const customIcon = L.divIcon({
       className: 'custom-div-icon',
-      html: `<div style="background-color:${color}; width:12px; height:12px; border-radius:50%; border:2px solid #FFF; box-shadow:0 0 4px rgba(0,0,0,0.4);"></div>`,
-      iconSize: [12, 12],
-      iconAnchor: [6, 6]
+      html: `
+        <div style="position:relative;">
+          <div class="${pulseClass}"></div>
+          <div class="vehicle-label-tag">${v.plate}</div>
+        </div>
+      `,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
     });
 
     const marker = L.marker([lat, lng], { icon: customIcon }).addTo(window.map);
@@ -1670,11 +1720,11 @@ function openEmployeeDetails(driverId) {
     <button class="btn-primary" style="font-size: 13px; padding: 8px 20px; border-radius: 30px;" onclick="closeEmployeeModal()">Закрыть</button>
   `;
   
-  document.getElementById("employeeDetailsModal").classList.add("active");
+  openModal("employeeDetailsModal");
 }
 
 function closeEmployeeModal() {
-  document.getElementById("employeeDetailsModal").classList.remove("active");
+  closeModal("employeeDetailsModal");
 }
 
 function toggleEmployeeBlockStatus(driverId) {
@@ -2682,6 +2732,24 @@ function openCompanyDetails(compId) {
   const totalCompleted = completedDeals.length + completedOrders.length + completedRepairs.length + completedSubrent.length + completedInsurance.length;
 
   // Генерация списков для вкладок
+  const replaceLeadingEmojiWithSvg = (titleStr) => {
+    const iconMap = {
+      "📄": `<svg viewBox="0 0 24 24" style="width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>`,
+      "📦": `<svg viewBox="0 0 24 24" style="width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 4px; display: inline-block; vertical-align: middle;"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5" rx="1"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>`,
+      "🔧": `<svg viewBox="0 0 24 24" style="width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>`,
+      "🚜": `<svg viewBox="0 0 24 24" style="width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 4px; display: inline-block; vertical-align: middle;"><circle cx="7.5" cy="17.5" r="2.5"></circle><circle cx="18.5" cy="15.5" r="4.5"></circle><path d="M14 9V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v6h12a2 2 0 0 0 2-2zM8 11h4M18.5 11h-3M6 5h4"></path></svg>`,
+      "🛡️": `<svg viewBox="0 0 24 24" style="width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`,
+      "🛡": `<svg viewBox="0 0 24 24" style="width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`
+    };
+    for (let key in iconMap) {
+      if (titleStr.startsWith(key)) {
+        return iconMap[key] + titleStr.replace(key, "").trim();
+      }
+    }
+    return titleStr;
+  };
+
+  // Генерация списков для вкладок
   const renderItemCard = (type, title, status, subtitle, price, docBtn, clickAction) => {
     let color = "#2563EB"; // crm
     if (type === 'supply') color = "#16A34A";
@@ -2697,7 +2765,7 @@ function openCompanyDetails(compId) {
            onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.08)';"
            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-weight: 700; font-size: 11px; color: ${color}; text-transform: uppercase;">${title}</span>
+          <span style="font-weight: 700; font-size: 11px; color: ${color}; text-transform: uppercase; display: inline-flex; align-items: center; gap: 4px;">${replaceLeadingEmojiWithSvg(title)}</span>
           <span class="badge badge-warning" style="font-size: 9px; padding: 2px 6px;">${status}</span>
         </div>
         <div style="font-size: 12px; font-weight: 600; color: var(--text-primary);">${subtitle}</div>
@@ -2848,7 +2916,7 @@ function openCompanyDetails(compId) {
     <button class="btn-primary" style="font-size: 13px; padding: 8px 20px; border-radius: 30px;" onclick="closeCompanyModal()">Закрыть</button>
   `;
   
-  document.getElementById("companyDetailsModal").classList.add("active");
+  openModal("companyDetailsModal");
 }
 
 function switchCompanyTab(tabName) {
@@ -2963,7 +3031,7 @@ function openReconciliationStatement(compId) {
 }
 
 function closeCompanyModal() {
-  document.getElementById("companyDetailsModal").classList.remove("active");
+  closeModal("companyDetailsModal");
 }
 
 function toggleCompanyStatus(compId) {
@@ -3066,6 +3134,12 @@ function renderTasksKanban() {
     card.addEventListener("dragend", handleTaskDragEnd);
     
     card.innerHTML = `
+      ${isOverdue ? `
+        <div class="badge badge-warning" style="font-size: 8px; padding: 2px 4px; margin-bottom: 6px; display: inline-flex; align-items: center; gap: 3px; max-width: max-content;">
+          <svg viewBox="0 0 24 24" style="width: 10px; height: 10px; stroke: currentColor; stroke-width: 2.2; fill: none; display: inline-block;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          ПРОСРОЧЕНО
+        </div>
+      ` : ''}
       <div class="task-card-title">${t.title}</div>
       <div class="task-card-desc">${t.description}</div>
       <div class="task-card-meta">
@@ -3074,8 +3148,8 @@ function renderTasksKanban() {
         ${t.siteId ? `<span>Объект: ${getSiteName(t.siteId)}</span>` : ''}
         <span>Исполнитель: <strong>${getDriverName(t.assignee)}</strong></span>
         ${t.signedDocument ? `
-          <span style="background:var(--status-success); color:white; font-weight:600; cursor:pointer;" onclick="openSignedDocument('${t.id}')">
-            📄 Документ
+          <span style="background:var(--status-success); color:white; font-weight:600; cursor:pointer; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px;" onclick="openSignedDocument('${t.id}')">
+            <svg viewBox="0 0 24 24" style="width: 11px; height: 11px; stroke: currentColor; stroke-width: 2.2; fill: none; display: inline-block; vertical-align: middle;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg> Документ
           </span>` : ''}
       </div>
     `;
@@ -3373,10 +3447,10 @@ function openTaskDetails(taskId) {
   let docStatusText = "";
   let viewDocBtn = "";
   if (t.signedDocument) {
-    docStatusText = `<span style="color:var(--status-success); font-weight:700;">🟢 Документ подписан (${t.signedDate || '2026-06-20'})</span>`;
+    docStatusText = `<span style="color:var(--status-success); font-weight:700; display:inline-flex; align-items:center; gap:6px;"><svg viewBox="0 0 24 24" style="width:12px; height:12px; fill:currentColor; stroke:none; display:inline-block;"><circle cx="12" cy="12" r="10"></circle></svg> Документ подписан (${t.signedDate || '2026-06-20'})</span>`;
     viewDocBtn = `<button class="btn-secondary" style="font-size:11px; padding:6px 12px; margin-top:8px; width:100%; text-align:center;" onclick="closeModal('taskDetailsModal'); openSignedDocument('${t.id}')">📄 Посмотреть документ (${t.documentType})</button>`;
   } else {
-    docStatusText = `<span style="color:var(--status-danger); font-weight:700;">🔴 Документ не подписан (требуется: ${t.documentType})</span>`;
+    docStatusText = `<span style="color:var(--status-danger); font-weight:700; display:inline-flex; align-items:center; gap:6px;"><svg viewBox="0 0 24 24" style="width:12px; height:12px; fill:currentColor; stroke:none; display:inline-block;"><circle cx="12" cy="12" r="10"></circle></svg> Документ не подписан (требуется: ${t.documentType})</span>`;
   }
   
   body.innerHTML = `
@@ -3679,35 +3753,68 @@ function getFutureDate(days) {
   return d.toISOString().split('T')[0];
 }
 
-function showSystemNotification(msg) {
+function showSystemNotification(msg, type = "info") {
   // Удобный toast/алерт для информирования пользователя без блокирования (UX!)
   const toast = document.createElement("div");
   toast.style.position = "fixed";
   toast.style.bottom = "24px";
   toast.style.right = "24px";
-  toast.style.backgroundColor = "var(--brand-color)";
+  toast.style.backgroundColor = type === "error" ? "var(--status-danger)" : "var(--brand-color)";
   toast.style.color = "#FFFFFF";
   toast.style.padding = "14px 20px";
   toast.style.borderRadius = "8px";
-  toast.style.boxShadow = "var(--shadow)";
+  toast.style.boxShadow = "0 10px 25px rgba(0,0,0,0.2)";
   toast.style.zIndex = "10000";
   toast.style.fontSize = "13px";
-  toast.style.fontWeight = "500";
-  toast.style.pointerEvents = "none";
-  toast.style.transition = "opacity 0.3s ease";
+  toast.style.fontWeight = "600";
+  toast.style.pointerEvents = "auto";
+  toast.style.cursor = "pointer";
+  toast.style.display = "flex";
+  toast.style.alignItems = "center";
+  toast.style.gap = "10px";
+  toast.style.transition = "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)";
   
-  toast.innerText = msg;
+  // Icon
+  let iconSvg = "";
+  if (type === "error") {
+    iconSvg = `<svg viewBox="0 0 24 24" style="width:16px; height:16px; stroke:currentColor; stroke-width:2.2; fill:none; display:inline-block; vertical-align:middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+  } else {
+    iconSvg = `<svg viewBox="0 0 24 24" style="width:16px; height:16px; stroke:currentColor; stroke-width:2.2; fill:none; display:inline-block; vertical-align:middle;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+  }
+  toast.innerHTML = `<span style="display:flex; align-items:center;">${iconSvg}</span> <span>${msg}</span>`;
+  
+  // click to close immediately
+  toast.onclick = () => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(10px) scale(0.95)";
+    setTimeout(() => toast.remove(), 300);
+  };
+  
   document.body.appendChild(toast);
   
+  // Slide in effect
+  toast.style.transform = "translateY(20px) scale(0.95)";
+  toast.style.opacity = "0";
+  requestAnimationFrame(() => {
+    toast.style.transform = "translateY(0) scale(1)";
+    toast.style.opacity = "1";
+  });
+  
   setTimeout(() => {
-    toast.style.opacity = "0";
-    setTimeout(() => toast.remove(), 300);
+    if (toast.parentNode) {
+      toast.style.opacity = "0";
+      toast.style.transform = "translateY(10px) scale(0.95)";
+      setTimeout(() => toast.remove(), 300);
+    }
   }, 4000);
 }
 
 // Управление модальными окнами
 function openModal(id) {
   document.getElementById(id).classList.add("active");
+  if (typeof applyPremiumStylesAndDecorators === "function") {
+    applyPremiumStylesAndDecorators();
+  }
 }
 
 function closeModal(id) {
@@ -3742,17 +3849,14 @@ function toggleAppTheme() {
   const next = current === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute("data-theme", next);
   
-  // Обновляем плитку на карте Leaflet
-  if (window.map) {
-    if (next === 'dark') {
-      window.lightTiles.remove();
-      window.darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; CartoDB'
-      }).addTo(window.map);
-    } else {
-      if (window.darkTiles) window.darkTiles.remove();
-      window.lightTiles.addTo(window.map);
-    }
+  const darkUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  const lightUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+  
+  if (window.map && window.lightTiles) {
+    window.lightTiles.setUrl(next === 'dark' ? darkUrl : lightUrl);
+  }
+  if (window.dispatcherMap && window.dispatcherTiles) {
+    window.dispatcherTiles.setUrl(next === 'dark' ? darkUrl : lightUrl);
   }
 }
 
@@ -3779,6 +3883,11 @@ function renderAll() {
   renderLodgingStats();
   updateKpiDashboard();
   
+  // Новые рендеры
+  renderTimesheetGrid();
+  renderStaffGrid();
+  renderSettingsDashboard();
+  
   // Render financial analytics chart
   window.activeChartPeriod = window.activeChartPeriod || "year";
   renderFinancialChart(window.activeChartPeriod);
@@ -3804,7 +3913,12 @@ function initDispatcherMap() {
   const centralKaz = [47.116, 52.848];
   window.dispatcherMap = L.map('dispatcher-map-container').setView(centralKaz, 8);
   
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  const theme = document.documentElement.getAttribute("data-theme") || "light";
+  const mapUrl = theme === 'dark'
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+    
+  window.dispatcherTiles = L.tileLayer(mapUrl, {
     attribution: '&copy; CartoDB'
   }).addTo(window.dispatcherMap);
   
@@ -3828,15 +3942,20 @@ function initDispatcherMap() {
     const lat = markerInfo ? markerInfo.lat : 47.116;
     const lng = markerInfo ? markerInfo.lng : 52.848;
     
-    let color = 'blue';
-    if (v.ownerType === 'subrent') color = 'purple';
-    if (v.status === 'На ремонте' || v.status === 'Неисправна') color = 'red';
+    let pulseClass = 'marker-pulse-own';
+    if (v.ownerType === 'subrent') pulseClass = 'marker-pulse-subrent';
+    if (v.status === 'На ремонте' || v.status === 'Неисправна') pulseClass = 'marker-pulse-repair';
     
     const customIcon = L.divIcon({
       className: 'custom-div-icon',
-      html: `<div style="background-color:${color}; width:12px; height:12px; border-radius:50%; border:2px solid #FFF; box-shadow:0 0 4px rgba(0,0,0,0.4);"></div>`,
-      iconSize: [12, 12],
-      iconAnchor: [6, 6]
+      html: `
+        <div style="position:relative;">
+          <div class="${pulseClass}"></div>
+          <div class="vehicle-label-tag">${v.plate}</div>
+        </div>
+      `,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
     });
 
     const marker = L.marker([lat, lng], { icon: customIcon }).addTo(window.dispatcherMap);
@@ -4142,7 +4261,7 @@ function renderPurchasingHub() {
           <td>
             ${isOrdered ? 
               `<button class="btn-primary" style="font-size:11px; padding:4px 8px;" onclick="receiveSupplyOrder('${so.id}')">Принять на склад</button>` : 
-              `<span style="color:var(--status-success); font-weight:600;">✓ Доставлено</span>`
+              `<span style="color:var(--status-success); font-weight:600; display:inline-flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" style="width:12px; height:12px; stroke:currentColor; stroke-width:2.2; fill:none; display:inline-block;"><polyline points="20 6 9 17 4 12"></polyline></svg> Доставлено</span>`
             }
           </td>
         `;
@@ -4880,7 +4999,7 @@ function openSupplyOrderDetail(orderId) {
   if (so.status === "Оформлен") {
     actionBtnHtml = `<button class="btn-primary" onclick="closeModal('dashboardDetailModal'); receiveSupplyOrder('${so.id}');">Принять на склад</button>`;
   } else {
-    actionBtnHtml = `<span style="color:var(--status-success); font-weight:600;">✓ Доставлено на Центральный склад</span>`;
+    actionBtnHtml = `<span style="color:var(--status-success); font-weight:600; display:inline-flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" style="width:12px; height:12px; stroke:currentColor; stroke-width:2.2; fill:none; display:inline-block;"><polyline points="20 6 9 17 4 12"></polyline></svg> Доставлено на Центральный склад</span>`;
   }
 
   body.innerHTML = `
@@ -5466,4 +5585,2184 @@ function hideChartTooltip() {
   const tooltip = document.getElementById("chartTooltip");
   if (tooltip) tooltip.style.display = "none";
 }
+
+// ----------------------------------------------------
+// ДОРАБОТКИ ERP: НОВЫЙ ФУНКЦИОНАЛ
+// ----------------------------------------------------
+
+// 1. Отмена перемещения сделки в CRM
+function undoLastCrmMove() {
+  window.crmHistory = window.crmHistory || [];
+  if (window.crmHistory.length === 0) {
+    showSystemNotification("Нет действий для отмены в текущей сессии.");
+    return;
+  }
+  const lastMove = window.crmHistory.pop();
+  const deal = db.deals.find(d => d.id === lastMove.dealId);
+  if (deal) {
+    deal.stage = lastMove.oldStage;
+    saveState();
+    renderCrmKanban();
+    updateKpiDashboard();
+    renderObjectsPnl();
+    showSystemNotification(`Отмена: Заказ "${deal.companyName}" возвращен в стадию "${lastMove.oldStage}"`);
+  }
+}
+
+// 2. Модуль: Табель учета рабочего времени
+function renderTimesheetGrid() {
+  const select = document.getElementById("timesheetMonthSelect");
+  if (!select) return;
+  const selectedMonth = select.value;
+  
+  const gridTable = document.getElementById("timesheetTableGrid");
+  if (!gridTable) return;
+  
+  gridTable.innerHTML = "";
+  
+  // Определяем количество дней в месяце
+  const year = parseInt(selectedMonth.split("-")[0]);
+  const month = parseInt(selectedMonth.split("-")[1]);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  
+  // Шапка таблицы
+  let headerHtml = `
+    <thead>
+      <tr>
+        <th style="text-align: left; min-width: 180px;">Техника</th>
+        <th style="min-width: 140px;">Основной водитель</th>
+  `;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dayOfWeek = new Date(year, month - 1, d).getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // 0 = Sunday, 6 = Saturday
+    const thStyle = isWeekend 
+      ? `width: 30px; text-align: center; color: var(--status-danger); background-color: rgba(220, 38, 38, 0.05); font-weight: 700;` 
+      : `width: 30px; text-align: center;`;
+    headerHtml += `<th style="${thStyle}">${d}</th>`;
+  }
+  headerHtml += `
+      </tr>
+    </thead>
+  `;
+  gridTable.innerHTML += headerHtml;
+  
+  const tbody = document.createElement("tbody");
+  
+  db.vehicles.forEach(v => {
+    // Находим табель для этой техники и месяца
+    let ts = db.timesheets.find(t => t.month === selectedMonth && t.vehicleId === v.id);
+    if (!ts) {
+      // Инициализируем пустой табель в памяти
+      ts = {
+        id: `ts_${v.id}_${selectedMonth}`,
+        month: selectedMonth,
+        vehicleId: v.id,
+        driverHistory: [],
+        dailyStatus: {},
+        mechanicApproved: false,
+        hrApproved: false,
+        directorApproved: false
+      };
+      // Заполняем рабочими днями
+      for (let day = 1; day <= daysInMonth; day++) {
+        ts.dailyStatus[day] = "W";
+      }
+      db.timesheets.push(ts);
+    }
+    
+    const defaultDriver = db.drivers.find(d => d.id === v.driverId);
+    const defaultDriverName = defaultDriver ? defaultDriver.name : "Не назначен";
+    
+    const tr = document.createElement("tr");
+    let rowHtml = `
+      <td style="text-align: left;">
+        <strong>${v.name}</strong><br>
+        <span style="font-size: 9px; color: var(--text-secondary);">${v.plate} | Инв. ${v.invNumber}</span>
+      </td>
+      <td>
+        <select class="form-control" style="font-size: 10px; padding: 4px; height: auto;" onchange="changeTimesheetVehicleDriver('${ts.id}', this.value)">
+          <option value="">-- Без водителя --</option>
+          ${db.drivers.map(d => `<option value="${d.id}" ${v.driverId === d.id ? 'selected' : ''}>${d.name}</option>`).join("")}
+        </select>
+      </td>
+    `;
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const status = ts.dailyStatus[day] || "W";
+      
+      // Проверяем замены водителя в этот день
+      const replacement = ts.driverHistory ? ts.driverHistory.find(h => h.day === day) : null;
+      let displayDriverInitials = "";
+      let hasReplacement = false;
+      
+      if (replacement && replacement.driverId !== v.driverId) {
+        hasReplacement = true;
+        const repDriver = db.drivers.find(d => d.id === replacement.driverId);
+        if (repDriver) {
+          const split = repDriver.name.split(" ");
+          const lastName = split[0] || "";
+          const firstName = split[1] || "";
+          const initials = (lastName ? lastName.charAt(0) : "") + (firstName ? firstName.charAt(0) : "");
+          displayDriverInitials = `<br><span style="font-size: 8px; color: var(--brand-color); font-weight: 700; border: 1px solid var(--brand-color); border-radius: 3px; padding: 0px 2px; background: rgba(37,99,235,0.08); display: inline-block; margin-top: 2px;" title="Замена: ${repDriver.name}">${initials}</span>`;
+        }
+      }
+      
+      let bg = "#DCFCE7"; // W - Green
+      let color = "#15803d";
+      if (status === "R") {
+        bg = "#FEF3C7"; // R - Yellow
+        color = "#b45309";
+      } else if (status === "O") {
+        bg = "#F1F5F9"; // O - Gray
+        color = "#475569";
+      } else if (status === "I") {
+        bg = "#FEE2E2"; // I - Soft Red for Simple/Idle
+        color = "#991B1B";
+      }
+      
+      const statusRu = status === "W" ? "Я" : (status === "R" ? "Р" : (status === "O" ? "В" : (status === "I" ? "П" : status)));
+      
+      rowHtml += `
+        <td style="background-color: ${bg}; color: ${color}; text-align: center; font-weight: 700; cursor: pointer; position: relative; padding: 4px;" onclick="cycleTimesheetDayStatus('${ts.id}', ${day})" title="Кликните для изменения статуса смены. ${hasReplacement ? 'Была замена водителя.' : ''}">
+          ${statusRu}
+          ${hasReplacement ? '<span style="color:var(--brand-color); position:absolute; top:1px; right:3px; font-size:8px;">*</span>' : ''}
+          ${displayDriverInitials}
+        </td>
+      `;
+    }
+    
+    tr.innerHTML = rowHtml;
+    tbody.appendChild(tr);
+  });
+  
+  gridTable.appendChild(tbody);
+  
+  // Отрисовка статусов цепочки согласования
+  // Найдем агрегированный статус согласования для выбранного месяца
+  const monthTimesheets = db.timesheets.filter(t => t.month === selectedMonth);
+  const allMechanicApproved = monthTimesheets.length > 0 && monthTimesheets.every(t => t.mechanicApproved);
+  const allHrApproved = monthTimesheets.length > 0 && monthTimesheets.every(t => t.hrApproved);
+  const allDirectorApproved = monthTimesheets.length > 0 && monthTimesheets.every(t => t.directorApproved);
+  
+  updateTimesheetApprovalStatusUI(allMechanicApproved, allHrApproved, allDirectorApproved);
+}
+
+function updateTimesheetApprovalStatusUI(mechApp, hrApp, dirApp) {
+  const badgeMech = document.getElementById("ts-badge-mechanic");
+  const badgeHr = document.getElementById("ts-badge-hr");
+  const badgeDir = document.getElementById("ts-badge-director");
+  
+  const checkSvg = `<svg viewBox="0 0 24 24" style="width: 10px; height: 10px; stroke: currentColor; stroke-width: 3.5; fill: none; display: inline-block; vertical-align: middle; margin-right: 4px;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+  const clockSvg = `<svg viewBox="0 0 24 24" style="width: 10px; height: 10px; stroke: currentColor; stroke-width: 2.2; fill: none; display: inline-block; vertical-align: middle; margin-right: 4px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
+
+  if (badgeMech) {
+    badgeMech.className = mechApp ? "badge badge-success" : "badge badge-neutral";
+    badgeMech.innerHTML = mechApp ? checkSvg + " Утверждено" : clockSvg + " Ожидает";
+    const stepEl = document.getElementById("ts-step-mechanic");
+    if (stepEl) {
+      stepEl.style.background = mechApp ? "rgba(22, 163, 74, 0.08)" : "var(--bg-secondary)";
+      stepEl.style.color = mechApp ? "var(--status-success)" : "var(--text-secondary)";
+      stepEl.style.border = mechApp ? "1px solid var(--status-success)" : "1px solid var(--border-color)";
+    }
+  }
+  if (badgeHr) {
+    badgeHr.className = hrApp ? "badge badge-success" : "badge badge-neutral";
+    badgeHr.innerHTML = hrApp ? checkSvg + " Утверждено" : clockSvg + " Ожидает";
+    const stepEl = document.getElementById("ts-step-hr");
+    if (stepEl) {
+      stepEl.style.background = hrApp ? "rgba(22, 163, 74, 0.08)" : "var(--bg-secondary)";
+      stepEl.style.color = hrApp ? "var(--status-success)" : "var(--text-secondary)";
+      stepEl.style.border = hrApp ? "1px solid var(--status-success)" : "1px solid var(--border-color)";
+    }
+  }
+  if (badgeDir) {
+    badgeDir.className = dirApp ? "badge badge-success" : "badge badge-neutral";
+    badgeDir.innerHTML = dirApp ? checkSvg + " Утверждено" : clockSvg + " Ожидает";
+    const stepEl = document.getElementById("ts-step-director");
+    if (stepEl) {
+      stepEl.style.background = dirApp ? "rgba(22, 163, 74, 0.08)" : "var(--bg-secondary)";
+      stepEl.style.color = dirApp ? "var(--status-success)" : "var(--text-secondary)";
+      stepEl.style.border = dirApp ? "1px solid var(--status-success)" : "1px solid var(--border-color)";
+    }
+  }
+  
+  // Доступные действия по ролям
+  const actionsDiv = document.getElementById("timesheetApprovalActions");
+  if (!actionsDiv) return;
+  actionsDiv.innerHTML = "";
+  
+  const role = db.settings.activeRole;
+  const select = document.getElementById("timesheetMonthSelect");
+  const selectedMonth = select ? select.value : "2026-06";
+  
+  if (role === "Mechanic" && !mechApp) {
+    actionsDiv.innerHTML = `<button class="btn-primary" onclick="triggerDoubleCheck(this, () => approveAllTimesheetsByRole('mechanic', '${selectedMonth}'))">Утвердить как Механик</button>`;
+  } else if (role === "HR" && mechApp && !hrApp) {
+    actionsDiv.innerHTML = `<button class="btn-primary" onclick="triggerDoubleCheck(this, () => approveAllTimesheetsByRole('hr', '${selectedMonth}'))">Утвердить как HR-Специалист</button>`;
+  } else if ((role === "Director" || role === "DeputyDirector") && mechApp && hrApp && !dirApp) {
+    actionsDiv.innerHTML = `<button class="btn-primary" onclick="triggerDoubleCheck(this, () => approveAllTimesheetsByRole('director', '${selectedMonth}'))">Утвердить как Директор</button>`;
+  } else if (role === "Accountant" && mechApp && hrApp && dirApp) {
+    actionsDiv.innerHTML = `<button class="btn-primary" style="background-color: var(--status-success);" onclick="runAccountantPayrollCalculation('${selectedMonth}')">Провести расчет ФОТ по табелю</button>`;
+  } else {
+    actionsDiv.innerHTML = `<span style="font-size: 12px; color: var(--text-secondary); font-style: italic;">Табель готов / Ожидает согласования предыдущих звеньев</span>`;
+  }
+}
+
+function cycleTimesheetDayStatus(timesheetId, day) {
+  const ts = db.timesheets.find(t => t.id === timesheetId);
+  if (!ts) return;
+  
+  const current = ts.dailyStatus[day] || "W";
+  let next = "W";
+  if (current === "W") next = "R";
+  else if (current === "R") next = "O";
+  else if (current === "O") next = "I";
+  else if (current === "I") next = "W";
+  
+  ts.dailyStatus[day] = next;
+  
+  // Добавить замену водителя для демонстрации (если кликаем с зажатым Shift, меняем водителя)
+  if (window.event && window.event.shiftKey) {
+    // Симулируем выбор другого водителя в этот день
+    const otherDriver = db.drivers.find(d => d.id !== db.vehicles.find(v => v.id === ts.vehicleId).driverId);
+    if (otherDriver) {
+      ts.driverHistory = ts.driverHistory || [];
+      const idx = ts.driverHistory.findIndex(h => h.day === day);
+      if (idx !== -1) {
+        ts.driverHistory[idx].driverId = otherDriver.id;
+      } else {
+        ts.driverHistory.push({ day: day, driverId: otherDriver.id });
+      }
+      showSystemNotification(`Замена водителя на ${day} число зафиксирована: ${otherDriver.name}`);
+    }
+  }
+  
+  saveState();
+  renderTimesheetGrid();
+}
+
+function changeTimesheetVehicleDriver(timesheetId, driverId) {
+  const ts = db.timesheets.find(t => t.id === timesheetId);
+  if (!ts) return;
+  
+  const veh = db.vehicles.find(v => v.id === ts.vehicleId);
+  if (veh) {
+    veh.driverId = driverId;
+    saveState();
+    renderTimesheetGrid();
+    showSystemNotification(`Основной водитель для техники ${veh.name} успешно обновлен.`);
+  }
+}
+
+function approveAllTimesheetsByRole(roleType, monthStr) {
+  db.timesheets.forEach(ts => {
+    if (ts.month === monthStr) {
+      if (roleType === "mechanic") ts.mechanicApproved = true;
+      if (roleType === "hr") ts.hrApproved = true;
+      if (roleType === "director") ts.directorApproved = true;
+    }
+  });
+  saveState();
+  renderTimesheetGrid();
+  showSystemNotification(`Табель за ${monthStr} успешно утвержден ролью: ${roleType}`);
+}
+
+function runAccountantPayrollCalculation(monthStr) {
+  // Начисляем зарплату по табелю
+  db.drivers.forEach(d => {
+    if (d.baseSalary > 0) {
+      // Ищем все табели за месяц
+      let daysWorked = 0;
+      db.timesheets.forEach(ts => {
+        if (ts.month === monthStr) {
+          // Считаем сколько дней данный водитель отработал
+          for (let day in ts.dailyStatus) {
+            if (ts.dailyStatus[day] === "W") {
+              const replacement = ts.driverHistory ? ts.driverHistory.find(h => h.day == day) : null;
+              if (replacement) {
+                if (replacement.driverId === d.id) daysWorked++;
+              } else {
+                const veh = db.vehicles.find(v => v.id === ts.vehicleId);
+                if (veh && veh.driverId === d.id) daysWorked++;
+              }
+            }
+          }
+        }
+      });
+      if (daysWorked > 0) {
+        d.shiftsWorked = daysWorked;
+      }
+    }
+  });
+  saveState();
+  calculateMonthlyPayroll();
+  showSystemNotification(`Расчет ФОТ за месяц ${monthStr} выполнен на основе табеля выходов!`);
+}
+
+// 3. Импорт и выгрузки в Excel (CSV)
+function exportTimesheetToExcel() {
+  const select = document.getElementById("timesheetMonthSelect");
+  const month = select ? select.value : "2026-06";
+  
+  let csvContent = "data:text/csv;charset=utf-8,";
+  csvContent += "Техника,Госномер,Водитель,Дни...\r\n";
+  
+  db.vehicles.forEach(v => {
+    const defaultDriver = db.drivers.find(d => d.id === v.driverId);
+    const driverName = defaultDriver ? defaultDriver.name : "Не назначен";
+    let row = `"${v.name}","${v.plate}","${driverName}"`;
+    
+    const ts = db.timesheets.find(t => t.month === month && t.vehicleId === v.id);
+    if (ts) {
+      for (let d = 1; d <= 30; d++) {
+        const status = ts.dailyStatus[d] || 'O';
+        const statusRu = status === "W" ? "Я" : (status === "R" ? "Р" : (status === "O" ? "В" : (status === "I" ? "П" : status)));
+        row += `,"${statusRu}"`;
+      }
+    }
+    csvContent += row + "\r\n";
+  });
+  
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `Табель_смен_KazBildInvest_${month}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showSystemNotification("Табель экспортирован в Excel (CSV)");
+}
+
+function exportSubrentTimesheet() {
+  const select = document.getElementById("timesheetMonthSelect");
+  const month = select ? select.value : "2026-06";
+  
+  let csvContent = "data:text/csv;charset=utf-8,";
+  csvContent += "СУБАРЕНДОВАННАЯ ТЕХНИКА,Арендодатель,Ставка (сутки),Водитель,Итого отработано смен\r\n";
+  
+  let count = 0;
+  db.vehicles.filter(v => v.ownerType === 'subrent').forEach(v => {
+    const defaultDriver = db.drivers.find(d => d.id === v.driverId);
+    const driverName = defaultDriver ? defaultDriver.name : "Водитель Арендодателя";
+    const ts = db.timesheets.find(t => t.month === month && t.vehicleId === v.id);
+    
+    let daysWorked = 0;
+    if (ts) {
+      for (let day in ts.dailyStatus) {
+        if (ts.dailyStatus[day] === "W") daysWorked++;
+      }
+    }
+    
+    csvContent += `"${v.name}","${v.subrentProvider || 'Неизвестно'}",${v.subrentRate || 0},"${driverName}",${daysWorked}\r\n`;
+    count++;
+  });
+  
+  if (count === 0) {
+    showSystemNotification("Нет субарендованной техники для выгрузки");
+    return;
+  }
+  
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `Единый_табель_субаренды_${month}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showSystemNotification("Единый табель субаренды отправлен на выгрузку клиенту!");
+}
+
+function exportStaffToExcel() {
+  let csvContent = "data:text/csv;charset=utf-8,";
+  csvContent += "ФИО,ИИН,Должность,Телефон,Тип контракта,Оклад,Статус\r\n";
+  
+  db.drivers.forEach(d => {
+    const status = d.isBlocked ? "Блокирован" : "Допущен";
+    csvContent += `"${d.name}","${d.iin}","${d.position}","${d.phone}","${d.contractType}",${d.baseSalary},"${status}"\r\n`;
+  });
+  
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `Реестр_персонала_KazBildInvest.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showSystemNotification("База сотрудников экспортирована в Excel (CSV)");
+}
+
+// 4. Единый реестр сотрудников по категориям
+window.activeStaffCategory = 'all';
+
+function filterStaffTab(category) {
+  window.activeStaffCategory = category;
+  document.querySelectorAll("#tab-staff .btn-secondary").forEach(btn => btn.classList.remove("active"));
+  
+  const activeBtn = document.getElementById("btn-staff-" + category);
+  if (activeBtn) activeBtn.classList.add("active");
+  
+  renderStaffGrid();
+}
+
+function renderStaffGrid() {
+  const tbody = document.querySelector("#staffTable tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  
+  const searchQuery = (document.getElementById("staffSearchInput")?.value || "").toLowerCase().trim();
+  const cat = window.activeStaffCategory;
+  
+  // Добавляем сотрудников из базы
+  let list = db.drivers.map(d => ({ ...d, isBlacklisted: false }));
+  
+  // Если категория черный список, выводим только ЧС
+  if (cat === 'blacklist') {
+    list = db.blacklist.map(d => ({ ...d, isBlacklisted: true }));
+  } else {
+    // Включаем ЧС в общий список
+    if (cat === 'all') {
+      const bl = db.blacklist.map(d => ({ ...d, isBlacklisted: true }));
+      list = [...list, ...bl];
+    }
+  }
+  
+  // Фильтрация по разделам
+  if (cat === 'admin') {
+    list = list.filter(d => d.position.includes("Директор") || d.position.includes("Бухгалтер") || d.position.includes("Логист") || d.position.includes("Диспетчер") || d.position.includes("Механик") || d.position.includes("Менеджер") || d.position.includes("складом"));
+  } else if (cat === 'drivers') {
+    list = list.filter(d => !d.isBlacklisted && (d.position.includes("Машинист") || d.position.includes("Водитель")) && d.baseSalary > 0);
+  } else if (cat === 'subrent') {
+    list = list.filter(d => !d.isBlacklisted && (d.baseSalary === 0 || d.position.includes("партнер")));
+  }
+  
+  // Поиск
+  if (searchQuery) {
+    list = list.filter(d => 
+      d.name.toLowerCase().includes(searchQuery) ||
+      d.iin.toLowerCase().includes(searchQuery) ||
+      d.position.toLowerCase().includes(searchQuery)
+    );
+  }
+  
+  list.forEach(d => {
+    const tr = document.createElement("tr");
+    
+    // Допуски медосмотр и ТБ
+    let docStatusHtml = "";
+    if (d.isBlacklisted) {
+      docStatusHtml = `<span style="color:var(--status-danger); font-weight:700;">ЧС: ${d.blockReason}</span>`;
+    } else {
+      const medExpired = new Date(d.medExpiry) < new Date();
+      const tbExpired = new Date(d.tbExpiry) < new Date();
+      docStatusHtml = `
+        <span class="badge ${medExpired ? 'badge-danger' : 'badge-success'}" style="font-size:9px;">Медосмотр: ${d.medExpiry}</span><br>
+        <span class="badge ${tbExpired ? 'badge-danger' : 'badge-success'}" style="font-size:9px; margin-top:2px;">Корочка ТБ: ${d.tbExpiry}</span>
+      `;
+    }
+    
+    let statusBadge = "";
+    if (d.isBlacklisted) {
+      statusBadge = `<span class="badge badge-danger" style="background: rgba(220,38,38,0.1); color: var(--status-danger);">ЗАБЛОКИРОВАН (ЧС)</span>`;
+    } else {
+      statusBadge = d.isBlocked ? 
+        `<span class="badge badge-danger">Заблокирован</span>` : 
+        `<span class="badge badge-success">Допущен</span>`;
+    }
+    
+    let actionBtn = "";
+    if (d.isBlacklisted) {
+      actionBtn = `<button class="btn-secondary" style="font-size:11px; padding:4px 8px; color:var(--status-success); border-color:var(--status-success);" onclick="triggerDoubleCheck(this, () => removeFromBlacklist('${d.id}'))">Удалить из ЧС</button>`;
+    } else {
+      actionBtn = `<button class="btn-primary" style="font-size:11px; padding:4px 8px;" onclick="openEmployeeDetails('${d.id}')">Личное дело</button>`;
+    }
+    
+    tr.innerHTML = `
+      <td><strong>${d.name}</strong><br><span style="font-size:10px; color:var(--text-secondary);">ИИН: ${d.iin}</span></td>
+      <td>${d.position}</td>
+      <td>${d.licenseCategory || "Категория С"}</td>
+      <td>${d.phone}</td>
+      <td>${docStatusHtml}</td>
+      <td>${d.lodging || "Атырау (Местный)"}</td>
+      <td>${statusBadge}</td>
+      <td>${actionBtn}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// 5. Функции добавления сущностей из новых модалок
+function openAddBlacklistModal() {
+  openModal("addBlacklistModal");
+}
+
+function submitAddBlacklist() {
+  const name = document.getElementById("blName").value.trim();
+  const iin = document.getElementById("blIin").value.trim();
+  const pos = document.getElementById("blPosition").value.trim();
+  const cat = document.getElementById("blCategory").value;
+  const reason = document.getElementById("blReason").value.trim();
+  const notes = document.getElementById("blNotes").value.trim();
+  
+  if (!name || !iin || !pos || !reason) {
+    showSystemNotification("Заполните обязательные поля!");
+    return;
+  }
+  
+  const newEntry = {
+    id: "bl_" + (db.blacklist.length + 1),
+    name: name,
+    iin: iin,
+    position: pos,
+    category: cat,
+    blockReason: reason,
+    blockDate: new Date().toISOString().split("T")[0],
+    notes: notes
+  };
+  
+  // Добавляем в ЧС
+  db.blacklist.push(newEntry);
+  
+  // Если водитель был в основной базе, блокируем его
+  const existDriver = db.drivers.find(d => d.iin === iin);
+  if (existDriver) {
+    existDriver.isBlocked = true;
+  }
+  
+  saveState();
+  renderStaffGrid();
+  renderEmployeesTable();
+  closeModal("addBlacklistModal");
+  showSystemNotification(`Сотрудник ${name} внесен в Черный список!`);
+  
+  // Очистка формы
+  document.getElementById("blacklistForm").reset();
+}
+
+function removeFromBlacklist(id) {
+  const entry = db.blacklist.find(b => b.id === id);
+  if (!entry) return;
+  
+  db.blacklist = db.blacklist.filter(b => b.id !== id);
+  
+  const existDriver = db.drivers.find(d => d.iin === entry.iin);
+  if (existDriver) {
+    existDriver.isBlocked = false;
+  }
+  
+  saveState();
+  renderStaffGrid();
+  renderEmployeesTable();
+  showSystemNotification(`Сотрудник ${entry.name} удален из Черного списка.`);
+}
+
+function openAddVehicleModal() {
+  openModal("addVehicleModal");
+}
+
+function toggleAddVehicleSubrentFields() {
+  const type = document.getElementById("newVehOwnerType").value;
+  const fields = document.getElementById("addVehicleSubrentFields");
+  if (type === 'subrent') {
+    fields.style.display = "block";
+  } else {
+    fields.style.display = "none";
+  }
+}
+
+function submitAddVehicle() {
+  const name = document.getElementById("newVehName").value.trim();
+  const model = document.getElementById("newVehModel").value.trim();
+  const plate = document.getElementById("newVehPlate").value.trim();
+  const type = document.getElementById("newVehType").value;
+  const ownerType = document.getElementById("newVehOwnerType").value;
+  const inv = document.getElementById("newVehInv").value.trim();
+  const year = parseInt(document.getElementById("newVehYear").value) || 2023;
+  
+  if (!name || !model || !plate || !inv) {
+    showSystemNotification("Заполните обязательные поля!");
+    return;
+  }
+  
+  const newVeh = {
+    id: "v" + (db.vehicles.length + 101),
+    name: name,
+    model: model,
+    plate: plate,
+    vin: "VIN" + Math.random().toString(36).substring(2, 15).toUpperCase(),
+    invNumber: inv,
+    year: year,
+    type: type,
+    ownerType: ownerType,
+    status: "Свободна",
+    currentSiteId: "karabatan",
+    mileage: 1000,
+    engineHours: 50,
+    fuelRate: ownerType === 'subrent' ? 25.0 : 15.0,
+    ptoDate: new Date(new Date().setMonth(new Date().getMonth() + 6)).toISOString().split("T")[0],
+    ctoDate: new Date(new Date().setMonth(new Date().getMonth() + 6)).toISOString().split("T")[0],
+    insuranceDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split("T")[0],
+    insuranceCost: ownerType === 'subrent' ? 0 : 150000,
+    taxDate: new Date().toISOString().split("T")[0],
+    taxCost: ownerType === 'subrent' ? 0 : 95000,
+    tempMove: null
+  };
+  
+  if (ownerType === 'subrent') {
+    newVeh.subrentProvider = document.getElementById("newVehSubrentProvider").value.trim() || "ТОО «Каспий Спец Техника»";
+    newVeh.subrentRate = parseInt(document.getElementById("newVehSubrentRate").value) || 120000;
+  }
+  
+  db.vehicles.push(newVeh);
+  saveState();
+  renderGpsVehicleList();
+  renderWarehouseInventory();
+  renderTimesheetGrid();
+  renderSettingsDashboard();
+  closeModal("addVehicleModal");
+  showSystemNotification(`Техника ${name} успешно добавлена в систему!`);
+  
+  document.getElementById("addVehicleForm").reset();
+  document.getElementById("addVehicleSubrentFields").style.display = "none";
+}
+
+function openOrderSafetyCertModal() {
+  const select = document.getElementById("scEmployeeSelect");
+  if (select) {
+    select.innerHTML = db.drivers.map(d => `<option value="${d.name}">${d.name} (${d.position})</option>`).join("");
+  }
+  openModal("orderSafetyCertModal");
+}
+
+function submitSafetyCertRequest() {
+  const name = document.getElementById("scEmployeeSelect").value;
+  const veh = document.getElementById("scVehicleName").value.trim();
+  
+  if (!veh) {
+    showSystemNotification("Укажите тип спецтехники!");
+    return;
+  }
+  
+  db.safetyCertRequests.push({
+    id: "scr_" + (db.safetyCertRequests.length + 1),
+    employeeName: name,
+    vehicleName: veh,
+    requestDate: new Date().toISOString().split("T")[0],
+    status: "В обработке"
+  });
+  
+  saveState();
+  renderSettingsDashboard();
+  closeModal("orderSafetyCertModal");
+  showSystemNotification("Заявка на корочку ТБ успешно оформлена менеджером!");
+}
+
+function openAddContractModal() {
+  openModal("addContractModal");
+  autoGenerateContractTemplate();
+}
+
+function autoGenerateContractTemplate() {
+  const num = document.getElementById("cntNum").value || "Д-06/2026-XX";
+  const company = document.getElementById("cntCompany").value || "[НАЗВАНИЕ КОНТРАГЕНТА]";
+  const type = document.getElementById("cntIsSubrent").value === "true" ? "субаренды" : "оказания услуг";
+  const start = document.getElementById("cntStart").value || "2026-06-22";
+  const vType = document.getElementById("cntVehType").value || "спецтехники";
+  
+  const text = `ДОГОВОР № ${num} ${type}\r\nТОО «KazBildInvest», именуемое в дальнейшем Исполнитель, и ${company}, именуемое в дальнейшем Заказчик, заключили настоящий договор о предоставлении услуг ${vType} с ${start}. Оплата по выставленным АВР в течение 10 банковских дней.`;
+  document.getElementById("cntTemplateText").value = text;
+}
+
+function submitAddContract() {
+  const num = document.getElementById("cntNum").value.trim();
+  const company = document.getElementById("cntCompany").value.trim();
+  const start = document.getElementById("cntStart").value;
+  const end = document.getElementById("cntEnd").value;
+  const vt = document.getElementById("cntVehType").value.trim();
+  const plate = document.getElementById("cntPlate").value.trim();
+  const owner = document.getElementById("cntOwner").value.trim();
+  const accountant = document.getElementById("cntAccountant").value.trim();
+  const isSubrent = document.getElementById("cntIsSubrent").value === "true";
+  
+  if (!num || !company || !vt || !plate) {
+    showSystemNotification("Заполните обязательные поля!");
+    return;
+  }
+  
+  const newContract = {
+    id: "cnt_" + (db.contracts.length + 1),
+    number: num,
+    companyName: company,
+    dateCreated: start,
+    dateEnd: end,
+    vehicleType: vt,
+    plateNumber: plate,
+    ownerContact: owner,
+    accountantContact: accountant,
+    isSubrent: isSubrent,
+    status: "Активен"
+  };
+  
+  db.contracts.push(newContract);
+  
+  // Добавляем сделку в CRM автоматически на этап «Договор»
+  db.deals.push({
+    id: "deal_" + (db.deals.length + 10),
+    companyName: company,
+    contactPerson: owner,
+    siteId: "karabatan",
+    address: "Строительная площадка заказчика",
+    jobType: `Аренда ${vt}`,
+    startDate: start,
+    endDate: end,
+    vehicleCount: 1,
+    vehicleIds: ["v101"],
+    price: isSubrent ? -500000 : 1200000,
+    stage: "Договор",
+    contractNumber: num,
+    contractSigned: true,
+    invoiceStatus: "Не выставлен счет",
+    invoiceDueDate: end,
+    paymentStageDays: 15
+  });
+  
+  saveState();
+  renderSettingsDashboard();
+  renderCrmKanban();
+  closeModal("addContractModal");
+  showSystemNotification(`Договор ${num} успешно зарегистрирован и привязан к сделке CRM!`);
+  
+  document.getElementById("contractForm").reset();
+}
+
+function openMaterialLogModal() {
+  const form = document.getElementById("materialLogForm");
+  if (form) form.reset();
+  updateMaterialSubmitButton();
+  openModal("addMaterialLogModal");
+}
+
+function submitAddMaterialLog() {
+  const type = document.getElementById("mwoType").value;
+  const item = document.getElementById("mwoItem").value.trim();
+  const qty = parseInt(document.getElementById("mwoQty").value) || 1;
+  const price = parseInt(document.getElementById("mwoPrice").value) || 10000;
+  const source = document.getElementById("mwoSource").value.trim();
+  
+  if (!item || !source) {
+    showSystemNotification("Заполните поля!");
+    return;
+  }
+  
+  db.materialsWriteOffs.push({
+    id: "mwo_" + (db.materialsWriteOffs.length + 1),
+    date: new Date().toISOString().split("T")[0],
+    type: type,
+    itemName: item,
+    qty: qty,
+    source: source,
+    price: price
+  });
+  
+  // Если приход на склад, добавляем в ТМЦ
+  if (type === "Приход") {
+    db.warehouses.central.push({
+      id: "tmc_" + Math.random().toString(36).substring(2, 8),
+      sku: "SKU-" + Math.floor(100 + Math.random() * 900),
+      name: item,
+      category: "Расходники",
+      supplier: source,
+      price: price,
+      balance: qty,
+      minStock: 2
+    });
+  }
+  
+  saveState();
+  renderSettingsDashboard();
+  renderWarehouseInventory();
+  closeModal("addMaterialLogModal");
+  showSystemNotification("Запись движения ТМЦ добавлена на склад!");
+  
+  document.getElementById("materialLogForm").reset();
+}
+
+function openSupplierAdvanceModal() {
+  openModal("addSupplierAdvanceModal");
+}
+
+function submitSupplierAdvance() {
+  const name = document.getElementById("saSupplier").value.trim();
+  const amount = parseInt(document.getElementById("saAmount").value) || 0;
+  const date = document.getElementById("saDate").value;
+  const purpose = document.getElementById("saPurpose").value.trim();
+  
+  if (!name || !amount || !purpose) {
+    showSystemNotification("Заполните поля!");
+    return;
+  }
+  
+  db.supplierAdvances.push({
+    id: "sa_" + (db.supplierAdvances.length + 1),
+    supplierName: name,
+    date: date,
+    amount: amount,
+    purpose: purpose
+  });
+  
+  saveState();
+  renderSettingsDashboard();
+  closeModal("addSupplierAdvanceModal");
+  showSystemNotification("Предоплата поставщику зарегистрирована в бухгалтерии!");
+  
+  document.getElementById("supplierAdvanceForm").reset();
+}
+
+function openPotentialSupplierModal() {
+  openModal("addPotentialSupplierModal");
+}
+
+function submitPotentialSupplier() {
+  const name = document.getElementById("psName").value.trim();
+  const contact = document.getElementById("psContact").value.trim();
+  const city = document.getElementById("psCity").value.trim();
+  const cat = document.getElementById("psCategory").value.trim();
+  const rating = parseFloat(document.getElementById("psRating").value) || 5.0;
+  
+  if (!name || !contact || !city || !cat) {
+    showSystemNotification("Заполните поля!");
+    return;
+  }
+  
+  db.potentialSuppliers.push({
+    id: "ps_" + (db.potentialSuppliers.length + 1),
+    name: name,
+    contact: contact,
+    city: city,
+    category: cat,
+    rating: rating
+  });
+  
+  saveState();
+  renderSettingsDashboard();
+  closeModal("addPotentialSupplierModal");
+  showSystemNotification("Потенциальный поставщик внесен в базу снабжения!");
+  
+  document.getElementById("potentialSupplierForm").reset();
+}
+
+// 6. Обновление и симуляция финансов
+function simulateCurrencyUpdate() {
+  db.currencyRates.USD = parseFloat((db.currencyRates.USD + (Math.random() * 2 - 1)).toFixed(2));
+  db.currencyRates.RUB = parseFloat((db.currencyRates.RUB + (Math.random() * 0.2 - 0.1)).toFixed(2));
+  
+  document.getElementById("rateUsdDisplay").innerText = db.currencyRates.USD.toFixed(2);
+  document.getElementById("rateRubDisplay").innerText = db.currencyRates.RUB.toFixed(2);
+  
+  saveState();
+  showSystemNotification("Курсы валют Нацбанка РК обновлены!");
+}
+
+function updateBankBalancesState() {
+  const kzt = parseInt(document.getElementById("balanceKztInput").value) || 0;
+  const usd = parseInt(document.getElementById("balanceUsdInput").value) || 0;
+  
+  db.bankBalances[0].balance = kzt;
+  db.bankBalances[1].balance = usd;
+  
+  saveState();
+  showSystemNotification("Остатки на банковских счетах сохранены в базу.");
+}
+
+// 7. Рендеринг панели настроек и финансов
+function renderSettingsDashboard() {
+  // 1. Курсы валют и балансы
+  const balanceKzt = document.getElementById("balanceKztInput");
+  const balanceUsd = document.getElementById("balanceUsdInput");
+  if (balanceKzt && balanceUsd) {
+    balanceKzt.value = db.bankBalances[0]?.balance || 14500000;
+    balanceUsd.value = db.bankBalances[1]?.balance || 25000;
+  }
+  
+  const rateUsd = document.getElementById("rateUsdDisplay");
+  const rateRub = document.getElementById("rateRubDisplay");
+  if (rateUsd && rateRub) {
+    rateUsd.innerText = db.currencyRates.USD.toFixed(2);
+    rateRub.innerText = db.currencyRates.RUB.toFixed(2);
+  }
+  
+  // 2. Авансы поставщикам
+  const advancesTbody = document.getElementById("supplierAdvancesTableBody");
+  if (advancesTbody) {
+    advancesTbody.innerHTML = db.supplierAdvances.map(a => `
+      <tr>
+        <td><strong>${a.supplierName}</strong></td>
+        <td>${a.date}</td>
+        <td style="color:var(--status-success); font-weight:700;">${a.amount.toLocaleString()} ₸</td>
+        <td>${a.purpose}</td>
+      </tr>
+    `).join("");
+  }
+  
+  // 3. Реестр договоров
+  const contractsTbody = document.getElementById("contractsTableBody");
+  if (contractsTbody) {
+    contractsTbody.innerHTML = db.contracts.map(c => `
+      <tr>
+        <td>
+          <strong>№ ${c.number}</strong><br>
+          <span style="font-size:10px; color:var(--text-secondary);">${c.companyName}</span>
+        </td>
+        <td>
+          <span class="badge ${c.isSubrent ? 'badge-danger' : 'badge-neutral'}" style="font-size:9px;">${c.isSubrent ? 'Субаренда' : 'Услуги'}</span><br>
+          <span style="font-size:10px; color:var(--text-secondary);">${c.vehicleType} (${c.plateNumber})</span>
+        </td>
+        <td>
+          <span style="font-size:10px;">Владелец: ${c.ownerContact}</span><br>
+          <span style="font-size:10px; color:var(--text-secondary);">Бухгалтер: ${c.accountantContact}</span>
+        </td>
+        <td><span class="badge badge-success" style="font-size:9px;">${c.status}</span></td>
+      </tr>
+    `).join("");
+  }
+  
+  // 4. Налог на транспорт
+  const taxTbody = document.getElementById("vehicleTaxTableBody");
+  if (taxTbody) {
+    taxTbody.innerHTML = db.vehicles.filter(v => v.ownerType === 'own').map(v => {
+      // Расчет дней до уплаты налога (условный дедлайн 15 июля 2026 года)
+      const deadline = new Date("2026-07-15");
+      const today = new Date();
+      const diffTime = deadline - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      let statusStyle = "color:var(--status-success);";
+      let statusText = `${diffDays} дней осталось`;
+      if (diffDays < 0) {
+        statusStyle = "color:var(--status-danger); font-weight:700;";
+        statusText = `Просрочено на ${Math.abs(diffDays)} дн.`;
+      } else if (diffDays <= 30) {
+        statusStyle = "color:var(--status-warning); font-weight:700;";
+        statusText = `Осталось ${diffDays} дн.!`;
+      }
+      
+      return `
+        <tr onclick="editVehicleTaxInfo('${v.id}')" style="cursor:pointer;" title="Кликните для изменения налогов, ПТО и страховки (для Механика/Директора)">
+          <td><strong>${v.name}</strong></td>
+          <td>${v.plate}</td>
+          <td>${(v.taxCost || 95000).toLocaleString()} ₸</td>
+          <td>2026-07-15</td>
+          <td style="${statusStyle}">${statusText}</td>
+        </tr>
+      `;
+    }).join("");
+  }
+  
+  // 5. Журнал ТМЦ
+  const materialsTbody = document.getElementById("materialsLogTableBody");
+  if (materialsTbody) {
+    materialsTbody.innerHTML = db.materialsWriteOffs.map(m => `
+      <tr>
+        <td>
+          <span class="badge ${m.type === 'Приход' ? 'badge-success' : 'badge-danger'}" style="font-size:9px;">${m.type}</span><br>
+          <span style="font-size:9px; color:var(--text-secondary);">${m.date}</span>
+        </td>
+        <td><strong>${m.itemName}</strong></td>
+        <td>${m.qty} шт</td>
+        <td>${m.source}</td>
+        <td>${(m.price * m.qty).toLocaleString()} ₸</td>
+      </tr>
+    `).join("");
+  }
+  
+  // 6. Заявки ТБ корочки
+  const certTbody = document.getElementById("safetyCertTableBody");
+  if (certTbody) {
+    certTbody.innerHTML = db.safetyCertRequests.map(s => `
+      <tr>
+        <td><strong>${s.employeeName}</strong></td>
+        <td>${s.vehicleName}</td>
+        <td>${s.requestDate}</td>
+        <td>
+          <span class="badge ${s.status === 'Оформлено' ? 'badge-success' : 'badge-neutral'}" style="font-size:9px; cursor:pointer;" onclick="toggleSafetyCertStatus('${s.id}')">
+            ${s.status}
+          </span>
+        </td>
+      </tr>
+    `).join("");
+  }
+}
+
+function toggleSafetyCertStatus(id) {
+  const req = db.safetyCertRequests.find(s => s.id === id);
+  if (!req) return;
+  req.status = req.status === "Оформлено" ? "В обработке" : "Оформлено";
+  saveState();
+  renderSettingsDashboard();
+  showSystemNotification("Статус оформления корочки ТБ изменен.");
+}
+
+// 8. Симулятор проверки штрафов ПДД РК для логистов
+function checkKzTrafficFines() {
+  const query = prompt("Введите Госномер спецтехники или ИИН водителя для проверки штрафов по базам РК:");
+  if (!query) return;
+  
+  showSystemNotification("Выполняется запрос в ГИС ЕРАП и Комитет правовой статистики РК...");
+  
+  setTimeout(() => {
+    // Симулируем результаты проверки
+    const sumFines = Math.random() > 0.4 ? Math.floor(Math.random() * 3 + 1) * 14530 : 0; // в тенге
+    
+    if (sumFines > 0) {
+      alert(`⚠️ ОБНАРУЖЕНЫ ШТРАФЫ!\r\nПо запросу "${query}" найдено штрафов на сумму: ${sumFines.toLocaleString()} ₸ (Предписание ПДД РК).\r\nРекомендуется удержать или уведомить водителя.`);
+      showSystemNotification(`По запросу "${query}" обнаружены штрафы на ${sumFines.toLocaleString()} ₸`);
+    } else {
+      alert(`✓ Проверка успешна!\r\nПо запросу "${query}" активных предписаний и штрафов в базе данных ПДД РК не обнаружено.`);
+      showSystemNotification(`Штрафов по запросу "${query}" не обнаружено`);
+    }
+  }, 1200);
+}
+
+function editVehicleTaxInfo(vehicleId) {
+  const role = db.settings.activeRole;
+  if (role !== "Mechanic" && role !== "Director" && role !== "DeputyDirector" && role !== "Accountant") {
+    showSystemNotification("Доступ запрещен. Только Механик или Руководство могут изменять данные ТО и страховок.");
+    return;
+  }
+  const v = db.vehicles.find(x => x.id === vehicleId);
+  if (!v) return;
+  
+  const newTax = prompt(`Изменение параметров для ${v.name} (${v.plate}):\r\n\r\nВведите годовую сумму транспортного налога (KZT):`, v.taxCost || 95000);
+  if (newTax === null) return;
+  
+  const newPto = prompt("Введите новую дату техосмотра ПТО (ГГГГ-ММ-ДД):", v.ptoDate || "2026-08-12");
+  if (newPto === null) return;
+  
+  const newIns = prompt("Введите срок окончания действия страховки (ГГГГ-ММ-ДД):", v.insuranceDate || "2026-12-01");
+  if (newIns === null) return;
+  
+  v.taxCost = parseInt(newTax) || 0;
+  v.ptoDate = newPto;
+  v.insuranceDate = newIns;
+  
+  saveState();
+  renderSettingsDashboard();
+  renderRepairsTable();
+  renderMaintenanceTracker();
+  renderAllVehicles();
+  showSystemNotification(`Данные ТО и страхования для ${v.name} успешно обновлены!`);
+}
+
+// ============================================================================
+// МОДУЛЬ 12: РЕЕСТР АВТОПАРКА («ВСЕ АВТО») И ИНДИВИДУАЛЬНЫЕ ТАБЕЛИ
+// ============================================================================
+
+function renderAllVehicles() {
+  const container = document.getElementById("tab-all_vehicles");
+  if (!container || container.style.display === "none") return;
+  
+  // Обновление статистики автопарка в инфо-баре
+  const total = db.vehicles.length;
+  const own = db.vehicles.filter(v => v.ownerType === "own").length;
+  const subrent = db.vehicles.filter(v => v.ownerType === "subrent").length;
+  const inRepair = db.vehicles.filter(v => v.status === "На ремонте" || v.status === "Неисправна").length;
+  
+  const infoBar = container.querySelector(".ux-info-panel div");
+  if (infoBar) {
+    infoBar.innerHTML = `
+      <strong>Единый реестр автопарка ТОО KazBildInvest.</strong> Всего в парке: <strong>${total}</strong> машин (Собственные: <strong>${own}</strong>, Субаренда: <strong>${subrent}</strong>). В ремонте/простое: <span style="color:var(--status-danger); font-weight:700;">${inRepair}</span> ТС.<br>
+      Раздел позволяет добавлять субаренду, изменять водителей, проверять штрафы ПДД РК по госномеру и просматривать расходы по отдельным машинам.
+    `;
+  }
+  
+  renderAllVehiclesList();
+  initHoldToConfirmButtons();
+}
+
+function renderAllVehiclesList() {
+  const searchVal = (document.getElementById("allVehiclesSearch")?.value || "").toLowerCase().trim();
+  const ownerFilter = document.getElementById("allVehiclesOwnerFilter")?.value || "all";
+  const tbody = document.getElementById("allVehiclesTableBody");
+  if (!tbody) return;
+  
+  let list = db.vehicles;
+  
+  // Фильтрация
+  if (searchVal) {
+    list = list.filter(v => 
+      v.name.toLowerCase().includes(searchVal) || 
+      v.plate.toLowerCase().includes(searchVal) || 
+      v.invNumber.toLowerCase().includes(searchVal)
+    );
+  }
+  if (ownerFilter !== "all") {
+    list = list.filter(v => v.ownerType === ownerFilter);
+  }
+  
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-secondary); padding: 40px 10px;">Техника по вашему запросу не найдена. Попробуйте изменить фильтры.</td></tr>`;
+    return;
+  }
+  
+  tbody.innerHTML = list.map(v => {
+    const driver = db.drivers.find(d => d.id === v.driverId);
+    const site = db.sites.find(s => s.id === v.currentSiteId);
+    
+    let ownershipText = "";
+    if (v.ownerType === "own") {
+      ownershipText = `<span class="badge badge-neutral" style="font-size: 10px;">Собственная</span>`;
+    } else {
+      ownershipText = `
+        <div style="font-size: 11px;">
+          <span class="badge badge-warning" style="font-size: 9px; background: rgba(217, 119, 6, 0.1);">Субаренда</span><br>
+          <span style="color:var(--text-secondary); font-size:10px;">${v.subrentProvider || "Партнер"}<br><b>${(v.subrentRate || 120000).toLocaleString()} ₸/сут</b></span>
+        </div>
+      `;
+    }
+    
+    let statusClass = "badge-neutral";
+    if (v.status === "Работает") statusClass = "badge-success";
+    if (v.status === "На ремонте" || v.status === "Неисправна") statusClass = "badge-danger";
+    if (v.status === "На ТО" || v.status === "В пути") statusClass = "badge-warning";
+    
+    const driverName = driver ? driver.name : "<span style='color:var(--text-secondary); font-style:italic;'>Не назначен</span>";
+    
+    return `
+      <tr>
+        <td>
+          <div style="font-weight:600; font-size:13px;">${v.name}</div>
+          <div style="font-size:11px; color:var(--text-secondary);">${v.model || ""}</div>
+        </td>
+        <td><code style="font-weight:700; color:var(--brand-color); font-size:12px;">${v.plate}</code></td>
+        <td><code>${v.invNumber}</code></td>
+        <td>${ownershipText}</td>
+        <td>${driverName}</td>
+        <td><span class="badge ${statusClass}">${v.status}</span></td>
+        <td><span style="font-size:11px;">${site ? site.name : "Вне геозоны"}</span></td>
+        <td style="text-align:right;">
+          <div style="display:flex; justify-content:flex-end; gap:6px;">
+            <button class="btn-secondary" style="font-size:11px; padding: 4px 8px;" onclick="openEditVehicleModal('${v.id}')">Редактировать</button>
+            <button class="btn-primary" style="font-size:11px; padding: 4px 8px;" onclick="selectVehicleForTimesheet('${v.id}')">Табель & Затраты</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+// ----------------------------------------------------
+// ИНСТРУМЕНТ: ПРОВЕРКА ПО ГОСНОМЕРУ РК
+// ----------------------------------------------------
+
+function performKzPlateCheck() {
+  const plateInput = document.getElementById("vehiclePlateCheckInput");
+  const container = document.getElementById("plateCheckResultContainer");
+  if (!plateInput || !container) return;
+  
+  const rawPlate = plateInput.value.trim();
+  if (!rawPlate) {
+    showSystemNotification("Введите госномер для проверки!");
+    return;
+  }
+  
+  showSystemNotification("Запрос в ГИС ЕРАП РК, страховые базы ЕРАИ и ЧС логистики...");
+  container.style.display = "block";
+  container.innerHTML = `
+    <div style="text-align:center; padding: 30px; color: var(--text-secondary);">
+      <svg class="spinner" viewBox="0 0 50 50" style="width:30px; height:30px; margin:0 auto 12px; display:block; stroke:var(--brand-color); stroke-width:4; fill:none; stroke-linecap:round; animation:spin 1s linear infinite;"><circle cx="25" cy="25" r="20"></circle></svg>
+      Выполняется сверка госномера с базами данных Республики Казахстан...
+    </div>
+  `;
+  
+  setTimeout(() => {
+    // Ищем машину в нашей базе для детальной информации
+    const plateUpper = rawPlate.toUpperCase().replace(/\s+/g, '');
+    const vehicle = db.vehicles.find(v => v.plate.toUpperCase().replace(/\s+/g, '') === plateUpper);
+    
+    let name = rawPlate;
+    let type = "Внедорожник/Сторонний транспорт";
+    let isOwn = false;
+    let insuranceText = "Не найдено в базе ТОО";
+    let insuranceClass = "badge-neutral";
+    let ptoText = "Нет сведений";
+    let ptoClass = "badge-neutral";
+    let taxText = "Нет сведений";
+    let taxClass = "badge-neutral";
+    let driverText = "Не назначен";
+    let driverClass = "badge-neutral";
+    let fineSum = Math.random() > 0.4 ? Math.floor(Math.random() * 3 + 1) * 14530 : 0;
+    
+    if (vehicle) {
+      name = `${vehicle.name} (${vehicle.model})`;
+      type = vehicle.type;
+      isOwn = vehicle.ownerType === "own";
+      
+      // Сроки страховки
+      const insDate = new Date(vehicle.insuranceDate);
+      const today = new Date();
+      const diffTime = insDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      const checkCheckmark = `<svg viewBox="0 0 24 24" style="width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.5; fill: none; margin-right: 4px; display: inline-block; vertical-align: middle;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      const checkCross = `<svg viewBox="0 0 24 24" style="width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.5; fill: none; margin-right: 4px; display: inline-block; vertical-align: middle;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+      const checkWarning = `<svg viewBox="0 0 24 24" style="width: 12px; height: 12px; stroke: currentColor; stroke-width: 2.5; fill: none; margin-right: 4px; display: inline-block; vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+
+      if (diffDays < 0) {
+        insuranceText = `${checkCross} ПРОСРОЧЕНА (срок истек ${Math.abs(diffDays)} дн. назад | ${vehicle.insuranceDate})`;
+        insuranceClass = "badge-danger";
+      } else if (diffDays <= 15) {
+        insuranceText = `${checkWarning} ИСТЕКАЕТ (осталось ${diffDays} дн. | ${vehicle.insuranceDate})`;
+        insuranceClass = "badge-warning";
+      } else {
+        insuranceText = `${checkCheckmark} Активна (осталось ${diffDays} дн. | до ${vehicle.insuranceDate})`;
+        insuranceClass = "badge-success";
+      }
+      
+      // Сроки ПТО
+      const ptoDate = new Date(vehicle.ptoDate);
+      const ptoDiff = ptoDate - today;
+      const ptoDays = Math.ceil(ptoDiff / (1000 * 60 * 60 * 24));
+      if (ptoDays < 0) {
+        ptoText = `${checkCross} Просрочен ПТО (истек ${Math.abs(ptoDays)} дн. назад)`;
+        ptoClass = "badge-danger";
+      } else {
+        ptoText = `${checkCheckmark} Пройден (до ${vehicle.ptoDate})`;
+        ptoClass = "badge-success";
+      }
+      
+      // Налог
+      if (isOwn) {
+        const taxDate = new Date(vehicle.taxDate || "2026-07-15");
+        const taxDiff = taxDate - today;
+        const taxDays = Math.ceil(taxDiff / (1000 * 60 * 60 * 24));
+        if (taxDays < 0) {
+          taxText = `${checkCross} Задолженность (${(vehicle.taxCost || 120000).toLocaleString()} ₸)`;
+          taxClass = "badge-danger";
+        } else {
+          taxText = `${checkCheckmark} Оплачен (${(vehicle.taxCost || 120000).toLocaleString()} ₸)`;
+          taxClass = "badge-success";
+        }
+      } else {
+        taxText = "Субаренда (оплачивает арендодатель)";
+        taxClass = "badge-neutral";
+      }
+      
+      // Водитель и проверка в ЧС
+      const driver = db.drivers.find(d => d.id === vehicle.driverId);
+      if (driver) {
+        // Проверяем по черному списку по ИИН или имени
+        const blacklisted = db.blacklist.find(b => b.iin === driver.iin || b.name.toLowerCase().includes(driver.name.toLowerCase()));
+        if (blacklisted) {
+          driverText = `${checkWarning} БЛОКИРОВКА: ${driver.name} в Черном списке! (Причина: ${blacklisted.blockReason})`;
+          driverClass = "badge-danger";
+        } else {
+          driverText = `${checkCheckmark} ${driver.name} (ИИН: ${driver.iin || "Нет"}) — Благонадежен`;
+          driverClass = "badge-success";
+        }
+      } else {
+        driverText = "Машинист не назначен на смену!";
+        driverClass = "badge-warning";
+      }
+    } else {
+      // Имитируем случайную проверку для стороннего госномера
+      insuranceText = "Внешняя страховка активна (Казкоммерц-Полис)";
+      insuranceClass = "badge-success";
+      ptoText = "Техосмотр пройден в ЦТО г. Атырау";
+      ptoClass = "badge-success";
+      taxText = "Сведений о задолженности по налогам нет";
+      taxClass = "badge-success";
+      driverText = "Сторонний оператор";
+      driverClass = "badge-neutral";
+    }
+    
+    let fineHtml = "";
+    if (fineSum > 0) {
+      fineHtml = `
+        <div style="background: rgba(220, 38, 38, 0.1); border-left: 4px solid var(--status-danger); padding: 12px; border-radius: 4px; margin-bottom: 12px;">
+          <span style="font-weight:700; color:var(--status-danger); font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+            <svg viewBox="0 0 24 24" style="width:12px; height:12px; stroke:currentColor; stroke-width:2.5; fill:none; display:inline-block;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            ОБНАРУЖЕНЫ ШТРАФЫ В БАЗЕ ЕРАП РК:
+          </span><br>
+          <span style="font-size:11px;">Найдено 1 предписание по превышению скорости на сумму: <strong>${fineSum.toLocaleString()} ₸</strong>. Рекомендуется удержать при выплатах.</span>
+        </div>
+      `;
+    } else {
+      fineHtml = `
+        <div style="background: rgba(22, 163, 74, 0.1); border-left: 4px solid var(--status-success); padding: 12px; border-radius: 4px; margin-bottom: 12px;">
+          <span style="font-weight:700; color:var(--status-success); font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+            <svg viewBox="0 0 24 24" style="width:12px; height:12px; stroke:currentColor; stroke-width:2.5; fill:none; display:inline-block;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            АКТИВНЫХ ШТРАФОВ НЕТ:
+          </span><br>
+          <span style="font-size:11px;">Предписаний ПДД и неоплаченных взысканий по ГИС ЕРАП РК не обнаружено.</span>
+        </div>
+      `;
+    }
+    
+    container.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+        <div>
+          <h4 style="font-size:14px; margin:0;">${name}</h4>
+          <span style="font-size:11px; color:var(--text-secondary);">${type}</span>
+        </div>
+        <span class="badge ${vehicle ? (isOwn ? 'badge-neutral' : 'badge-warning') : 'badge-neutral'}">
+          ${vehicle ? (isOwn ? 'Собственность ТОО' : 'Субаренда') : 'Вне реестра'}
+        </span>
+      </div>
+      
+      ${fineHtml}
+      
+      <div class="grid-container" style="gap:12px; font-size:11px;">
+        <div class="col-6">
+          <strong>Страховой полис (ЕРАИ):</strong><br>
+          <span class="badge ${insuranceClass}" style="margin-top:4px; display:inline-block; text-align:left; font-size:10px;">${insuranceText}</span>
+        </div>
+        <div class="col-6">
+          <strong>Технический осмотр (ПТО):</strong><br>
+          <span class="badge ${ptoClass}" style="margin-top:4px; display:inline-block; font-size:10px;">${ptoText}</span>
+        </div>
+        <div class="col-6" style="margin-top:8px;">
+          <strong>Налог на транспорт:</strong><br>
+          <span class="badge ${taxClass}" style="margin-top:4px; display:inline-block; font-size:10px;">${taxText}</span>
+        </div>
+        <div class="col-6" style="margin-top:8px;">
+          <strong>Проверка машиниста / ЧС логистов:</strong><br>
+          <span class="badge ${driverClass}" style="margin-top:4px; display:inline-block; text-align:left; font-size:10px;">${driverText}</span>
+        </div>
+      </div>
+    `;
+  }, 800);
+}
+
+// ----------------------------------------------------
+// ОКНО РЕДАКТИРОВАНИЯ ТЕХНИКИ
+// ----------------------------------------------------
+
+function openEditVehicleModal(vehicleId) {
+  const v = db.vehicles.find(x => x.id === vehicleId);
+  if (!v) return;
+  
+  document.getElementById("editVehId").value = v.id;
+  document.getElementById("editVehName").value = v.name;
+  document.getElementById("editVehModel").value = v.model;
+  document.getElementById("editVehPlate").value = v.plate;
+  document.getElementById("editVehType").value = v.type;
+  document.getElementById("editVehOwnerType").value = v.ownerType;
+  document.getElementById("editVehInv").value = v.invNumber;
+  document.getElementById("editVehYear").value = v.year;
+  document.getElementById("editVehStatus").value = v.status;
+  
+  // Наполнение селектора водителей
+  const driverSelect = document.getElementById("editVehDriver");
+  if (driverSelect) {
+    driverSelect.innerHTML = `<option value="">Нет назначенного водителя</option>` +
+      db.drivers.map(d => `<option value="${d.id}" ${d.id === v.driverId ? 'selected' : ''}>${d.name} (${d.position})</option>`).join("");
+  }
+  
+  // Дополнительные поля субаренды / собственности
+  document.getElementById("editVehSubrentProvider").value = v.subrentProvider || "";
+  document.getElementById("editVehSubrentRate").value = v.subrentRate || "";
+  
+  document.getElementById("editVehTaxCost").value = v.taxCost || "";
+  document.getElementById("editVehTaxDate").value = v.taxDate || "2026-07-15";
+  document.getElementById("editVehPtoDate").value = v.ptoDate || "";
+  document.getElementById("editVehCtoDate").value = v.ctoDate || "";
+  document.getElementById("editVehInsProvider").value = v.insuranceProvider || "";
+  document.getElementById("editVehInsDate").value = v.insuranceDate || "";
+  
+  toggleEditVehicleSubrentFields();
+  openModal("editVehicleModal");
+}
+
+function toggleEditVehicleSubrentFields() {
+  const type = document.getElementById("editVehOwnerType").value;
+  const subrentBlock = document.getElementById("editVehicleSubrentFields");
+  const ownBlock = document.getElementById("editVehicleOwnFields");
+  
+  if (type === "subrent") {
+    subrentBlock.style.display = "block";
+    ownBlock.style.display = "none";
+  } else {
+    subrentBlock.style.display = "none";
+    ownBlock.style.display = "block";
+  }
+}
+
+function submitEditVehicle() {
+  const id = document.getElementById("editVehId").value;
+  const v = db.vehicles.find(x => x.id === id);
+  if (!v) return;
+  
+  const name = document.getElementById("editVehName").value.trim();
+  const model = document.getElementById("editVehModel").value.trim();
+  const plate = document.getElementById("editVehPlate").value.trim();
+  const type = document.getElementById("editVehType").value;
+  const ownerType = document.getElementById("editVehOwnerType").value;
+  const inv = document.getElementById("editVehInv").value.trim();
+  const year = parseInt(document.getElementById("editVehYear").value) || 2023;
+  const status = document.getElementById("editVehStatus").value;
+  const driverId = document.getElementById("editVehDriver").value;
+  
+  if (!name || !model || !plate || !inv) {
+    showSystemNotification("Заполните обязательные поля!");
+    return;
+  }
+  
+  v.name = name;
+  v.model = model;
+  v.plate = plate;
+  v.type = type;
+  v.ownerType = ownerType;
+  v.invNumber = inv;
+  v.year = year;
+  v.status = status;
+  v.driverId = driverId;
+  
+  if (ownerType === "subrent") {
+    v.subrentProvider = document.getElementById("editVehSubrentProvider").value.trim();
+    v.subrentRate = parseInt(document.getElementById("editVehSubrentRate").value) || 0;
+  } else {
+    v.taxCost = parseInt(document.getElementById("editVehTaxCost").value) || 0;
+    v.taxDate = document.getElementById("editVehTaxDate").value;
+    v.ptoDate = document.getElementById("editVehPtoDate").value;
+    v.ctoDate = document.getElementById("editVehCtoDate").value;
+    v.insuranceProvider = document.getElementById("editVehInsProvider").value.trim();
+    v.insuranceDate = document.getElementById("editVehInsDate").value;
+  }
+  
+  saveState();
+  renderAllVehicles();
+  renderGpsVehicleList();
+  renderRepairsTable();
+  renderMaintenanceTracker();
+  renderGanttChart();
+  closeModal("editVehicleModal");
+  showSystemNotification(`Техника ${name} успешно отредактирована!`);
+}
+
+// ----------------------------------------------------
+// ДЕТАЛЬНЫЙ ТАБЕЛЬ И РАСХОДЫ ПО КОНКРЕТНОЙ ТЕХНИКЕ
+// ----------------------------------------------------
+
+function selectVehicleForTimesheet(vehicleId) {
+  window.selectedVehForTimesheet = vehicleId;
+  const wrapper = document.getElementById("individualVehicleTimesheetWrapper");
+  if (wrapper) {
+    wrapper.style.display = "block";
+    renderIndividualVehicleTimesheet();
+    
+    // Плавный скролл к блоку
+    setTimeout(() => {
+      wrapper.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+  }
+}
+
+function renderIndividualVehicleTimesheet() {
+  const vehicleId = window.selectedVehForTimesheet;
+  if (!vehicleId) return;
+  
+  const v = db.vehicles.find(x => x.id === vehicleId);
+  if (!v) return;
+  
+  const wrapper = document.getElementById("individualVehicleTimesheetWrapper");
+  if (!wrapper) return;
+  
+  const monthInputVal = document.getElementById("individualTimesheetMonth")?.value || "2026-06";
+  const defaultMonth = monthInputVal;
+  
+  // Ищем или создаем запись табеля
+  let timesheet = db.timesheets.find(t => t.vehicleId === vehicleId && t.month === defaultMonth);
+  if (!timesheet) {
+    // Создаем пустой табель на 30 дней по умолчанию
+    const defaultHistory = [];
+    const defaultDaily = {};
+    for (let day = 1; day <= 30; day++) {
+      defaultHistory.push({ day: day, driverId: v.driverId || "d101" });
+      // Будние дни - работа, выходные - выходной
+      const dayOfWeek = new Date(`2026-06-${day.toString().padStart(2, '0')}`).getDay();
+      defaultDaily[day] = (dayOfWeek === 0 || dayOfWeek === 6) ? "O" : "W";
+    }
+    
+    timesheet = {
+      id: "ts_ind_" + vehicleId + "_" + defaultMonth.replace("-", ""),
+      month: defaultMonth,
+      vehicleId: vehicleId,
+      driverHistory: defaultHistory,
+      dailyStatus: defaultDaily,
+      mechanicApproved: false,
+      hrApproved: false,
+      directorApproved: false
+    };
+    db.timesheets.push(timesheet);
+    saveState();
+  }
+  
+  // Вычисляем показатели работы
+  let workDays = 0;
+  let offDays = 0;
+  let repairDays = 0;
+  let idleDays = 0;
+  
+  Object.keys(timesheet.dailyStatus).forEach(day => {
+    const s = timesheet.dailyStatus[day];
+    if (s === "W") workDays++;
+    if (s === "O") offDays++;
+    if (s === "R") repairDays++;
+    if (s === "I") idleDays++;
+  });
+  
+  // Считаем Затраты
+  // 1. Аренда / Амортизация
+  let rentCost = 0;
+  let rentText = "";
+  if (v.ownerType === "subrent") {
+    rentCost = workDays * (v.subrentRate || 120000);
+    rentText = `Субаренда: <strong>${workDays}</strong> дн. × <strong>${(v.subrentRate || 120000).toLocaleString()} ₸</strong> = <strong>${rentCost.toLocaleString()} ₸</strong>`;
+  } else {
+    rentCost = 150000; // фикс амортизация
+    rentText = `Расчетная амортизация за месяц: <strong>150 000 ₸</strong>`;
+  }
+  
+  // 2. Ремонты спецтехники за этот месяц
+  const repairsInMonth = db.repairs.filter(r => r.vehicleId === vehicleId && r.createdAt.startsWith(defaultMonth));
+  const repairsCost = repairsInMonth.reduce((sum, r) => sum + (r.damageCost || 0) + (r.laborCost || 0), 0);
+  
+  // 3. Затраты на ГСМ (заправки)
+  const fuelInMonth = db.fuelLogs.filter(f => f.vehicleId === vehicleId && f.date.startsWith(defaultMonth));
+  const fuelCost = fuelInMonth.reduce((sum, f) => sum + (f.cost || 0), 0);
+  const fuelLiters = fuelInMonth.reduce((sum, f) => sum + (f.liters || 0), 0);
+  
+  const totalDirectCost = rentCost + repairsCost + fuelCost;
+  
+  // Генерация карточек дней
+  let daysHtml = "";
+  for (let day = 1; day <= 30; day++) {
+    const activeDriverObj = timesheet.driverHistory.find(h => h.day === day) || { driverId: v.driverId };
+    const currentStatus = timesheet.dailyStatus[day] || "W";
+    
+    let statusClass = "work";
+    if (currentStatus === "O") statusClass = "off";
+    if (currentStatus === "R") statusClass = "repair";
+    if (currentStatus === "I") statusClass = "idle";
+    
+    const driverOptions = db.drivers.map(d => `<option value="${d.id}" ${d.id === activeDriverObj.driverId ? 'selected' : ''}>${d.name.split(" ")[0]}</option>`).join("");
+    
+    daysHtml += `
+      <div class="indiv-day-card ${statusClass}">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="indiv-day-num">${day} июня</span>
+          <select style="font-size:9px; padding:2px; font-weight:700;" onchange="updateIndivDayStatus('${vehicleId}', '${defaultMonth}', ${day}, this.value)">
+            <option value="W" ${currentStatus === "W" ? 'selected' : ''}>Работа (Я)</option>
+            <option value="O" ${currentStatus === "O" ? 'selected' : ''}>Выходной (В)</option>
+            <option value="R" ${currentStatus === "R" ? 'selected' : ''}>Ремонт (Р)</option>
+            <option value="I" ${currentStatus === "I" ? 'selected' : ''}>Простой (П)</option>
+          </select>
+        </div>
+        <div style="margin-top:4px;">
+          <span style="font-size:9px; color:var(--text-secondary); display:block;">Машинист:</span>
+          <select style="font-size:10px; width:100%; padding:2px;" onchange="updateIndivDayDriver('${vehicleId}', '${defaultMonth}', ${day}, this.value)">
+            ${driverOptions}
+          </select>
+        </div>
+      </div>
+    `;
+  }
+  
+  wrapper.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; border-bottom:1px solid var(--border-color); padding-bottom:12px;">
+      <div>
+        <h3 style="font-size: 15px; margin:0;">Индивидуальный табель смен и затраты: <strong>${v.name}</strong> (${v.plate})</h3>
+        <span style="font-size:11px; color:var(--text-secondary);">Индивидуальный контроль замен машинистов и прямых издержек спецтехники по дням</span>
+      </div>
+      <div style="display:flex; gap:12px; align-items:center;">
+        <label style="font-size:11px; font-weight:600; color:var(--text-secondary);">Месяц:</label>
+        <input type="month" id="individualTimesheetMonth" value="${defaultMonth}" class="form-control" style="width:160px; font-size:12px; padding:5px 8px;" onchange="renderIndividualVehicleTimesheet()" />
+      </div>
+    </div>
+    
+    <div class="grid-container" style="gap:20px;">
+      <!-- Левая часть: Калькулятор затрат -->
+      <div class="col-4">
+        <div class="card" style="background:var(--bg-secondary); border:1px solid var(--border-color); padding:16px; display:flex; flex-direction:column; gap:12px; height:100%;">
+          <h4 style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; font-weight:700;">Прямые затраты за месяц</h4>
+          
+          <div style="font-size:12px; border-bottom:1px dashed var(--border-color); padding-bottom:8px;">
+            <div style="color:var(--text-secondary); font-size:10px; text-transform:uppercase; font-weight:600;">1. Содержание / Аренда</div>
+            <div style="margin-top:2px;">${rentText}</div>
+          </div>
+          
+          <div style="font-size:12px; border-bottom:1px dashed var(--border-color); padding-bottom:8px;">
+            <div style="color:var(--text-secondary); font-size:10px; text-transform:uppercase; font-weight:600;">2. Затраты на ремонт за месяц</div>
+            <div style="margin-top:2px; display:flex; justify-content:space-between;">
+              <span>Найдено <strong>${repairsInMonth.length}</strong> дефектных актов:</span>
+              <strong>${repairsCost.toLocaleString()} ₸</strong>
+            </div>
+            ${repairsInMonth.map(r => "<div style='font-size:9px; color:var(--text-secondary); margin-top:2px;'>• " + r.createdAt + ": " + r.description.substring(0, 30) + "... (" + (r.damageCost + r.laborCost).toLocaleString() + " ₸)</div>").join("")}
+          </div>
+          
+          <div style="font-size:12px; border-bottom:1px dashed var(--border-color); padding-bottom:8px;">
+            <div style="color:var(--text-secondary); font-size:10px; text-transform:uppercase; font-weight:600;">3. Затраты на ГСМ за месяц</div>
+            <div style="margin-top:2px; display:flex; justify-content:space-between;">
+              <span>Всего заправлено <strong>${fuelLiters} л</strong>:</span>
+              <strong>${fuelCost.toLocaleString()} ₸</strong>
+            </div>
+          </div>
+          
+          <div style="background:var(--bg-card); padding:12px; border-radius:6px; margin-top:auto; box-shadow:var(--shadow);">
+            <div style="font-size:10px; color:var(--text-secondary); text-transform:uppercase; font-weight:700;">Итого прямых издержек</div>
+            <div style="font-size:20px; font-weight:800; color:var(--text-primary); margin-top:2px;">${totalDirectCost.toLocaleString()} ₸</div>
+          </div>
+          
+          <button class="btn-primary" style="justify-content:center; margin-top:8px;" onclick="saveIndividualVehicleTimesheet()">Сохранить изменения табеля</button>
+        </div>
+      </div>
+      
+      <!-- Правая часть: Календарная сетка -->
+      <div class="col-8">
+        <h4 style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; font-weight:700; color:var(--text-secondary);">Сетка рабочих смен спецтехники по дням:</h4>
+        <div class="indiv-timesheet-grid">
+          ${daysHtml}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function updateIndivDayStatus(vehicleId, month, day, newStatus) {
+  const timesheet = db.timesheets.find(t => t.vehicleId === vehicleId && t.month === month);
+  if (!timesheet) return;
+  timesheet.dailyStatus[day] = newStatus;
+  renderIndividualVehicleTimesheet();
+}
+
+function updateIndivDayDriver(vehicleId, month, day, newDriverId) {
+  const timesheet = db.timesheets.find(t => t.vehicleId === vehicleId && t.month === month);
+  if (!timesheet) return;
+  
+  const historyIdx = timesheet.driverHistory.findIndex(h => h.day === day);
+  if (historyIdx >= 0) {
+    timesheet.driverHistory[historyIdx].driverId = newDriverId;
+  } else {
+    timesheet.driverHistory.push({ day: day, driverId: newDriverId });
+  }
+}
+
+function saveIndividualVehicleTimesheet() {
+  saveState();
+  renderTimesheetGrid(); // Синхронизируем глобальный табель
+  showSystemNotification("Данные индивидуального табеля и замен водителей сохранены.");
+}
+
+// ============================================================================
+// МОДУЛЬ 13: РЕЕСТР ДОГОВОРОВ И ШАБЛОНОВ ДЛЯ МЕНЕДЖЕРА
+// ============================================================================
+
+function renderContractsRegistry() {
+  const tbody = document.getElementById("contractsTabTableBody");
+  if (!tbody) return;
+  
+  tbody.innerHTML = db.contracts.map(c => {
+    return `
+      <tr>
+        <td>
+          <div style="font-weight:600;">№ ${c.number}</div>
+          <span style="font-size:11px; color:var(--text-secondary);">${c.companyName}</span>
+        </td>
+        <td>
+          <div style="font-size:12px;">${c.vehicleType}</div>
+          <span style="font-size:10px; color:var(--text-secondary);">${c.plateNumber}</span>
+        </td>
+        <td>
+          <span style="font-size:11px;">С: ${c.dateCreated}<br>По: ${c.dateEnd}</span>
+        </td>
+        <td>
+          <span class="badge ${c.status === 'Активен' ? 'badge-success' : 'badge-neutral'}">${c.status}</span>
+        </td>
+        <td style="text-align:right;">
+          <button class="btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewContractPrintForm('${c.id}')">🔎 Печать</button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function viewContractPrintForm(contractId) {
+  const c = db.contracts.find(x => x.id === contractId);
+  const container = document.getElementById("contractPreviewContainer");
+  if (!c || !container) return;
+  
+  // Шаблон А4 формы договора
+  container.innerHTML = `
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-bottom:12px;">
+      <button class="btn-primary" style="font-size:11px; padding:4px 8px;" onclick="printContractDocument('${c.id}')">Распечатать договор</button>
+    </div>
+    
+    <div class="a4-print-document" id="a4-printed-contract">
+      <div class="a4-header">
+        <h2 style="font-size:15px; font-weight:700; margin:0; text-transform:uppercase;">ТОО «KazBildInvest»</h2>
+        <span style="font-size:10px; color:#555;">Казахстан, г. Атырау, пр. Абулхаир Хана 45</span>
+        <div class="a4-title">Договор аренды спецтехники № ${c.number}</div>
+        <span style="font-size:12px;">г. Атырау &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Дата: ${c.dateCreated}</span>
+      </div>
+      
+      <div class="a4-body" style="font-size:11px; line-height:1.4;">
+        <p><b>1. ПРЕДМЕТ ДОГОВОРА</b><br>
+        1.1. Арендодатель обязуется предоставить Арендатору во временное владение и пользование спецтехнику: <strong>${c.vehicleType}</strong> (государственные регистрационные знаки: <strong>${c.plateNumber}</strong>), а Арендатор обязуется принять технику и своевременно оплачивать арендные услуги.</p>
+        
+        <p style="margin-top:8px;"><b>2. ПОРЯДОК РАСЧЕТОВ</b><br>
+        2.1. Расчет стоимости аренды производится согласно утвержденным тарифам и актам выполненных работ. Оплата осуществляется безналичным расчетом в национальной валюте Республики Казахстан (Тенге).</p>
+        
+        <p style="margin-top:8px;"><b>3. СРОКИ И ПОРЯДОК ПЕРЕДАЧИ</b><br>
+        3.1. Настоящий договор вступает в силу с момента его подписания и действует до <strong>${c.dateEnd}</strong>. Спецтехника передается на основании Акта приема-передачи.</p>
+        
+        <p style="margin-top:8px;"><b>4. РЕКВИЗИТЫ СТОРОН</b></p>
+        <table class="a4-meta-table">
+          <tr>
+            <td style="width:50%;">
+              <strong>АРЕНДАТОР:</strong><br>
+              ТОО «KazBildInvest»<br>
+              БИН: 150240003920<br>
+              г. Атырау, ул. Сырым Датова 12<br>
+              Тел: +7 (7122) 30-40-50
+            </td>
+            <td style="width:50%;">
+              <strong>АРЕНДОДАТЕЛЬ (КОНТРАГЕНТ):</strong><br>
+              ${c.companyName}<br>
+              БИН: 120440012934 / ИИН: 840219300181<br>
+              Контакты владельца: ${c.ownerContact}<br>
+              Контакты бухгалтера: ${c.accountantContact}
+            </td>
+          </tr>
+        </table>
+      </div>
+      
+      <div class="a4-footer">
+        <div class="a4-stamp-box">
+          <span style="font-size:10px;">Директор ТОО «KBI»</span>
+          <img class="a4-seal-img" src="https://static.tildacdn.com/tild3534-3135-4330-b333-316531393666/seal_kaz.png" alt="Печать" style="display:none;" /> <!-- Заглушка, подгружается при печати -->
+          <div style="font-size:9px; color:#555; position:absolute; top:20px; left:40px; font-weight:bold; border: 2px solid #2563EB; border-radius:50%; width:70px; height:70px; display:flex; align-items:center; justify-content:center; color:#2563EB; transform:rotate(-15deg); opacity:0.85;">ПЕЧАТЬ ТОО</div>
+        </div>
+        <div class="a4-stamp-box">
+          <span style="font-size:10px;">Представитель контрагента</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function printContractDocument(contractId) {
+  const doc = document.getElementById("a4-printed-contract");
+  if (!doc) return;
+  
+  // Открытие окна для печати
+  const printWindow = window.open('', '_blank', 'width=800,height=900');
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Печать договора</title>
+        <style>
+          body { font-family: sans-serif; padding: 20px; }
+          .a4-print-document { background: #fff; border: none; box-shadow: none; max-width: 100%; margin: 0; padding: 0; }
+          .a4-header { border-bottom: 2px solid #000; text-align: center; padding-bottom: 12px; margin-bottom: 20px; }
+          .a4-title { font-size: 16px; font-weight: bold; text-transform: uppercase; margin-top: 10px; }
+          .a4-meta-table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
+          .a4-meta-table td { padding: 6px; border: 1px solid #000; font-size: 10px; }
+          .a4-body { font-size: 11px; line-height: 1.4; text-align: justify; }
+          .a4-footer { display: flex; justify-content: space-between; margin-top: 40px; font-size: 11px; }
+          .a4-stamp-box { position: relative; width: 200px; height: 100px; border-bottom: 1px solid #000; display: flex; align-items: flex-end; }
+          .seal-blue { border: 2px solid #1d4ed8; color: #1d4ed8; border-radius: 50%; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; font-size: 9px; transform: rotate(-15deg); font-weight: bold; position: absolute; top: 10px; left: 60px; opacity: 0.8; }
+        </style>
+      </head>
+      <body>
+        ${doc.innerHTML}
+        <script>
+          // Добавляем штамп печати
+          const footers = document.getElementsByClassName("a4-footer");
+          if(footers.length > 0) {
+            const firstStamp = footers[0].getElementsByClassName("a4-stamp-box")[0];
+            const seal = document.createElement("div");
+            seal.className = "seal-blue";
+            seal.innerText = "ПОДПИСАНО\\nТОО KBI";
+            firstStamp.appendChild(seal);
+          }
+          window.onload = function() { window.print(); window.close(); }
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+// ============================================================================
+// МОДУЛЬ 14: ФИНАНСЫ И КАЗНАЧЕЙСТВО (TREASURY)
+// ============================================================================
+
+function renderFinanceTreasury() {
+  // Наполнение банковских остатков
+  const balKzt = document.getElementById("finBalanceKztInput");
+  const balUsd = document.getElementById("finBalanceUsdInput");
+  if (balKzt) balKzt.value = db.settings.bankKzt || 45200000;
+  if (balUsd) balUsd.value = db.settings.bankUsd || 89000;
+  
+  // Курсы валют
+  const rateUsd = document.getElementById("finRateUsdDisplay");
+  const rateRub = document.getElementById("finRateRubDisplay");
+  if (rateUsd) rateUsd.innerText = (db.currencyRates?.USD || 448.50).toFixed(2);
+  if (rateRub) rateRub.innerText = (db.currencyRates?.RUB || 5.12).toFixed(2);
+  
+  // Выданные авансы
+  const advancesTbody = document.getElementById("finSupplierAdvancesTableBody");
+  if (advancesTbody) {
+    advancesTbody.innerHTML = db.supplierAdvances.map(a => `
+      <tr>
+        <td><strong>${a.supplierName}</strong></td>
+        <td>${a.date}</td>
+        <td><strong style="color:var(--brand-color);">${a.amount.toLocaleString()} ₸</strong></td>
+        <td><span style="color:var(--text-secondary); font-size:10px;">${a.purpose}</span></td>
+      </tr>
+    `).join("");
+  }
+  
+  // Налог на транспорт
+  const taxTbody = document.getElementById("finTransportTaxTableBody");
+  if (taxTbody) {
+    const today = new Date();
+    taxTbody.innerHTML = db.vehicles.filter(v => v.ownerType === "own").map(v => {
+      const taxDate = new Date(v.taxDate || "2026-07-15");
+      const diffTime = taxDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      let statusClass = "badge-success";
+      let statusText = "Оплачен";
+      if (diffDays < 0) {
+        statusClass = "badge-danger";
+        statusText = `Просрочен на ${Math.abs(diffDays)} дн.`;
+      } else if (diffDays <= 30) {
+        statusClass = "badge-warning";
+        statusText = `Срок ${diffDays} дн.`;
+      }
+      
+      return `
+        <tr>
+          <td><strong>${v.name}</strong></td>
+          <td><code>${v.plate}</code></td>
+          <td>${(v.taxCost || 95000).toLocaleString()} ₸</td>
+          <td>${v.taxDate || "2026-07-15"}</td>
+          <td><span class="badge ${statusClass}">${statusText}</span></td>
+        </tr>
+      `;
+    }).join("");
+  }
+  
+  // Кредиторка (AP)
+  const apTbody = document.getElementById("finAccountsPayableTableBody");
+  if (apTbody) {
+    // Выведем счета из CRM или статические обязательства
+    const apList = [
+      { id: "ap_1", supplierName: "ТОО «Каспий Спец Техника»", purpose: "Аренда крана за май", amount: 2450000, dueDate: "2026-06-25", paid: false },
+      { id: "ap_2", supplierName: "ТОО «Борусан Машинери»", purpose: "Гидроцилиндр CAT 320", amount: 1800000, dueDate: "2026-06-30", paid: false },
+      { id: "ap_3", supplierName: "ТОО «Helios OIL»", purpose: "Заправка дизельного топлива", amount: 3500000, dueDate: "2026-06-20", paid: true }
+    ];
+    
+    apTbody.innerHTML = apList.map(item => {
+      return `
+        <tr>
+          <td><strong>${item.supplierName}</strong></td>
+          <td>${item.purpose}</td>
+          <td><strong>${item.amount.toLocaleString()} ₸</strong></td>
+          <td>${item.dueDate}</td>
+          <td>
+            ${item.paid 
+              ? `<span class="badge badge-success">Оплачено</span>` 
+              : `<button class="btn-hold-confirm btn-primary" style="font-size:10px; padding:4px 8px; background:var(--brand-color); border:none;" data-action="payAp" data-id="${item.id}" data-amount="${item.amount}">
+                  <span class="hold-progress"></span>
+                  <span>Удерживать для оплаты</span>
+                 </button>`
+            }
+          </td>
+        </tr>
+      `;
+    }).join("");
+  }
+  
+  // Дебиторка (AR)
+  const arTbody = document.getElementById("finAccountsReceivableTableBody");
+  if (arTbody) {
+    // Получаем список дебиторки
+    arTbody.innerHTML = db.debtors.map(d => {
+      let warningText = "Уведомление не отправлено";
+      let warningClass = "badge-neutral";
+      
+      if (d.paymentStageDays === 1) {
+        warningText = "⚠️ 1-е Предупреждение";
+        warningClass = "badge-warning";
+      } else if (d.paymentStageDays === 2) {
+        warningText = "🔥 2-е Предупреждение";
+        warningClass = "badge-warning";
+      } else if (d.paymentStageDays >= 3) {
+        warningText = "🚨 БЛОКИРОВКА / СУД";
+        warningClass = "badge-danger";
+      }
+      
+      return `
+        <tr>
+          <td><strong>${d.companyName}</strong></td>
+          <td><strong style="color:var(--status-danger);">${d.debtAmount.toLocaleString()} ₸</strong></td>
+          <td><span style="color:var(--status-danger); font-weight:700;">${d.delayDays} дн.</span></td>
+          <td><span class="badge ${warningClass}">${warningText}</span></td>
+          <td>
+            <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="sendDebtReminder('${d.id}', '${d.companyName}', ${d.debtAmount}, ${d.paymentStageDays || 0})">
+              Напомнить
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+  }
+  
+  initHoldToConfirmButtons();
+}
+
+function updateFinanceBalancesState() {
+  const balKzt = parseInt(document.getElementById("finBalanceKztInput").value) || 0;
+  const balUsd = parseInt(document.getElementById("finBalanceUsdInput").value) || 0;
+  db.settings.bankKzt = balKzt;
+  db.settings.bankUsd = balUsd;
+  saveState();
+  showSystemNotification("Остатки на банковских счетах обновлены.");
+}
+
+function sendDebtReminder(id, name, amount, currentLevel) {
+  const debtor = db.debtors.find(x => x.id === id);
+  if (!debtor) return;
+  
+  const nextLevel = currentLevel + 1;
+  debtor.paymentStageDays = nextLevel;
+  saveState();
+  
+  let msg = "";
+  if (nextLevel === 1) {
+    msg = `Клиенту "${name}" отправлено Первое предупреждение по задолженности в размере ${amount.toLocaleString()} ₸. Ссылка отправлена по Email.`;
+  } else if (nextLevel === 2) {
+    msg = `Клиенту "${name}" отправлено Второе досудебное предупреждение. Отправлено SMS логисту клиента.`;
+  } else {
+    msg = `Критический уровень! Клиент "${name}" заблокирован. Выписан судебный иск и предписание по ограничению выезда техники на объекты!`;
+  }
+  
+  alert(msg);
+  renderFinanceTreasury();
+  showSystemNotification(`Уровень предупреждения должника ${name} повышен до ${nextLevel}.`);
+}
+
+// ----------------------------------------------------
+// ТАКТИЛЬНАЯ ЗАЩИТА: HOLD-TO-CONFIRM И DOUBLE-CHECK
+// ----------------------------------------------------
+
+function initHoldToConfirmButtons() {
+  const buttons = document.querySelectorAll(".btn-hold-confirm");
+  buttons.forEach(btn => {
+    if (btn.holdHandlersRegistered) return;
+    
+    let timer = null;
+    
+    const startHold = (e) => {
+      e.preventDefault();
+      btn.classList.add("holding");
+      
+      timer = setTimeout(() => {
+        btn.classList.remove("holding");
+        // Выполняем экшен
+        executeHoldAction(btn);
+      }, 1200); // 1.2 секунды удержания
+    };
+    
+    const cancelHold = () => {
+      btn.classList.remove("holding");
+      if (timer) clearTimeout(timer);
+    };
+    
+    btn.addEventListener("mousedown", startHold);
+    btn.addEventListener("mouseup", cancelHold);
+    btn.addEventListener("mouseleave", cancelHold);
+    
+    btn.addEventListener("touchstart", startHold);
+    btn.addEventListener("touchend", cancelHold);
+    
+    btn.holdHandlersRegistered = true;
+  });
+}
+
+function executeHoldAction(btn) {
+  const action = btn.dataset.action;
+  if (action === "payAp") {
+    const id = btn.dataset.id;
+    const amount = parseInt(btn.dataset.amount) || 0;
+    
+    // Снимаем деньги со счета KZT
+    const balance = db.settings.bankKzt || 45200000;
+    if (balance < amount) {
+      alert("Недостаточно средств на счете Halyk Bank для проведения платежа!");
+      showSystemNotification("Ошибка оплаты: недостаточно средств.");
+      return;
+    }
+    
+    db.settings.bankKzt = balance - amount;
+    saveState();
+    
+    alert(`✓ Успешный платеж!\r\nСчет на сумму ${amount.toLocaleString()} ₸ оплачен со счета Halyk Bank.\r\nТранзакция TX-PAY-${Math.floor(Math.random()*90000+10000)} проведена.`);
+    renderFinanceTreasury();
+    showSystemNotification(`Счет поставщика успешно оплачен: -${amount.toLocaleString()} ₸`);
+  } else if (action === "resetDemo") {
+    resetDemoData();
+  } else if (action === "clearCache") {
+    clearSystemCache();
+  } else if (action === "materialWriteOff") {
+    submitAddMaterialLog();
+  }
+}
+
+// Повторное оборачивание рендера для тактильных эффектов и декорации
+const originalRenderAll = renderAll;
+renderAll = function() {
+  originalRenderAll();
+  initHoldToConfirmButtons();
+  applyPremiumStylesAndDecorators();
+};
+
+function updateMaterialSubmitButton() {
+  const typeEl = document.getElementById("mwoType");
+  const type = typeEl ? typeEl.value : "Приход";
+  const btn = document.getElementById("mwoSubmitBtn");
+  if (!btn) return;
+  
+  if (type === "Списание") {
+    btn.className = "btn-hold-confirm btn-primary";
+    btn.dataset.action = "materialWriteOff";
+    btn.removeAttribute("onclick");
+    btn.innerHTML = `<span class="hold-progress"></span><span>Зафиксировать списание (Удерживать)</span>`;
+    btn.holdHandlersRegistered = false;
+    initHoldToConfirmButtons();
+  } else {
+    btn.className = "btn-primary";
+    delete btn.dataset.action;
+    btn.setAttribute("onclick", "submitAddMaterialLog()");
+    btn.innerHTML = `Зафиксировать`;
+  }
+}
+
+function triggerDoubleCheck(btn, callback) {
+  if (btn.classList.contains("btn-double-confirm-pending")) {
+    // Second click: execute action
+    if (btn.doubleCheckTimeout) {
+      clearTimeout(btn.doubleCheckTimeout);
+      btn.doubleCheckTimeout = null;
+    }
+    resetDoubleCheckButton(btn);
+    if (typeof callback === "function") {
+      callback();
+    }
+  } else {
+    // First click: prompt double check
+    btn.classList.add("btn-double-confirm-pending");
+    btn.dataset.originalHtml = btn.innerHTML;
+    btn.innerHTML = "Подтвердите нажатие";
+    
+    btn.doubleCheckTimeout = setTimeout(() => {
+      resetDoubleCheckButton(btn);
+    }, 3000);
+  }
+}
+
+function resetDoubleCheckButton(btn) {
+  if (btn.classList.contains("btn-double-confirm-pending")) {
+    btn.classList.remove("btn-double-confirm-pending");
+    if (btn.dataset.originalHtml) {
+      btn.innerHTML = btn.dataset.originalHtml;
+      delete btn.dataset.originalHtml;
+    }
+    if (btn.doubleCheckTimeout) {
+      clearTimeout(btn.doubleCheckTimeout);
+      btn.doubleCheckTimeout = null;
+    }
+  }
+}
+
+function applyPremiumStylesAndDecorators() {
+  // 1. Декорируем кнопки закрытия модальных окон
+  document.querySelectorAll(".modal-close-btn").forEach(btn => {
+    if (btn.innerHTML.trim() === "×" || btn.innerHTML.trim() === "&times;") {
+      btn.innerHTML = `<svg viewBox="0 0 24 24" style="fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; width: 12px; height: 12px; display: block;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    }
+  });
+
+  // 2. Декорируем кнопки в футерах модальных окон (добавляем иконки)
+  const iconMap = {
+    "сохранить": `<svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>`,
+    "создать": `<svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`,
+    "зафиксировать": `<svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+    "добавить": `<svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`,
+    "удалить": `<svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: var(--status-danger); stroke-width: 2.2; fill: none; margin-right: 6px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`,
+    "провести": `<svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px;"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>`,
+    "отправить": `<svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px;"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`,
+    "печать": `<svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px;"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>`,
+    "выполнить": `<svg viewBox="0 0 24 24" style="width: 13px; height: 13px; stroke: currentColor; stroke-width: 2.2; fill: none; margin-right: 6px;"><polyline points="22 11.08 20 12 12 12 12 3 12.92 3.75"></polyline><path d="M22 4L12 14.01l-3-3"></path></svg>`
+  };
+
+  document.querySelectorAll(".modal-footer button, .modal-footer .btn-primary, .modal-footer .btn-secondary").forEach(btn => {
+    if (btn.classList.contains("modal-close-btn")) return;
+    if (btn.querySelector("svg") || btn.querySelector(".hold-progress")) return;
+
+    const txt = btn.textContent.trim().toLowerCase();
+    for (let key in iconMap) {
+      if (txt.includes(key)) {
+        btn.innerHTML = iconMap[key] + `<span>${btn.textContent.trim()}</span>`;
+        break;
+      }
+    }
+  });
+
+  // 3. Сканируем и декорируем все остальные обычные кнопки с текстовыми иконками/эмодзи
+  const appIconPatterns = [
+    { char: "+", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>` },
+    { char: "⚠", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:var(--status-danger); stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>` },
+    { char: "📥", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>` },
+    { char: "📤", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>` },
+    { char: "🔎", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>` },
+    { char: "🔍", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>` },
+    { char: "🗑️", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:var(--status-danger); stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>` },
+    { char: "🗑", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:var(--status-danger); stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>` },
+    { char: "⚙️", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>` },
+    { char: "⚙", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>` },
+    { char: "↩", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>` },
+    { char: "✓", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><polyline points="20 6 9 17 4 12"></polyline></svg>` },
+    { char: "→", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>` },
+    { char: "🔄", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>` },
+    { char: "💸", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>` },
+    { char: "📝", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>` },
+    { char: "📊", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>` },
+    { char: "📄", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>` },
+    { char: "📦", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5" rx="1"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>` },
+    { char: "🔧", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>` },
+    { char: "🚜", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><circle cx="7.5" cy="17.5" r="2.5"></circle><circle cx="18.5" cy="15.5" r="4.5"></circle><path d="M14 9V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v6h12a2 2 0 0 0 2-2zM8 11h4M18.5 11h-3M6 5h4"></path></svg>` },
+    { char: "🛡️", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>` },
+    { char: "🛡", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>` },
+    { char: "▶", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:currentColor; margin-right:6px; vertical-align:middle;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>` },
+    { char: "⏳", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>` },
+    { char: "✅", svg: `<svg viewBox="0 0 24 24" style="width:13px; height:13px; stroke:currentColor; stroke-width:2.2; fill:none; margin-right:6px; vertical-align:middle;"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>` }
+  ];
+
+  document.querySelectorAll("button, .btn-primary, .btn-secondary").forEach(btn => {
+    if (btn.classList.contains("modal-close-btn")) return;
+    if (btn.querySelector("svg") || btn.querySelector(".hold-progress")) return;
+
+    let content = btn.innerHTML.trim();
+    for (let item of appIconPatterns) {
+      if (content.startsWith(item.char)) {
+        const rest = content.substring(item.char.length).trim();
+        btn.innerHTML = item.svg + `<span>${rest}</span>`;
+        break;
+      }
+    }
+  });
+}
+
 

@@ -1026,6 +1026,125 @@ const initialData = {
     { id: "so_2", partSku: "OIL-ENG-5W40", partName: "Моторное масло 20л", qty: 5, price: 45000, total: 225000, supplier: "ТОО Helios OIL", status: "Доставлен", date: "2026-06-18" },
     { id: "so_3", partSku: "FIL-OIL-201", partName: "Фильтр масляный CAT (x5)", qty: 5, price: 18500, total: 92500, supplier: "ТОО Борусан Машинери", status: "В пути", date: "2026-06-20" },
     { id: "so_4", partSku: "OIL-ENG-1540", partName: "Масло Mobil Delvac 20л", qty: 2, price: 42000, total: 84000, supplier: "ТОО Helios OIL", status: "Оформлен", date: "2026-06-20" }
+  ],
+
+  // База потенциальных поставщиков
+  potentialSuppliers: [
+    { id: "ps_1", name: "ТОО «ЗапчастьИмпортКазахстан»", contact: "+7 701 445 88 12", city: "Атырау", category: "Запчасти КНР", rating: 4.8 },
+    { id: "ps_2", name: "ИП «СпецСнаб-Сервис»", contact: "+7 702 334 55 11", city: "Актау", category: "Гидравлика и РВД", rating: 4.2 },
+    { id: "ps_3", name: "ТОО «Каспий Нефть ГСМ»", contact: "+7 775 889 00 33", city: "Атырау", category: "Оптовое ДТ", rating: 4.5 }
+  ],
+
+  // Черный список HR
+  blacklist: [
+    { id: "bl_1", name: "Касымов А. К.", iin: "840219300181", position: "Машинист автокрана", category: "сторонний", blockReason: "Систематическое употребление алкоголя в смене", blockDate: "2026-05-10", notes: "Был нанят по субаренде от ТОО «Каспий Спец Техника». Уволен со скандалом на объекте Карабатан." },
+    { id: "bl_2", name: "Рахимов Б. С.", iin: "910512300422", position: "Водитель самосвала", category: "собственный", blockReason: "Кража ГСМ (слив дизеля 150 литров)", blockDate: "2026-06-02", notes: "Камера зафиксировала слив из бака ночью. Удержано 50% ФОТ, уволен по отрицательным мотивам." }
+  ],
+
+  // Табели учета рабочего времени (Табелирование)
+  timesheets: [
+    {
+      id: "ts_1",
+      month: "2026-06",
+      vehicleId: "v101",
+      driverHistory: [
+        { day: 1, driverId: "d101" }, { day: 2, driverId: "d101" }, { day: 3, driverId: "d101" }, { day: 4, driverId: "d101" }, { day: 5, driverId: "d101" },
+        { day: 6, driverId: "d101" }, { day: 7, driverId: "d101" }, { day: 8, driverId: "d101" }, { day: 9, driverId: "d101" }, { day: 10, driverId: "d101" },
+        { day: 11, driverId: "d101" }, { day: 12, driverId: "d101" }, { day: 13, driverId: "d101" }, { day: 14, driverId: "d101" }, { day: 15, driverId: "d101" },
+        // Водитель заменен на d102 с 16 по 20 июня
+        { day: 16, driverId: "d102" }, { day: 17, driverId: "d102" }, { day: 18, driverId: "d102" }, { day: 19, driverId: "d102" }, { day: 20, driverId: "d102" },
+        { day: 21, driverId: "d101" }, { day: 22, driverId: "d101" }, { day: 23, driverId: "d101" }, { day: 24, driverId: "d101" }, { day: 25, driverId: "d101" },
+        { day: 26, driverId: "d101" }, { day: 27, driverId: "d101" }, { day: 28, driverId: "d101" }, { day: 29, driverId: "d101" }, { day: 30, driverId: "d101" }
+      ],
+      dailyStatus: {
+        1:"W", 2:"W", 3:"W", 4:"W", 5:"W", 6:"O", 7:"O", 8:"W", 9:"W", 10:"W", 11:"W", 12:"W", 13:"O", 14:"O", 15:"W",
+        16:"W", 17:"W", 18:"W", 19:"W", 20:"W", 21:"O", 22:"O", 23:"W", 24:"W", 25:"W", 26:"W", 27:"W", 28:"O", 29:"O", 30:"W"
+      },
+      mechanicApproved: true,
+      hrApproved: false,
+      directorApproved: false
+    },
+    {
+      id: "ts_2",
+      month: "2026-06",
+      vehicleId: "v103",
+      driverHistory: [
+        { day: 1, driverId: "d103" }, { day: 2, driverId: "d103" }, { day: 3, driverId: "d103" }, { day: 4, driverId: "d103" }, { day: 5, driverId: "d103" },
+        { day: 6, driverId: "d103" }, { day: 7, driverId: "d103" }, { day: 8, driverId: "d103" }, { day: 9, driverId: "d103" }, { day: 10, driverId: "d103" },
+        { day: 11, driverId: "d103" }, { day: 12, driverId: "d103" }, { day: 13, driverId: "d103" }, { day: 14, driverId: "d103" }, { day: 15, driverId: "d103" },
+        { day: 16, driverId: "d103" }, { day: 17, driverId: "d103" }, { day: 18, driverId: "d103" }, { day: 19, driverId: "d103" }, { day: 20, driverId: "d103" },
+        { day: 21, driverId: "d103" }, { day: 22, driverId: "d103" }, { day: 23, driverId: "d103" }, { day: 24, driverId: "d103" }, { day: 25, driverId: "d103" },
+        { day: 26, driverId: "d103" }, { day: 27, driverId: "d103" }, { day: 28, driverId: "d103" }, { day: 29, driverId: "d103" }, { day: 30, driverId: "d103" }
+      ],
+      dailyStatus: {
+        1:"W", 2:"W", 3:"W", 4:"W", 5:"W", 6:"O", 7:"O", 8:"W", 9:"W", 10:"W", 11:"W", 12:"W", 13:"O", 14:"O", 15:"W",
+        16:"W", 17:"W", 18:"W", 19:"W", 20:"W", 21:"O", 22:"O", 23:"W", 24:"W", 25:"W", 26:"W", 27:"W", 28:"O", 29:"O", 30:"W"
+      },
+      mechanicApproved: true,
+      hrApproved: true,
+      directorApproved: true
+    }
+  ],
+
+  // Авансы поставщиков
+  supplierAdvances: [
+    { id: "sa_1", supplierName: "ТОО «Helios OIL»", date: "2026-06-15", amount: 1500000, purpose: "Предоплата за ДТ по топливным картам" },
+    { id: "sa_2", supplierName: "ТОО «Борусан Машинери»", date: "2026-06-18", amount: 800000, purpose: "Аванс за гидравлические цилиндры CAT" }
+  ],
+
+  // Курсы валют
+  currencyRates: {
+    USD: 448.50,
+    EUR: 480.20,
+    RUB: 5.12
+  },
+
+  // Баланс банковских счетов
+  bankBalances: [
+    { id: "bb_1", bankName: "АО «Halyk Bank»", currency: "KZT", balance: 14500000 },
+    { id: "bb_2", bankName: "АО «ForteBank»", currency: "USD", balance: 25000 }
+  ],
+
+  // Заявки на корочки ТБ
+  safetyCertRequests: [
+    { id: "scr_1", employeeName: "Жусупов Б. Н.", vehicleName: "Гусеничный экскаватор CAT 320", requestDate: "2026-06-20", status: "В обработке" },
+    { id: "scr_2", employeeName: "Сериков А. С.", vehicleName: "Автокран Zoomlion 25t", requestDate: "2026-06-21", status: "Оформлено" }
+  ],
+
+  // Журнал списания/прихода материалов
+  materialsWriteOffs: [
+    { id: "mwo_1", date: "2026-06-18", type: "Приход", itemName: "Фильтр воздушный Shacman", qty: 10, source: "Поставщик ИП ШансиЗапчасть", price: 24000 },
+    { id: "mwo_2", date: "2026-06-19", type: "Списание", itemName: "Фильтр масляный CAT 320", qty: 2, source: "Списание под ТО-2 (v103)", price: 18500 }
+  ],
+
+  // Реестр договоров (менеджер)
+  contracts: [
+    {
+      id: "cnt_1",
+      number: "Д-06/2026-11",
+      companyName: "ТОО «АтырауНефть»",
+      dateCreated: "2026-06-10",
+      dateEnd: "2026-12-31",
+      vehicleType: "Автокран, Экскаватор",
+      plateNumber: "714 ADE 06, 8823 AT 06",
+      ownerContact: "+7 701 456 1212 (Жолдасов Б.)",
+      accountantContact: "+7 7122 35 44 12 (Гульсим)",
+      isSubrent: false,
+      status: "Активен"
+    },
+    {
+      id: "cnt_2",
+      number: "Д-05/2026-02",
+      companyName: "ТОО «Каспий Спец Техника»",
+      dateCreated: "2026-05-01",
+      dateEnd: "2026-09-01",
+      vehicleType: "Автокран (Grove 100t)",
+      plateNumber: "109 MKA 02",
+      ownerContact: "+7 701 888 2233 (Смаков А.)",
+      accountantContact: "+7 7122 90 90 10 (Асель)",
+      isSubrent: true,
+      status: "Активен"
+    }
   ]
 };
 

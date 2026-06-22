@@ -47,7 +47,9 @@ try {
             }
             
             $response.ContentLength64 = $bytes.Length
-            $response.OutputStream.Write($bytes, 0, $bytes.Length)
+            if ($request.HttpMethod -ne "HEAD") {
+                $response.OutputStream.Write($bytes, 0, $bytes.Length)
+            }
         } else {
             $response.StatusCode = 404
             $errBytes = [System.Text.Encoding]::UTF8.GetBytes("File Not Found")
