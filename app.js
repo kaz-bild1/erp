@@ -7614,7 +7614,6 @@ function viewContractPrintForm(contractId) {
       <div class="a4-footer">
         <div class="a4-stamp-box">
           <span style="font-size:10px;">Директор ТОО «KBI»</span>
-          <img class="a4-seal-img" src="https://static.tildacdn.com/tild3534-3135-4330-b333-316531393666/seal_kaz.png" alt="Печать" style="display:none;" /> <!-- Заглушка, подгружается при печати -->
           <div style="font-size:9px; color:#555; position:absolute; top:20px; left:40px; font-weight:bold; border: 2px solid #2563EB; border-radius:50%; width:70px; height:70px; display:flex; align-items:center; justify-content:center; color:#2563EB; transform:rotate(-15deg); opacity:0.85;">ПЕЧАТЬ ТОО</div>
         </div>
         <div class="a4-stamp-box">
