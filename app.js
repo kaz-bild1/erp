@@ -154,8 +154,25 @@ function changeActiveRole() {
   renderAll();
 }
 
+function resetBlockedRole() {
+  document.getElementById("roleSelector").value = "Director";
+  changeActiveRole();
+}
+
 function applyRolePermissions() {
   const role = db.settings.activeRole;
+  
+  // Проверка блокировки доступа
+  const overlay = document.getElementById("accessBlockedOverlay");
+  if (overlay) {
+    const user = db.users ? db.users.find(u => u.role === role) : null;
+    const isBlocked = user && db.orgNodes ? db.orgNodes.some(n => n.userId === user.id && n.isBlocked) : false;
+    if (isBlocked) {
+      overlay.style.display = "flex";
+    } else {
+      overlay.style.display = "none";
+    }
+  }
   
   // Скрытие вкладок меню по ролям
   const allMenuItems = document.querySelectorAll(".sidebar .menu-item");
@@ -916,6 +933,13 @@ function initMap() {
       weight: 2
     }).addTo(window.map);
     
+    polygon.on('mouseover', function () {
+      this.setStyle({ fillOpacity: 0.35, weight: 3 });
+    });
+    polygon.on('mouseout', function () {
+      this.setStyle({ fillOpacity: 0.15, weight: 2 });
+    });
+
     polygon.bindTooltip(`Геозона: ${site.name}`, { permanent: false, direction: "center" });
     window.geofenceLayers[site.id] = polygon;
   });
@@ -1029,6 +1053,9 @@ function toggleGpsMovementSimulation() {
   showSystemNotification(isGpsSimulating ? "GPS симуляция движения включена" : "GPS симуляция приостановлена");
 }
 
+window.activeGpsFilter = 'all';
+window.selectedGpsVehicleId = null;
+
 function renderGpsVehicleList() {
   const container = document.getElementById("gpsVehicleList");
   if (!container) return;
@@ -1037,7 +1064,11 @@ function renderGpsVehicleList() {
   
   const searchVal = (document.getElementById("gpsVehicleSearch")?.value || "").trim().toLowerCase();
   
+  // Пересчитать KPI метрики
+  updateGpsKpis();
+
   db.vehicles.forEach(v => {
+    // 1. Поисковый фильтр
     if (searchVal) {
       const nameMatch = v.name && v.name.toLowerCase().includes(searchVal);
       const plateMatch = v.plate && v.plate.toLowerCase().includes(searchVal);
@@ -1047,38 +1078,39 @@ function renderGpsVehicleList() {
       }
     }
     
-    let color = '#2E7D32'; 
-    if (v.ownerType === 'subrent') color = '#9C27B0'; 
-    if (v.status === 'На ремонте' || v.status === 'Неисправна') color = '#C62828'; 
+    // 2. Фильтр статусов по KPI-карточкам
+    const isActive = v.status === 'Работает' || v.status === 'В пути';
+    const isRepair = v.status === 'На ремонте' || v.status === 'Неисправна';
+    const isIdle = v.status === 'Простой' || v.status === 'Стоит' || (!isActive && !isRepair);
+
+    if (window.activeGpsFilter === 'active' && !isActive) return;
+    if (window.activeGpsFilter === 'idle' && !isIdle) return;
+    if (window.activeGpsFilter === 'repair' && !isRepair) return;
+
+    let dotColor = '#2E7D32'; 
+    if (v.ownerType === 'subrent') dotColor = '#9C27B0'; 
+    if (isRepair) dotColor = '#C62828'; 
     
     const item = document.createElement("div");
     item.className = "vehicle-list-item";
-    item.style.cssText = `
-      padding: 10px 12px;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
-      background-color: var(--bg-card);
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      transition: all 0.2s ease;
-    `;
-    
-    item.addEventListener('mouseenter', () => {
-      item.style.backgroundColor = 'var(--bg-secondary)';
-      item.style.borderColor = 'var(--brand-color)';
-    });
-    item.addEventListener('mouseleave', () => {
-      item.style.backgroundColor = 'var(--bg-card)';
-      item.style.borderColor = 'var(--border-color)';
-    });
+    if (window.selectedGpsVehicleId === v.id) {
+      item.classList.add("selected");
+    }
     
     item.addEventListener('click', () => {
+      // Снять выделение со всех и добавить текущему
+      const items = container.querySelectorAll(".vehicle-list-item");
+      items.forEach(el => el.classList.remove("selected"));
+      item.classList.add("selected");
+      window.selectedGpsVehicleId = v.id;
+
+      // Найти маркер и плавно пролететь к нему
       const markerInfo = window.vehicleMarkers[v.id];
       if (markerInfo && window.map) {
-        window.map.setView([markerInfo.lat, markerInfo.lng], 12);
-        markerInfo.marker.openPopup();
+        window.map.flyTo([markerInfo.lat, markerInfo.lng], 13, { animate: true, duration: 1.2 });
+        setTimeout(() => {
+          markerInfo.marker.openPopup();
+        }, 1200);
       }
     });
     
@@ -1087,7 +1119,7 @@ function renderGpsVehicleList() {
     item.innerHTML = `
       <div style="display: flex; align-items: center; justify-content: space-between;">
         <span style="font-weight: 600; font-size: 13px; color: var(--text-primary); text-overflow: ellipsis; white-space: nowrap; overflow: hidden; max-width: 80%;">${v.name}</span>
-        <div style="background-color: ${color}; width: 8px; height: 8px; border-radius: 50%;" title="${v.ownerType === 'subrent' ? 'Субаренда' : 'Собственная'}"></div>
+        <div style="background-color: ${dotColor}; width: 8px; height: 8px; border-radius: 50%;" title="${v.ownerType === 'subrent' ? 'Субаренда' : 'Собственная'}"></div>
       </div>
       <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary);">
         <span>${v.plate}</span>
@@ -1095,7 +1127,7 @@ function renderGpsVehicleList() {
       </div>
       <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-top: 2px;">
         <span style="color: var(--text-secondary); text-overflow: ellipsis; white-space: nowrap; overflow: hidden; max-width: 60%;">${driver ? driver.name.split(' ')[0] : 'Нет водителя'}</span>
-        <span class="badge ${v.status === 'На ремонте' || v.status === 'Неисправна' ? 'badge-danger' : (v.status === 'Работает' || v.status === 'В пути' ? 'badge-success' : 'badge-neutral')}" style="font-size: 9px; padding: 2px 4px; text-transform: none;">
+        <span class="badge ${isRepair ? 'badge-danger' : (isActive ? 'badge-success' : 'badge-neutral')}" style="font-size: 9px; padding: 2px 4px; text-transform: none;">
           ${v.status}
         </span>
       </div>
@@ -1103,6 +1135,73 @@ function renderGpsVehicleList() {
     
     container.appendChild(item);
   });
+}
+
+function updateGpsKpis() {
+  if (!db.vehicles) return;
+  
+  let total = db.vehicles.length;
+  let active = 0;
+  let repair = 0;
+  let idle = 0;
+
+  db.vehicles.forEach(v => {
+    const isActive = v.status === 'Работает' || v.status === 'В пути';
+    const isRepair = v.status === 'На ремонте' || v.status === 'Неисправна';
+    if (isActive) active++;
+    else if (isRepair) repair++;
+    else idle++;
+  });
+
+  const allVal = document.getElementById("gpsKpiVal-all");
+  const activeVal = document.getElementById("gpsKpiVal-active");
+  const idleVal = document.getElementById("gpsKpiVal-idle");
+  const repairVal = document.getElementById("gpsKpiVal-repair");
+
+  if (allVal) allVal.textContent = total;
+  if (activeVal) activeVal.textContent = active;
+  if (idleVal) idleVal.textContent = idle;
+  if (repairVal) repairVal.textContent = repair;
+}
+
+function filterGpsList(filterType) {
+  window.activeGpsFilter = filterType;
+  
+  const cards = ["all", "active", "idle", "repair"];
+  cards.forEach(c => {
+    const cardEl = document.getElementById(`gpsKpiCard-${c}`);
+    if (cardEl) {
+      if (c === filterType) cardEl.classList.add("active");
+      else cardEl.classList.remove("active");
+    }
+  });
+
+  renderGpsVehicleList();
+}
+
+function switchMapLayer(layerType) {
+  const darkUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  const lightUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+  const satelliteUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+  
+  const theme = document.documentElement.getAttribute("data-theme") || "light";
+  let targetUrl = theme === 'dark' ? darkUrl : lightUrl;
+  
+  const btnSchema = document.getElementById("btnMapSchema");
+  const btnSat = document.getElementById("btnMapSatellite");
+
+  if (layerType === 'satellite') {
+    targetUrl = satelliteUrl;
+    if (btnSat) btnSat.classList.add("active");
+    if (btnSchema) btnSchema.classList.remove("active");
+  } else {
+    if (btnSat) btnSat.classList.remove("active");
+    if (btnSchema) btnSchema.classList.add("active");
+  }
+  
+  if (window.map && window.lightTiles) {
+    window.lightTiles.setUrl(targetUrl);
+  }
 }
 
 function filterGpsVehicleList() {
@@ -1116,20 +1215,12 @@ function filterGpsVehicleList() {
 
 function renderFuelTable() {
   const table = document.getElementById("fuelVerificationTable");
-  if (!table) return;
+  if (!table || !db.fuelShifts) return;
   
   const tbody = table.querySelector("tbody");
   tbody.innerHTML = "";
   
-  // Симуляция данных сверки смены
-  // Сформируем список смен
-  const shiftLogs = [
-    { vehicleId: "v101", driverId: "d101", vStart: 120, vEnd: 195, vFill: 120, N: 12.5, tHours: 3.5, delta: 0.5, status: "Норма" },
-    { vehicleId: "v103", driverId: "d103", vStart: 300, vEnd: 170, vFill: 0, N: 15.0, tHours: 8.0, delta: 10.0, status: "Подозрение на слив" },
-    { vehicleId: "v107", driverId: "d107", vStart: 450, vEnd: 460, vFill: 250, N: 28.0, tHours: 8.5, delta: 2.0, status: "Норма" }
-  ];
-  
-  shiftLogs.forEach(log => {
+  db.fuelShifts.forEach(log => {
     const v = db.vehicles.find(x => x.id === log.vehicleId);
     const d = db.drivers.find(x => x.id === log.driverId);
     if (!v || !d) return;
@@ -1138,51 +1229,362 @@ function renderFuelTable() {
     const calculatedUsed = log.N * log.tHours;
     const formulaEnd = log.vStart + log.vFill - calculatedUsed;
     const deltaLiters = Math.abs(formulaEnd - log.vEnd);
-    const deltaPercent = ((deltaLiters / log.vStart) * 100).toFixed(1);
+    const deltaPercent = log.vStart > 0 ? ((deltaLiters / log.vStart) * 100).toFixed(1) : "0.0";
     
     const isTheft = log.status === "Подозрение на слив";
+    const isJustified = log.status === "Оправдано";
+    const isFined = log.status === "Списано с ЗП";
+    
+    // Определение цвета строки и значка
+    let rowBg = "";
+    let statusClass = "badge-success";
+    if (isTheft) {
+      rowBg = "rgba(220, 38, 38, 0.05)";
+      statusClass = "badge-danger";
+    } else if (isJustified) {
+      rowBg = "rgba(16, 185, 129, 0.05)";
+      statusClass = "badge-success";
+    } else if (isFined) {
+      rowBg = "rgba(75, 85, 99, 0.05)";
+      statusClass = "badge-neutral";
+    }
     
     const tr = document.createElement("tr");
+    if (rowBg) tr.style.backgroundColor = rowBg;
+    
     tr.innerHTML = `
       <td><strong>${v.invNumber}</strong><br><span style="font-size:11px;color:var(--text-secondary);">${v.name}</span></td>
-      <td>${d.name}</td>
-      <td>${log.vStart}л / ${log.vEnd}л</td>
-      <td>+${log.vFill}л (Чеки АЗС)</td>
+      <td><strong>${d.name}</strong></td>
+      <td>${log.vStart}л &rarr; ${log.vEnd}л</td>
+      <td>+${log.vFill}л (Чеки)</td>
       <td>${log.tHours} ч</td>
       <td>${log.N} л/ч</td>
-      <td><strong style="color: ${isTheft ? 'var(--status-danger)' : 'var(--status-success)'};">${deltaLiters.toFixed(1)} л (${deltaPercent}%)</strong></td>
-      <td><span class="badge ${isTheft ? 'badge-danger' : 'badge-success'}">${log.status}</span></td>
       <td>
-        ${isTheft ? `<button class="btn-primary" style="font-size:11px; padding:4px 8px; background-color:var(--status-danger);" onclick="processFuelTheftDeduction('${d.id}', ${deltaLiters})">Списать ЗП</button>` : `<span class="badge badge-neutral" style="font-size:10px;">Проверено</span>`}
+        <strong style="color: ${isTheft ? 'var(--status-danger)' : 'var(--status-success)'};">
+          ${deltaLiters.toFixed(1)} л (${deltaPercent}%)
+        </strong>
+      </td>
+      <td>
+        <span class="badge ${statusClass}">${log.status}</span>
+        ${log.comment ? `<br><span style="font-size:10px; color:var(--text-secondary); font-style:italic;">"${log.comment}"</span>` : ""}
+      </td>
+      <td>
+        <div style="display: flex; gap: 6px;">
+          ${isTheft ? `
+            <button class="btn-primary" style="font-size:10px; padding:4px 8px; background-color:var(--status-danger); border-color:var(--status-danger);" onclick="processFuelShiftDeduction('${log.id}')">Списать</button>
+            <button class="btn-secondary" style="font-size:10px; padding:4px 8px;" onclick="justifyFuelShift('${log.id}')">Оправдать</button>
+          ` : `<span class="badge badge-neutral" style="font-size:10px;">Действий нет</span>`}
+        </div>
       </td>
     `;
     tbody.appendChild(tr);
   });
+  
+  renderFuelKPIs();
+  renderFuelRefillsList();
 }
 
-// Проведение списания
-function processFuelTheftDeduction(driverId, liters) {
+function renderFuelKPIs() {
+  if (!db.fuelTransactions || !db.fuelShifts) return;
+  
+  // 1. Всего заправлено
+  const totalLitersFilled = db.fuelTransactions.reduce((sum, t) => sum + t.liters, 0);
+  const totalLitersMock = 1820; 
+  const fillKpi = document.getElementById("fuelKpiTotalFilled");
+  if (fillKpi) fillKpi.textContent = (totalLitersMock + totalLitersFilled).toLocaleString() + " л";
+  
+  // 2. Сливов зафиксировано
+  const theftShifts = db.fuelShifts.filter(s => s.status === "Подозрение на слив" || s.status === "Списано с ЗП");
+  const theftLiters = theftShifts.reduce((sum, s) => {
+    const calcUsed = s.N * s.tHours;
+    const endCalc = s.vStart + s.vFill - calcUsed;
+    return sum + Math.abs(endCalc - s.vEnd);
+  }, 0);
+  
+  const theftsKpi = document.getElementById("fuelKpiTotalThefts");
+  if (theftsKpi) theftsKpi.textContent = theftShifts.length + " смен";
+  
+  const theftsLitersKpi = document.getElementById("fuelKpiTotalTheftLiters");
+  if (theftsLitersKpi) theftsLitersKpi.textContent = theftLiters.toFixed(1) + " л расхождений";
+  
+  // 3. Сумма удержаний (штрафов)
+  const totalFines = db.drivers.reduce((sum, d) => sum + (d.fuelDeduction || 0), 0);
+  const finesKpi = document.getElementById("fuelKpiTotalFines");
+  if (finesKpi) finesKpi.textContent = totalFines.toLocaleString() + " ₸";
+}
+
+function renderFuelRefillsList() {
+  const container = document.getElementById("fuelRefillReceiptsList");
+  if (!container || !db.fuelTransactions) return;
+  
+  if (db.fuelTransactions.length === 0) {
+    container.innerHTML = `<div style="text-align:center; color:var(--text-secondary); padding: 12px 0;">Нет зарегистрированных чеков</div>`;
+    return;
+  }
+  
+  container.innerHTML = db.fuelTransactions.map(t => {
+    const v = db.vehicles.find(x => x.id === t.vehicleId);
+    const d = db.drivers.find(x => x.id === t.driverId);
+    return `
+      <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; display:flex; flex-direction:column; gap:4px;">
+        <div style="display:flex; justify-content:space-between; font-weight:700;">
+          <span>${v ? v.invNumber : t.vehicleId}</span>
+          <span style="color:var(--brand-color);">+${t.liters} л</span>
+        </div>
+        <div style="color:var(--text-secondary); font-size:11px; display:flex; justify-content:space-between;">
+          <span>Водитель: ${d ? d.name.split(" ")[0] : t.driverId}</span>
+          <span>${t.date}</span>
+        </div>
+        <div style="font-size:10px; border-top:1px dashed var(--border-color); padding-top:4px; margin-top:2px; display:flex; justify-content:space-between;">
+          <span>${t.checkNum}</span>
+          <strong>${t.cost.toLocaleString()} ₸</strong>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function openRegisterFuelRefillModal() {
+  const form = document.getElementById("registerFuelRefillForm");
+  if (form) form.reset();
+  
+  const now = new Date();
+  document.getElementById("refillDate").value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  
+  // Заполняем ТС
+  const vSelect = document.getElementById("refillVehicleSelect");
+  if (vSelect) {
+    vSelect.innerHTML = db.vehicles.map(v => `<option value="${v.id}">${v.invNumber} (${v.name})</option>`).join("");
+  }
+  
+  // Заполняем водителей
+  const dSelect = document.getElementById("refillDriverSelect");
+  if (dSelect) {
+    dSelect.innerHTML = db.drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join("");
+  }
+  
+  openModal("registerFuelRefillModal");
+}
+
+function submitRegisterFuelRefill() {
+  const vehicleId = document.getElementById("refillVehicleSelect").value;
+  const driverId = document.getElementById("refillDriverSelect").value;
+  const liters = parseFloat(document.getElementById("refillLiters").value);
+  const checkNum = document.getElementById("refillCheckNum").value.trim();
+  const price = parseFloat(document.getElementById("refillPrice").value);
+  const date = document.getElementById("refillDate").value;
+  
+  if (!vehicleId || !driverId || isNaN(liters) || !checkNum || isNaN(price) || !date) {
+    alert("Заполните все обязательные поля!");
+    return;
+  }
+  
+  const cost = Math.round(liters * price);
+  const refillId = "ft_" + (db.fuelTransactions.length + 1);
+  
+  // 1. Добавляем в реестр транзакций
+  db.fuelTransactions.push({
+    id: refillId,
+    vehicleId: vehicleId,
+    driverId: driverId,
+    liters: liters,
+    checkNum: checkNum,
+    price: price,
+    cost: cost,
+    date: date
+  });
+  
+  // 2. Отражаем в финансах (добавляем запись в лог топлива)
+  if (!db.fuelLogs) db.fuelLogs = [];
+  db.fuelLogs.push({
+    id: "fl_" + (db.fuelLogs.length + 1),
+    vehicleId: vehicleId,
+    driverId: driverId,
+    liters: liters,
+    cost: cost,
+    fuelType: "ДТ",
+    fuelCard: `CARD-REF-${refillId}`,
+    date: date
+  });
+  
+  // 3. Обновляем дельту в верификации смен
+  const shift = db.fuelShifts.find(s => s.vehicleId === vehicleId && s.driverId === driverId && (s.status === "Норма" || s.status === "Подозрение на слив"));
+  if (shift) {
+    shift.vFill += liters;
+    // Пересчитаем статус
+    const calculatedUsed = shift.N * shift.tHours;
+    const formulaEnd = shift.vStart + shift.vFill - calculatedUsed;
+    const deltaLiters = Math.abs(formulaEnd - shift.vEnd);
+    if (deltaLiters > 10.0) {
+      shift.status = "Подозрение на слив";
+    } else {
+      shift.status = "Норма";
+    }
+  } else {
+    // Создаем новую запись о смене на основе заправки
+    db.fuelShifts.push({
+      id: "fs_" + (db.fuelShifts.length + 1) + "_" + Math.floor(Math.random() * 100),
+      vehicleId: vehicleId,
+      driverId: driverId,
+      vStart: 150,
+      vEnd: 150 + liters - 45, 
+      vFill: liters,
+      N: 15.0,
+      tHours: 3.0,
+      status: "Норма",
+      comment: "Сгенерировано автоматически по чеку АЗС"
+    });
+  }
+  
+  logUserAction(getActiveUsername(), `Зарегистрирован чек АЗС ${checkNum} на ${liters} л (${cost.toLocaleString()} ₸)`, "ГСМ", "success");
+  saveState();
+  closeModal("registerFuelRefillModal");
+  renderFuelTable();
+  showSystemNotification("Чек АЗС зарегистрирован и проверен системой ГПС!");
+}
+
+function openDeductSalaryModal() {
+  const form = document.getElementById("deductSalaryForm");
+  if (form) form.reset();
+  
+  const now = new Date();
+  document.getElementById("deductDate").value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  
+  // Заполняем водителей
+  const dSelect = document.getElementById("deductDriverSelect");
+  if (dSelect) {
+    dSelect.innerHTML = db.drivers.map(d => `<option value="${d.id}">${d.name}</option>`).join("");
+  }
+  
+  updateDeductSalaryCalculation();
+  openModal("deductSalaryModal");
+}
+
+function updateDeductSalaryCalculation() {
+  const liters = parseFloat(document.getElementById("deductLiters").value) || 0;
+  const fine = Math.round(liters * 295);
+  const display = document.getElementById("deductSalaryTotalFineDisplay");
+  if (display) display.textContent = fine.toLocaleString() + " ₸";
+}
+
+function submitDeductSalary() {
+  const driverId = document.getElementById("deductDriverSelect").value;
+  const liters = parseFloat(document.getElementById("deductLiters").value);
+  const reason = document.getElementById("deductReason").value.trim();
+  const date = document.getElementById("deductDate").value;
+  
+  if (!driverId || isNaN(liters) || !reason || !date) {
+    alert("Заполните все обязательные поля!");
+    return;
+  }
+  
+  const fine = Math.round(liters * 295);
   const driver = db.drivers.find(d => d.id === driverId);
   if (!driver) return;
   
-  const pricePerLiter = 295;
-  const totalFine = Math.round(liters * pricePerLiter);
+  driver.fuelDeduction = (driver.fuelDeduction || 0) + fine;
   
-  driver.fuelDeduction += totalFine;
+  db.fuelShifts.push({
+    id: "fs_ded_" + Math.floor(Math.random() * 1000),
+    vehicleId: "v101", 
+    driverId: driverId,
+    vStart: 200,
+    vEnd: 200 - liters,
+    vFill: 0,
+    N: 0,
+    tHours: 0,
+    status: "Списано с ЗП",
+    comment: `${reason} (${liters} л)`
+  });
+  
+  logUserAction(getActiveUsername(), `Удержание ГСМ с ${driver.name}: ${fine} ₸ за ${liters} л`, "ФОТ/ГСМ", "danger");
   saveState();
-  
+  closeModal("deductSalaryModal");
   renderFuelTable();
   renderEmployeesTable();
-  showSystemNotification(`Зафиксировано удержание ГСМ с водителя ${driver.name} на сумму ${totalFine.toLocaleString()} ₸ (Слив ${liters.toFixed(1)} л)`);
+  showSystemNotification(`Оформлено удержание стоимости топлива в размере ${fine.toLocaleString()} ₸.`);
+}
+
+function processFuelShiftDeduction(shiftId) {
+  const shift = db.fuelShifts.find(s => s.id === shiftId);
+  if (!shift) return;
+  
+  const driver = db.drivers.find(d => d.id === shift.driverId);
+  if (!driver) return;
+  
+  const calculatedUsed = shift.N * shift.tHours;
+  const formulaEnd = shift.vStart + shift.vFill - calculatedUsed;
+  const deltaLiters = Math.abs(formulaEnd - shift.vEnd);
+  
+  const price = 295;
+  const fine = Math.round(deltaLiters * price);
+  
+  driver.fuelDeduction = (driver.fuelDeduction || 0) + fine;
+  shift.status = "Списано с ЗП";
+  shift.comment = `Удержано автоматически по расхождению ΔV = ${deltaLiters.toFixed(1)} л`;
+  
+  logUserAction(getActiveUsername(), `Удержание ГСМ с ${driver.name}: ${fine} ₸ за ${deltaLiters.toFixed(1)} л`, "ФОТ/ГСМ", "danger");
+  saveState();
+  renderFuelTable();
+  renderEmployeesTable();
+  showSystemNotification(`Оформлено списание стоимости слива с ЗП водителя ${driver.name} на сумму ${fine.toLocaleString()} ₸.`);
+}
+
+function justifyFuelShift(shiftId) {
+  const comment = prompt("Введите причину оправдания перерасхода ГСМ:");
+  if (comment === null) return; 
+  const cleanComment = comment.trim();
+  if (!cleanComment) {
+    alert("Причина обязательна для оправдания слива!");
+    return;
+  }
+  
+  const shift = db.fuelShifts.find(s => s.id === shiftId);
+  if (!shift) return;
+  
+  shift.status = "Оправдано";
+  shift.comment = cleanComment;
+  
+  logUserAction(getActiveUsername(), `Оправдан слив по смене ${shiftId}. Причина: ${cleanComment}`, "ГСМ", "info");
+  saveState();
+  renderFuelTable();
+  showSystemNotification("Расход ГСМ оправдан. Статус смены изменен.");
 }
 
 function simulateNormalFuelClose() {
-  showSystemNotification("Смена закрыта успешно. Расхождения ГСМ в пределах нормы (ΔV = +0.8%).");
+  db.fuelShifts.push({
+    id: "fs_sim_" + Math.floor(Math.random() * 1000),
+    vehicleId: "v101",
+    driverId: "d101",
+    vStart: 150,
+    vEnd: 105,
+    vFill: 0,
+    N: 12.5,
+    tHours: 3.5,
+    status: "Норма",
+    comment: "Симуляция нормальной смены"
+  });
+  saveState();
+  renderFuelTable();
+  showSystemNotification("Симуляция: Смена закрыта успешно. Расхождения в пределах нормы.");
 }
 
 function simulateFuelTheftClose() {
-  // Вызываем списание ГСМ на водителя Жусупова
-  processFuelTheftDeduction('d103', 18.5);
+  db.fuelShifts.push({
+    id: "fs_sim_" + Math.floor(Math.random() * 1000),
+    vehicleId: "v103",
+    driverId: "d103",
+    vStart: 300,
+    vEnd: 150, 
+    vFill: 0,
+    N: 15.0,
+    tHours: 8.0,
+    status: "Подозрение на слив",
+    comment: "Симуляция слива (ΔV = 30 л)"
+  });
+  saveState();
+  renderFuelTable();
+  showSystemNotification("Симуляция: Обнаружено расхождение по смене водителя Жусупова. Статус: Подозрение на слив!");
 }
 
 
@@ -2546,12 +2948,12 @@ function approveAllPayrollSlips() {
 function getVehicleInvNumber(vId) {
   if (!vId) return "-";
   const v = db.vehicles.find(x => x.id === vId);
-  return v ? v.invNumber : "-";
+  return v ? v.invNumber : vId;
 }
 function getVehicleName(vId) {
   if (!vId) return "Без техники";
   const v = db.vehicles.find(x => x.id === vId);
-  return v ? v.name : "Без техники";
+  return v ? v.name : vId;
 }
 function getVehiclePlate(vId) {
   if (!vId) return "";
@@ -2561,7 +2963,7 @@ function getVehiclePlate(vId) {
 function getSiteName(sId) {
   if (!sId) return "База Атырау";
   const s = db.sites.find(x => x.id === sId);
-  return s ? s.name : "База Атырау";
+  return s ? s.name : sId;
 }
 function getDriverName(dId) {
   if (!dId) return "Не назначен";
@@ -3153,7 +3555,6 @@ function renderTasksKanban() {
     card.className = `task-card ${isOverdue ? 'overdue' : ''}`;
     card.draggable = true;
     card.id = `task-card-${t.id}`;
-    card.style.borderLeft = `3px solid ${taskStages[t.status].color}`;
     card.style.cursor = "pointer";
     card.onclick = () => openTaskDetails(t.id);
     
@@ -3161,7 +3562,14 @@ function renderTasksKanban() {
     card.addEventListener("dragstart", (e) => handleTaskDragStart(e, t.id));
     card.addEventListener("dragend", handleTaskDragEnd);
     
+    // Расчет процента прогресса задачи
+    let progressPercent = 15;
+    if (t.status === 'in_progress') progressPercent = 50;
+    else if (t.status === 'safety_review') progressPercent = 85;
+    else if (t.status === 'completed') progressPercent = 100;
+
     card.innerHTML = `
+      <div class="task-status-tag" style="background-color: ${taskStages[t.status].color};"></div>
       ${isOverdue ? `
         <div class="badge badge-warning" style="font-size: 8px; padding: 2px 4px; margin-bottom: 6px; display: inline-flex; align-items: center; gap: 3px; max-width: max-content;">
           <svg viewBox="0 0 24 24" style="width: 10px; height: 10px; stroke: currentColor; stroke-width: 2.2; fill: none; display: inline-block;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
@@ -3170,14 +3578,25 @@ function renderTasksKanban() {
       ` : ''}
       <div class="task-card-title">${t.title}</div>
       <div class="task-card-desc">${t.description}</div>
+      
+      <div class="task-progress-wrapper">
+        <div style="display: flex; justify-content: space-between; font-size: 8px; color: var(--text-secondary); margin-bottom: 3px;">
+          <span>Прогресс</span>
+          <strong>${progressPercent}%</strong>
+        </div>
+        <div class="task-progress-bar-bg">
+          <div class="task-progress-bar-fill ${t.status === 'in_progress' ? 'pulse' : ''}" style="width: ${progressPercent}%; background-color: ${taskStages[t.status].color};"></div>
+        </div>
+      </div>
+
       <div class="task-card-meta">
-        <span>Срок: <strong>${t.dueDate}</strong></span>
-        ${t.vehicleId ? `<span>Машина: ${getVehicleInvNumber(t.vehicleId)}</span>` : ''}
-        ${t.siteId ? `<span>Объект: ${getSiteName(t.siteId)}</span>` : ''}
-        <span>Исполнитель: <strong>${getDriverName(t.assignee)}</strong></span>
+        <span class="meta-pill" title="Срок">🗓️ ${t.dueDate}</span>
+        ${t.vehicleId ? `<span class="meta-pill" title="Спецтехника">🚜 ${getVehicleInvNumber(t.vehicleId)}</span>` : ''}
+        ${t.siteId ? `<span class="meta-pill" title="Строительный объект">📍 ${getSiteName(t.siteId)}</span>` : ''}
+        <span class="meta-pill" title="Исполнитель">👤 ${getDriverName(t.assignee)}</span>
         ${t.signedDocument ? `
-          <span style="background:var(--status-success); color:white; font-weight:600; cursor:pointer; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 4px;" onclick="openSignedDocument('${t.id}')">
-            <svg viewBox="0 0 24 24" style="width: 11px; height: 11px; stroke: currentColor; stroke-width: 2.2; fill: none; display: inline-block; vertical-align: middle;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg> Документ
+          <span class="meta-pill" style="background:var(--pastel-success-bg); color:var(--status-success); cursor:pointer; border-color: rgba(22, 163, 74, 0.2);" onclick="openSignedDocument('${t.id}')">
+            📄 Документ
           </span>` : ''}
       </div>
     `;
@@ -3654,40 +4073,52 @@ function updateRelocateOldSite() {
 }
 
 function submitRelocateVehicle() {
-  const vId = document.getElementById("relocateVehicleSelect").value;
-  const newSiteId = document.getElementById("relocateNewSiteSelect").value;
+  const vId = getComboValue("relocateVehicleCombo");
+  const newSiteId = getComboValue("relocateNewSiteCombo");
   const reason = document.getElementById("relocateReason").value;
   
-  const v = db.vehicles.find(x => x.id === vId);
+  let v = db.vehicles.find(x => x.id === vId);
+  if (!v && vId) {
+    v = db.vehicles.find(x => x.plate === vId || x.invNumber === vId || x.name === vId);
+    if (!v) {
+      v = { id: vId, invNumber: vId, name: vId, currentSiteId: "" };
+    }
+  }
+  
   if (v) {
-    const oldSite = db.sites.find(s => s.id === v.currentSiteId);
-    const newSite = db.sites.find(s => s.id === newSiteId);
+    const oldSite = db.sites.find(s => s.id === v.currentSiteId) || { name: v.currentSiteId || "База Атырау" };
+    const newSite = db.sites.find(s => s.id === newSiteId) || { name: newSiteId || "Неизвестно" };
     
     // Вносим запись в перемещения
     db.vehicleMoves.push({
       id: "m_" + (db.vehicleMoves.length + 1),
-      vehicleId: vId,
-      oldSite: oldSite ? oldSite.name : "База Атырау",
-      newSite: newSite ? newSite.name : "Неизвестно",
+      vehicleId: v.id,
+      oldSite: oldSite.name,
+      newSite: newSite.name,
       date: new Date().toISOString().split('T')[0],
       reason: reason || "Производственная необходимость",
       author: db.settings.activeRole
     });
     
-    v.currentSiteId = newSiteId;
-    saveState();
+    const dbVeh = db.vehicles.find(x => x.id === v.id);
+    if (dbVeh) {
+      dbVeh.currentSiteId = newSiteId;
+      saveState();
+    }
     
     renderGanttChart();
     renderMovesHistoryTable();
     closeModal("relocateVehicleModal");
-    showSystemNotification(`Техника ${v.invNumber} успешно перебазирована на объект ${newSite ? newSite.name : ''}`);
+    showSystemNotification(`Техника ${v.invNumber} успешно перебазирована на объект ${newSite.name}`);
     
     // Обновляем маркер на карте
-    if (window.vehicleMarkers[vId]) {
-      window.vehicleMarkers[vId].targetSiteId = newSiteId;
-      window.vehicleMarkers[vId].lat = newSite.lat + (Math.random() - 0.5) * 0.03;
-      window.vehicleMarkers[vId].lng = newSite.lng + (Math.random() - 0.5) * 0.03;
-      window.vehicleMarkers[vId].marker.setLatLng([window.vehicleMarkers[vId].lat, window.vehicleMarkers[vId].lng]);
+    if (dbVeh && window.vehicleMarkers && window.vehicleMarkers[v.id]) {
+      window.vehicleMarkers[v.id].targetSiteId = newSiteId;
+      if (newSite && newSite.lat) {
+        window.vehicleMarkers[v.id].lat = newSite.lat + (Math.random() - 0.5) * 0.03;
+        window.vehicleMarkers[v.id].lng = newSite.lng + (Math.random() - 0.5) * 0.03;
+        window.vehicleMarkers[v.id].marker.setLatLng([window.vehicleMarkers[v.id].lat, window.vehicleMarkers[v.id].lng]);
+      }
     }
   }
 }
@@ -3740,7 +4171,7 @@ document.getElementById("transferToSelect").onchange = function() {
 function submitCreateDeal() {
   const comp = document.getElementById("dealCompany").value;
   const cont = document.getElementById("dealContact").value;
-  const siteId = document.getElementById("dealSiteSelect").value;
+  const siteId = getComboValue("dealSiteCombo");
   const addr = document.getElementById("dealAddress").value;
   const job = document.getElementById("dealJobType").value;
   const start = document.getElementById("dealStart").value;
@@ -3896,6 +4327,8 @@ function renderAll() {
   renderFuelTable();
   renderWarehouseInventory();
   renderLogisticsPipeline();
+  renderOrgChart();
+  renderDocumentsRegistry();
   renderRepairsTable();
   renderMaintenanceTracker();
   renderEmployeesTable();
@@ -3959,6 +4392,14 @@ function initDispatcherMap() {
       fillOpacity: 0.15,
       weight: 2
     }).addTo(window.dispatcherMap);
+    
+    polygon.on('mouseover', function () {
+      this.setStyle({ fillOpacity: 0.35, weight: 3 });
+    });
+    polygon.on('mouseout', function () {
+      this.setStyle({ fillOpacity: 0.15, weight: 2 });
+    });
+
     polygon.bindTooltip(`Геозона: ${site.name}`, { permanent: false, direction: "center" });
     window.dispatcherGeofenceLayers[site.id] = polygon;
   });
@@ -5638,6 +6079,240 @@ function undoLastCrmMove() {
 }
 
 // 2. Модуль: Табель учета рабочего времени
+function getVehicleMonthlyRate(vehicle) {
+  if (!vehicle) return 1550000;
+  const name = (vehicle.name || "").toLowerCase();
+  const type = (vehicle.type || "").toLowerCase();
+  if (name.includes("автокран") || type.includes("автокран")) return 3500000;
+  if (name.includes("экскаватор") || type.includes("экскаватор")) return 3100000;
+  if (name.includes("бульдозер") || type.includes("бульдозер")) return 2800000;
+  if (name.includes("самосвал") || type.includes("самосвал")) return 1860000;
+  if (name.includes("погрузчик") || type.includes("погрузчик")) return 2170000;
+  return 1550000;
+}
+
+function getDayHours(status) {
+  if (status === "W") return 11;
+  if (status === "R" || status === "O" || status === "I") return 0;
+  if (status === undefined || status === null) return 0;
+  const num = parseInt(status);
+  return isNaN(num) ? 0 : num;
+}
+
+function editTimesheetHours(tsId, day) {
+  const ts = db.timesheets.find(t => t.id === tsId);
+  if (!ts) return;
+  
+  const currentVal = getDayHours(ts.dailyStatus[day]);
+  const v = db.vehicles.find(veh => veh.id === ts.vehicleId);
+  const vName = v ? v.name : 'Техника';
+  const standardShift = 11;
+  
+  // Закрыть предыдущий если есть
+  const existingModal = document.getElementById('timesheetCellModal');
+  if (existingModal) existingModal.remove();
+  
+  const modal = document.createElement('div');
+  modal.id = 'timesheetCellModal';
+  modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; z-index:10000; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.3); backdrop-filter:blur(2px);';
+  
+  modal.innerHTML = `
+    <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:12px; padding:24px; width:340px; box-shadow:0 20px 60px rgba(0,0,0,0.15); animation: modalFadeIn 0.2s ease;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div>
+          <div style="font-size:14px; font-weight:700; color:var(--text-primary);">День ${day}</div>
+          <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">${vName}</div>
+        </div>
+        <button onclick="document.getElementById('timesheetCellModal').remove()" style="background:none; border:none; cursor:pointer; color:var(--text-secondary); font-size:18px; width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; transition:all 0.15s;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='none'">✕</button>
+      </div>
+      
+      <div style="margin-bottom:14px;">
+        <label style="font-size:10px; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-secondary); font-weight:600; display:block; margin-bottom:6px;">Отработанные часы</label>
+        <input type="number" id="tsHoursInput" value="${currentVal}" min="0" max="24" step="0.5" 
+          style="width:100%; padding:10px 14px; border:1px solid var(--border-color); border-radius:8px; font-size:20px; font-weight:700; text-align:center; background:var(--bg-secondary); color:var(--text-primary); outline:none; transition:border-color 0.2s;"
+          onfocus="this.style.borderColor='var(--brand-color)'" onblur="this.style.borderColor='var(--border-color)'" />
+      </div>
+      
+      <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px;">
+        <button class="ts-quick-btn" onclick="document.getElementById('tsHoursInput').value=0;updateTsPreview()" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-secondary); cursor:pointer; font-size:11px; font-weight:600; color:var(--text-secondary); transition:all 0.15s;">0 — Выходной</button>
+        <button class="ts-quick-btn" onclick="document.getElementById('tsHoursInput').value=8;updateTsPreview()" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-secondary); cursor:pointer; font-size:11px; font-weight:600; color:var(--text-secondary); transition:all 0.15s;">8ч</button>
+        <button class="ts-quick-btn" onclick="document.getElementById('tsHoursInput').value=11;updateTsPreview()" style="padding:4px 10px; border-radius:6px; border:1px solid var(--brand-color); background:rgba(37,99,235,0.08); cursor:pointer; font-size:11px; font-weight:700; color:var(--brand-color); transition:all 0.15s;">11ч — Стандарт</button>
+        <button class="ts-quick-btn" onclick="document.getElementById('tsHoursInput').value=12;updateTsPreview()" style="padding:4px 10px; border-radius:6px; border:1px solid var(--status-warning); background:rgba(217,119,6,0.08); cursor:pointer; font-size:11px; font-weight:600; color:var(--status-warning); transition:all 0.15s;">12ч</button>
+        <button class="ts-quick-btn" onclick="document.getElementById('tsHoursInput').value=14;updateTsPreview()" style="padding:4px 10px; border-radius:6px; border:1px solid var(--status-danger); background:rgba(220,38,38,0.08); cursor:pointer; font-size:11px; font-weight:600; color:var(--status-danger); transition:all 0.15s;">14ч — Переработка</button>
+      </div>
+      
+      <div id="tsPreviewBlock" style="padding:10px 12px; background:var(--bg-secondary); border-radius:8px; margin-bottom:16px; font-size:12px; border:1px solid var(--border-color);">
+        ${currentVal > standardShift 
+          ? `<span style="color:var(--status-warning); font-weight:700;">⚡ Переработка: +${currentVal - standardShift}ч сверх нормы (${standardShift}ч)</span>` 
+          : currentVal === 0 
+            ? `<span style="color:var(--text-secondary);">Выходной / Простой</span>`
+            : currentVal < standardShift
+              ? `<span style="color:var(--brand-color);">Неполная смена: ${standardShift - currentVal}ч меньше нормы</span>`
+              : `<span style="color:var(--status-success);">✓ Стандартная смена (${standardShift}ч)</span>`
+        }
+      </div>
+      
+      <div style="display:flex; gap:8px;">
+        <button onclick="document.getElementById('timesheetCellModal').remove()" class="btn-secondary" style="flex:1; justify-content:center;">Отмена</button>
+        <button onclick="saveTsHours('${tsId}', ${day})" class="btn-primary" style="flex:1; justify-content:center;">Сохранить</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Закрытие по клику на фон
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+  
+  // Фокус на input
+  setTimeout(() => {
+    const inp = document.getElementById('tsHoursInput');
+    if (inp) { inp.focus(); inp.select(); }
+  }, 100);
+  
+  // Enter для сохранения
+  document.getElementById('tsHoursInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveTsHours(tsId, day);
+    if (e.key === 'Escape') modal.remove();
+  });
+  
+  // Обновление превью при изменении
+  document.getElementById('tsHoursInput').addEventListener('input', updateTsPreview);
+}
+
+function updateTsPreview() {
+  const inp = document.getElementById('tsHoursInput');
+  const preview = document.getElementById('tsPreviewBlock');
+  if (!inp || !preview) return;
+  
+  const val = parseFloat(inp.value) || 0;
+  const standardShift = 11;
+  
+  if (val > standardShift) {
+    preview.innerHTML = `<span style="color:var(--status-warning); font-weight:700;">⚡ Переработка: +${(val - standardShift).toFixed(1)}ч сверх нормы (${standardShift}ч)</span>`;
+    preview.style.borderColor = 'var(--status-warning)';
+    preview.style.background = 'rgba(217,119,6,0.06)';
+  } else if (val === 0) {
+    preview.innerHTML = `<span style="color:var(--text-secondary);">Выходной / Простой</span>`;
+    preview.style.borderColor = 'var(--border-color)';
+    preview.style.background = 'var(--bg-secondary)';
+  } else if (val < standardShift) {
+    preview.innerHTML = `<span style="color:var(--brand-color);">Неполная смена: ${(standardShift - val).toFixed(1)}ч меньше нормы</span>`;
+    preview.style.borderColor = 'var(--brand-color)';
+    preview.style.background = 'rgba(37,99,235,0.06)';
+  } else {
+    preview.innerHTML = `<span style="color:var(--status-success);">✓ Стандартная смена (${standardShift}ч)</span>`;
+    preview.style.borderColor = 'var(--status-success)';
+    preview.style.background = 'rgba(22,163,74,0.06)';
+  }
+}
+
+function saveTsHours(tsId, day) {
+  const inp = document.getElementById('tsHoursInput');
+  if (!inp) return;
+  
+  const hours = parseFloat(inp.value);
+  if (isNaN(hours) || hours < 0 || hours > 24) {
+    inp.style.borderColor = 'var(--status-danger)';
+    inp.style.animation = 'shake 0.3s';
+    return;
+  }
+  
+  const ts = db.timesheets.find(t => t.id === tsId);
+  if (!ts) return;
+  
+  ts.dailyStatus[day] = hours;
+  saveState();
+  
+  const modal = document.getElementById('timesheetCellModal');
+  if (modal) modal.remove();
+  
+  renderTimesheetGrid();
+  
+  const standardShift = 11;
+  if (hours > standardShift) {
+    showSystemNotification(`День ${day}: ${hours}ч — зафиксирована переработка +${(hours - standardShift).toFixed(1)}ч`);
+  } else if (hours < standardShift && hours > 0) {
+    showSystemNotification(`День ${day}: ${hours}ч — неполная смена (−${(standardShift - hours).toFixed(1)}ч)`);
+  } else {
+    showSystemNotification(`День ${day}: часы обновлены — ${hours}ч`);
+  }
+}
+
+function editTimesheetAdvance(tsId) {
+  const ts = db.timesheets.find(t => t.id === tsId);
+  if (!ts) return;
+  
+  const currentVal = ts.advance || 0;
+  const v = db.vehicles.find(veh => veh.id === ts.vehicleId);
+  const vName = v ? v.name : 'Техника';
+  
+  // Закрыть предыдущий если есть
+  const existingModal = document.getElementById('timesheetCellModal');
+  if (existingModal) existingModal.remove();
+  
+  const modal = document.createElement('div');
+  modal.id = 'timesheetCellModal';
+  modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; z-index:10000; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.3); backdrop-filter:blur(2px);';
+  
+  modal.innerHTML = `
+    <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:12px; padding:24px; width:320px; box-shadow:0 20px 60px rgba(0,0,0,0.15); animation: modalFadeIn 0.2s ease;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div>
+          <div style="font-size:14px; font-weight:700; color:var(--text-primary);">Аванс</div>
+          <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">${vName}</div>
+        </div>
+        <button onclick="document.getElementById('timesheetCellModal').remove()" style="background:none; border:none; cursor:pointer; color:var(--text-secondary); font-size:18px; width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='none'">✕</button>
+      </div>
+      
+      <div style="margin-bottom:16px;">
+        <label style="font-size:10px; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-secondary); font-weight:600; display:block; margin-bottom:6px;">Сумма аванса (₸)</label>
+        <input type="number" id="tsAdvanceInput" value="${currentVal}" min="0" step="1000" 
+          style="width:100%; padding:10px 14px; border:1px solid var(--border-color); border-radius:8px; font-size:20px; font-weight:700; text-align:center; background:var(--bg-secondary); color:var(--text-primary); outline:none;"
+          onfocus="this.style.borderColor='var(--brand-color)'" onblur="this.style.borderColor='var(--border-color)'" />
+      </div>
+      
+      <div style="display:flex; gap:8px;">
+        <button onclick="document.getElementById('timesheetCellModal').remove()" class="btn-secondary" style="flex:1; justify-content:center;">Отмена</button>
+        <button onclick="saveTsAdvance('${tsId}')" class="btn-primary" style="flex:1; justify-content:center;">Сохранить</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  setTimeout(() => { const inp = document.getElementById('tsAdvanceInput'); if (inp) { inp.focus(); inp.select(); } }, 100);
+  document.getElementById('tsAdvanceInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveTsAdvance(tsId);
+    if (e.key === 'Escape') modal.remove();
+  });
+}
+
+function saveTsAdvance(tsId) {
+  const inp = document.getElementById('tsAdvanceInput');
+  if (!inp) return;
+  
+  const adv = parseInt(inp.value);
+  if (isNaN(adv) || adv < 0) {
+    inp.style.borderColor = 'var(--status-danger)';
+    return;
+  }
+  
+  const ts = db.timesheets.find(t => t.id === tsId);
+  if (!ts) return;
+  
+  ts.advance = adv;
+  saveState();
+  
+  const modal = document.getElementById('timesheetCellModal');
+  if (modal) modal.remove();
+  
+  renderTimesheetGrid();
+  showSystemNotification(`Сумма аванса обновлена до ${adv.toLocaleString()} ₸.`);
+}
+
 function renderTimesheetGrid() {
   const select = document.getElementById("timesheetMonthSelect");
   if (!select) return;
@@ -5646,127 +6321,162 @@ function renderTimesheetGrid() {
   const gridTable = document.getElementById("timesheetTableGrid");
   if (!gridTable) return;
   
+  gridTable.className = "excel-timesheet-table";
   gridTable.innerHTML = "";
   
-  // Определяем количество дней в месяце
-  const year = parseInt(selectedMonth.split("-")[0]);
-  const month = parseInt(selectedMonth.split("-")[1]);
-  const daysInMonth = new Date(year, month, 0).getDate();
+  let monthText = "май 2026 г.";
+  if (selectedMonth === "2026-06") monthText = "июнь 2026 г.";
+  else if (selectedMonth === "2026-07") monthText = "июль 2026 г.";
+  else {
+    const parts = selectedMonth.split("-");
+    const m = parseInt(parts[1]);
+    const months = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
+    monthText = `${months[m - 1]} ${parts[0]} г.`;
+  }
   
-  // Шапка таблицы
+  const daysInMonth = 30;
+  
   let headerHtml = `
     <thead>
       <tr>
-        <th style="text-align: left; min-width: 180px;">Техника</th>
-        <th style="min-width: 140px;">Основной водитель</th>
+        <th style="display:none;"></th>
+        <th colspan="43" style="background-color:#1E293B !important; color:#FFFFFF !important; font-size:13px; font-weight:700; padding:10px !important; text-align:center !important;">
+          Табель за ${monthText} наемная техника обьект ЗКО кап ремонт
+        </th>
+      </tr>
+      <tr>
+        <th style="display:none;"></th>
+        <th rowspan="2" style="width: 40px; vertical-align:middle; text-align:center;">№ п/п</th>
+        <th colspan="2" style="vertical-align:middle; text-align:center;">Модель машины / Водитель</th>
+        <th rowspan="2" style="width: 100px; vertical-align:middle; text-align:center;">Номер машины</th>
+        <th colspan="30" style="vertical-align:middle; text-align:center;">Календарные дни (часы работы)</th>
+        <th colspan="9" style="vertical-align:middle; text-align:center;">Расчетный блок (Бухгалтерия)</th>
+      </tr>
+      <tr>
+        <th style="display:none;"></th>
+        <th style="min-width: 130px; text-align:center;">Модель машины</th>
+        <th style="min-width: 120px; text-align:center;">ФИО Водителя</th>
   `;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dayOfWeek = new Date(year, month - 1, d).getDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // 0 = Sunday, 6 = Saturday
-    const thStyle = isWeekend 
-      ? `width: 30px; text-align: center; color: var(--status-danger); background-color: rgba(220, 38, 38, 0.05); font-weight: 700;` 
-      : `width: 30px; text-align: center;`;
-    headerHtml += `<th style="${thStyle}">${d}</th>`;
+  
+  for (let d = 1; d <= 30; d++) {
+    headerHtml += `<th style="width: 28px; text-align:center; font-weight:700;">${d}</th>`;
   }
+  
   headerHtml += `
+        <th style="width: 40px; text-align:center;">Тип</th>
+        <th style="width: 50px; text-align:center;">Всего ч.</th>
+        <th class="cell-separator" style="width: 12px;"></th>
+        <th style="width: 80px; text-align:center;">Ставка дня</th>
+        <th style="width: 45px; text-align:center;">Смена</th>
+        <th style="width: 60px; text-align:center;">Цена ч.</th>
+        <th style="width: 80px; text-align:center;">Итого</th>
+        <th style="width: 70px; text-align:center; background-color:#b45309 !important; color:#fff !important;">Аванс</th>
+        <th style="width: 85px; text-align:center; background-color:#15803d !important; color:#fff !important;">К выплате</th>
       </tr>
     </thead>
   `;
-  gridTable.innerHTML += headerHtml;
+  
+  gridTable.innerHTML = headerHtml;
   
   const tbody = document.createElement("tbody");
   
-  db.vehicles.forEach(v => {
-    // Находим табель для этой техники и месяца
+  db.vehicles.forEach((v, index) => {
     let ts = db.timesheets.find(t => t.month === selectedMonth && t.vehicleId === v.id);
     if (!ts) {
-      // Инициализируем пустой табель в памяти
       ts = {
         id: `ts_${v.id}_${selectedMonth}`,
         month: selectedMonth,
         vehicleId: v.id,
         driverHistory: [],
         dailyStatus: {},
+        advance: 0,
         mechanicApproved: false,
         hrApproved: false,
         directorApproved: false
       };
-      // Заполняем рабочими днями
-      for (let day = 1; day <= daysInMonth; day++) {
-        ts.dailyStatus[day] = "W";
+      for (let day = 1; day <= 30; day++) {
+        ts.dailyStatus[day] = 11;
       }
       db.timesheets.push(ts);
     }
     
-    const defaultDriver = db.drivers.find(d => d.id === v.driverId);
-    const defaultDriverName = defaultDriver ? defaultDriver.name : "Не назначен";
+    if (ts.advance === undefined) ts.advance = 0;
+    
+    const driver = db.drivers.find(d => d.id === v.driverId);
+    const driverName = driver ? driver.name : "Не назначен";
+    
+    let totalHours = 0;
+    for (let day = 1; day <= 30; day++) {
+      totalHours += getDayHours(ts.dailyStatus[day]);
+    }
+    
+    const monthlyRate = getVehicleMonthlyRate(v);
+    const dailyRate = Math.round(monthlyRate / 31);
+    const shiftLength = 11;
+    const hourlyRate = Math.round(dailyRate / shiftLength);
+    const totalPaid = totalHours * hourlyRate;
+    const advance = ts.advance || 0;
+    const netPaid = totalPaid - advance;
     
     const tr = document.createElement("tr");
-    let rowHtml = `
-      <td style="text-align: left;">
-        <strong>${v.name}</strong><br>
-        <span style="font-size: 9px; color: var(--text-secondary);">${v.plate} | Инв. ${v.invNumber}</span>
-      </td>
-      <td>
-        <select class="form-control" style="font-size: 10px; padding: 4px; height: auto;" onchange="changeTimesheetVehicleDriver('${ts.id}', this.value)">
-          <option value="">-- Без водителя --</option>
-          ${db.drivers.map(d => `<option value="${d.id}" ${v.driverId === d.id ? 'selected' : ''}>${d.name}</option>`).join("")}
-        </select>
-      </td>
-    `;
     
-    for (let day = 1; day <= daysInMonth; day++) {
-      const status = ts.dailyStatus[day] || "W";
+    let daysHtml = "";
+    for (let day = 1; day <= 30; day++) {
+      const hrs = getDayHours(ts.dailyStatus[day]);
+      const standardShift = 11;
+      let cellBg, cellColor;
       
-      // Проверяем замены водителя в этот день
-      const replacement = ts.driverHistory ? ts.driverHistory.find(h => h.day === day) : null;
-      let displayDriverInitials = "";
-      let hasReplacement = false;
-      
-      if (replacement && replacement.driverId !== v.driverId) {
-        hasReplacement = true;
-        const repDriver = db.drivers.find(d => d.id === replacement.driverId);
-        if (repDriver) {
-          const split = repDriver.name.split(" ");
-          const lastName = split[0] || "";
-          const firstName = split[1] || "";
-          const initials = (lastName ? lastName.charAt(0) : "") + (firstName ? firstName.charAt(0) : "");
-          displayDriverInitials = `<br><span style="font-size: 8px; color: var(--brand-color); font-weight: 700; border: 1px solid var(--brand-color); border-radius: 3px; padding: 0px 2px; background: rgba(37,99,235,0.08); display: inline-block; margin-top: 2px;" title="Замена: ${repDriver.name}">${initials}</span>`;
-        }
+      if (hrs === 0) {
+        cellBg = "rgba(241, 245, 249, 0.6)";
+        cellColor = "#94a3b8";
+      } else if (hrs > standardShift) {
+        // Переработка — оранжевый/красный
+        cellBg = hrs >= 14 ? "rgba(220, 38, 38, 0.1)" : "rgba(217, 119, 6, 0.1)";
+        cellColor = hrs >= 14 ? "#dc2626" : "#d97706";
+      } else if (hrs < standardShift) {
+        // Неполная смена — синий
+        cellBg = "rgba(37, 99, 235, 0.08)";
+        cellColor = "#2563eb";
+      } else {
+        // Стандарт — зеленый
+        cellBg = "rgba(34, 197, 94, 0.08)";
+        cellColor = "#16a34a";
       }
       
-      let bg = "#DCFCE7"; // W - Green
-      let color = "#15803d";
-      if (status === "R") {
-        bg = "#FEF3C7"; // R - Yellow
-        color = "#b45309";
-      } else if (status === "O") {
-        bg = "#F1F5F9"; // O - Gray
-        color = "#475569";
-      } else if (status === "I") {
-        bg = "#FEE2E2"; // I - Soft Red for Simple/Idle
-        color = "#991B1B";
-      }
+      const overtimeMarker = hrs > standardShift ? `title="Переработка +${(hrs - standardShift)}ч"` : hrs < standardShift && hrs > 0 ? `title="Неполная смена −${(standardShift - hrs)}ч"` : '';
       
-      const statusRu = status === "W" ? "Я" : (status === "R" ? "Р" : (status === "O" ? "В" : (status === "I" ? "П" : status)));
-      
-      rowHtml += `
-        <td style="background-color: ${bg}; color: ${color}; text-align: center; font-weight: 700; cursor: pointer; position: relative; padding: 4px;" onclick="cycleTimesheetDayStatus('${ts.id}', ${day})" title="Кликните для изменения статуса смены. ${hasReplacement ? 'Была замена водителя.' : ''}">
-          ${statusRu}
-          ${hasReplacement ? '<span style="color:var(--brand-color); position:absolute; top:1px; right:3px; font-size:8px;">*</span>' : ''}
-          ${displayDriverInitials}
+      daysHtml += `
+        <td class="cell-editable" style="background-color: ${cellBg}; color: ${cellColor}; text-align: center; font-weight:700; position:relative;" onclick="editTimesheetHours('${ts.id}', ${day})" ${overtimeMarker}>
+          ${hrs}${hrs > standardShift ? '<span style="position:absolute;top:1px;right:2px;font-size:7px;color:#d97706;">⬆</span>' : ''}
         </td>
       `;
     }
     
-    tr.innerHTML = rowHtml;
+    tr.innerHTML = `
+      <td style="display:none;"></td>
+      <td style="text-align: center; font-weight: 600;">${index + 1}</td>
+      <td style="text-align: left; font-weight: 600;">${v.type} (${v.name.split(" ").slice(1).join(" ") || v.name})</td>
+      <td style="text-align: left;">${driverName}</td>
+      <td style="text-align: center; font-weight: 500;">${v.plate}</td>
+      ${daysHtml}
+      <td style="font-weight:600; color:var(--text-secondary);">ф</td>
+      <td style="font-weight:700; color:var(--text-primary);">${totalHours}</td>
+      <td class="cell-separator"></td>
+      <td title="Формула: =${monthlyRate}/31" style="color:var(--text-secondary);">${dailyRate.toLocaleString()} ₸</td>
+      <td>${shiftLength}</td>
+      <td title="Формула: =Ставкадня/Смена" style="color:var(--text-secondary);">${hourlyRate.toLocaleString()} ₸</td>
+      <td title="Формула: =Всегочасов*Ценач" style="font-weight:700; color:var(--text-primary);">${totalPaid.toLocaleString()} ₸</td>
+      <td class="cell-editable" style="background-color:rgba(180, 83, 9, 0.06); color:#b45309; font-weight:700;" onclick="editTimesheetAdvance('${ts.id}')" title="Кликните для редактирования аванса">
+        ${advance > 0 ? advance.toLocaleString() + " ₸" : "—"}
+      </td>
+      <td title="Формула: =Итого-Аванс" style="font-weight:800; color:#15803d; background-color:rgba(21, 128, 61, 0.06);">${netPaid.toLocaleString()} ₸</td>
+    `;
+    
     tbody.appendChild(tr);
   });
   
   gridTable.appendChild(tbody);
   
-  // Отрисовка статусов цепочки согласования
-  // Найдем агрегированный статус согласования для выбранного месяца
   const monthTimesheets = db.timesheets.filter(t => t.month === selectedMonth);
   const allMechanicApproved = monthTimesheets.length > 0 && monthTimesheets.every(t => t.mechanicApproved);
   const allHrApproved = monthTimesheets.length > 0 && monthTimesheets.every(t => t.hrApproved);
@@ -5837,36 +6547,7 @@ function updateTimesheetApprovalStatusUI(mechApp, hrApp, dirApp) {
 }
 
 function cycleTimesheetDayStatus(timesheetId, day) {
-  const ts = db.timesheets.find(t => t.id === timesheetId);
-  if (!ts) return;
-  
-  const current = ts.dailyStatus[day] || "W";
-  let next = "W";
-  if (current === "W") next = "R";
-  else if (current === "R") next = "O";
-  else if (current === "O") next = "I";
-  else if (current === "I") next = "W";
-  
-  ts.dailyStatus[day] = next;
-  
-  // Добавить замену водителя для демонстрации (если кликаем с зажатым Shift, меняем водителя)
-  if (window.event && window.event.shiftKey) {
-    // Симулируем выбор другого водителя в этот день
-    const otherDriver = db.drivers.find(d => d.id !== db.vehicles.find(v => v.id === ts.vehicleId).driverId);
-    if (otherDriver) {
-      ts.driverHistory = ts.driverHistory || [];
-      const idx = ts.driverHistory.findIndex(h => h.day === day);
-      if (idx !== -1) {
-        ts.driverHistory[idx].driverId = otherDriver.id;
-      } else {
-        ts.driverHistory.push({ day: day, driverId: otherDriver.id });
-      }
-      showSystemNotification(`Замена водителя на ${day} число зафиксирована: ${otherDriver.name}`);
-    }
-  }
-  
-  saveState();
-  renderTimesheetGrid();
+  editTimesheetHours(timesheetId, day);
 }
 
 function changeTimesheetVehicleDriver(timesheetId, driverId) {
@@ -5905,7 +6586,8 @@ function runAccountantPayrollCalculation(monthStr) {
         if (ts.month === monthStr) {
           // Считаем сколько дней данный водитель отработал
           for (let day in ts.dailyStatus) {
-            if (ts.dailyStatus[day] === "W") {
+            const hrs = getDayHours(ts.dailyStatus[day]);
+            if (hrs > 0) {
               const replacement = ts.driverHistory ? ts.driverHistory.find(h => h.day == day) : null;
               if (replacement) {
                 if (replacement.driverId === d.id) daysWorked++;
@@ -5943,9 +6625,9 @@ function exportTimesheetToExcel() {
     const ts = db.timesheets.find(t => t.month === month && t.vehicleId === v.id);
     if (ts) {
       for (let d = 1; d <= 30; d++) {
-        const status = ts.dailyStatus[d] || 'O';
-        const statusRu = status === "W" ? "Я" : (status === "R" ? "Р" : (status === "O" ? "В" : (status === "I" ? "П" : status)));
-        row += `,"${statusRu}"`;
+        const status = ts.dailyStatus[d];
+        const hrs = getDayHours(status);
+        row += `,"${hrs}"`;
       }
     }
     csvContent += row + "\r\n";
@@ -6369,50 +7051,7 @@ function openMaterialLogModal() {
   openModal("addMaterialLogModal");
 }
 
-function submitAddMaterialLog() {
-  const type = document.getElementById("mwoType").value;
-  const item = document.getElementById("mwoItem").value.trim();
-  const qty = parseInt(document.getElementById("mwoQty").value) || 1;
-  const price = parseInt(document.getElementById("mwoPrice").value) || 10000;
-  const source = document.getElementById("mwoSource").value.trim();
-  
-  if (!item || !source) {
-    showSystemNotification("Заполните поля!");
-    return;
-  }
-  
-  db.materialsWriteOffs.push({
-    id: "mwo_" + (db.materialsWriteOffs.length + 1),
-    date: new Date().toISOString().split("T")[0],
-    type: type,
-    itemName: item,
-    qty: qty,
-    source: source,
-    price: price
-  });
-  
-  // Если приход на склад, добавляем в ТМЦ
-  if (type === "Приход") {
-    db.warehouses.central.push({
-      id: "tmc_" + Math.random().toString(36).substring(2, 8),
-      sku: "SKU-" + Math.floor(100 + Math.random() * 900),
-      name: item,
-      category: "Расходники",
-      supplier: source,
-      price: price,
-      balance: qty,
-      minStock: 2
-    });
-  }
-  
-  saveState();
-  renderSettingsDashboard();
-  renderWarehouseInventory();
-  closeModal("addMaterialLogModal");
-  showSystemNotification("Запись движения ТМЦ добавлена на склад!");
-  
-  document.getElementById("materialLogForm").reset();
-}
+
 
 function openSupplierAdvanceModal() {
   openModal("addSupplierAdvanceModal");
@@ -7407,10 +8046,12 @@ function renderIndividualVehicleTimesheet() {
   
   Object.keys(timesheet.dailyStatus).forEach(day => {
     const s = timesheet.dailyStatus[day];
-    if (s === "W") workDays++;
-    if (s === "O") offDays++;
-    if (s === "R") repairDays++;
-    if (s === "I") idleDays++;
+    const hrs = getDayHours(s);
+    if (hrs > 0) workDays++;
+    else if (s === "O") offDays++;
+    else if (s === "R") repairDays++;
+    else if (s === "I") idleDays++;
+    else offDays++;
   });
   
   // Считаем Затраты
@@ -8080,6 +8721,2195 @@ function applyPremiumStylesAndDecorators() {
       }
     }
   });
+
+  // 4. Динамический редизайн модальных окон в стиле ГИС ЕРАП РК
+  const modalThemeConfigs = {
+    "erapCheckSearchModal": {
+      title: "Интеграция с ГИС ЕРАП РК",
+      desc: "Получите полную историю владения, техническое состояние, информацию о ДТП, залогах и неоплаченных штрафах в реальном времени.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: currentColor;"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 11.5v8c0 .83.67 1.5 1.5 1.5h1c.82 0 1.5-.67 1.5-1.5V18h10v1.5c0 .83.67 1.5 1.5 1.5h1c.82 0 1.5-.67 1.5-1.5v-8l-2.08-5.49zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 10l1.5-4.5h11L19 10H5z"/></svg>`
+    },
+    "vehicleFullCheckModal": {
+      title: "Проверка спецтехники в ГИС ЕРАП РК",
+      desc: "Детальные официальные сведения о владельце, наличии обременений, запрещений и действующих техосмотрах.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`
+    },
+    "chatBotModal": {
+      title: "WhatsApp ИИ-Логист — KazBildInvest",
+      desc: "Виртуальный диспетчер принимает отчеты водителей, распознает текст через ИИ и автоматически обновляет табель учета.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`
+    },
+    "createDealModal": {
+      title: "Новый заказ спецтехники (Лид)",
+      desc: "Оформление заявки на аренду техники, выбор заказчика, адреса строительного объекта и планируемого срока работ.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
+    },
+    "dealDetailsModal": {
+      title: "Карточка сделки и Заказы",
+      desc: "Подробная история взаимодействия, файлы договоров, статус согласования и история перемещений сметного расчета.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`
+    },
+    "viewApprovalRequestModal": {
+      title: "Модуль согласования KazBildInvest",
+      desc: "Утверждение счетов на оплату, договоров субподряда и актов списания руководством компании в электронном формате.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><circle cx="12" cy="14" r="4"></circle></svg>`
+    },
+    "kpPrintModal": {
+      title: "Печатные формы и Договоры",
+      desc: "Сформируйте официальное коммерческое предложение или договор с автозаполнением реквизитов контрагента.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>`
+    },
+    "relocateVehicleModal": {
+      title: "Перемещение спецтехники",
+      desc: "Зафиксируйте отправку машины на другой строительный объект или вывод в резерв / на ремонтную базу.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><rect x="1" y="3" width="15" height="13" rx="2" ry="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`
+    },
+    "createRepairModal": {
+      title: "Регистрация поломки / Заявка на ТО",
+      desc: "Укажите характер неисправности, ответственного механика, срочность ремонта и перечень требуемых запчастей.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`
+    },
+    "receivePartModal": {
+      title: "Приход ТМЦ на центральный склад",
+      desc: "Оформление поступления запасных частей, масел и расходных материалов от поставщика с привязкой к накладной.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`
+    },
+    "transferPartModal": {
+      title: "Списание / Перемещение ТМЦ",
+      desc: "Передайте детали с центрального склада в бортовой запас конкретного автомобиля или спишите на текущий ремонт.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`
+    },
+    "requisitionModal": {
+      title: "Заявка на приобретение запчастей",
+      desc: "Формирование потребности в деталях для ремонта спецтехники. Заявка отправляется напрямую в отдел снабжения.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`
+    },
+    "repairManageModal": {
+      title: "Управление ремонтом и Заказ-наряды",
+      desc: "Контроль статуса ремонтных работ, списание запчастей из бортового запаса и закрытие заказ-наряда с выпуском на линию.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
+    },
+    "createEmployeeModal": {
+      title: "Прием на работу нового сотрудника",
+      desc: "Внесение анкетных данных, ИИН, должности, оклада и закрепление зон ответственности.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>`
+    },
+    "editLodgingModal": {
+      title: "Расселение и Жилой фонд",
+      desc: "Управление спальными местами, закрепление сотрудников за комнатами общежитий и учет коммунальных расходов.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`
+    },
+    "editEmployeeModal": {
+      title: "Редактирование карточки сотрудника",
+      desc: "Корректировка оклада, контактных данных, продление медицинских книжек и допусков техники безопасности.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`
+    },
+    "createSupplyOrderModal": {
+      title: "Заказ поставщику (Снабжение)",
+      desc: "Оформление закупки материалов и запчастей у внешних поставщиков с фиксацией цен и сроков поставки.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`
+    },
+    "transferBoardStockModal": {
+      title: "Выдача ТМЦ водителю спецтехники",
+      desc: "Передача расходных материалов с центрального склада в подотчет водителю для проведения автономного обслуживания.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`
+    },
+    "createCompanyModal": {
+      title: "Регистрация нового контрагента",
+      desc: "Занесение БИН, полного наименования, банковских реквизитов и определение типа взаимодействия.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 3v18"/><path d="M15 3v18"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>`
+    },
+    "createTaskModal": {
+      title: "Создание новой задачи спецтехнике",
+      desc: "Постановка задания, определение приоритета, SLA и ответственного машиниста / ИТР-специалиста.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`
+    },
+    "taskDetailsModal": {
+      title: "Управление и Детали задачи",
+      desc: "Информация о ходе выполнения, отметки машиниста, списание расходных материалов и прикрепленные файлы.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`
+    },
+    "viewDocumentModal": {
+      title: "Электронный документ",
+      desc: "Просмотр реквизитов документа, листа согласований и истории изменения статусов подписания.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`
+    },
+    "dashboardDetailModal": {
+      title: "Анализ P&L и Финансовые метрики",
+      desc: "Сводные графики структуры расходов (ГСМ, ремонты, амортизация, ФОТ) и сравнение плановой выручки с фактической.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`
+    },
+    "addBlacklistModal": {
+      title: "Внесение сотрудника в черный список",
+      desc: "Блокировка доступа к платформе и запрет назначения на рейсы в связи с серьезными нарушениями ТБ.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+    },
+    "addVehicleModal": {
+      title: "Ввод новой спецтехники в автопарк",
+      desc: "Укажите модель машины, госномер, № техпаспорта, тип владения (собственная/аренда) и базовые лимиты расхода ГСМ.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><rect x="1" y="3" width="15" height="13" rx="2" ry="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`
+    },
+    "editVehicleModal": {
+      title: "Редактирование параметров спецтехники",
+      desc: "Изменение статуса машины, прикрепление скан-копий техпаспорта и корректировка нормативных моточасов.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`
+    },
+    "orderSafetyCertModal": {
+      title: "Заказ допуска по технике безопасности",
+      desc: "Заявка на проведение инструктажей ТБ и проверку квалификации водителя перед выездом на объект.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`
+    },
+    "addContractModal": {
+      title: "Внести новый договор в архив",
+      desc: "Регистрация контракта на аренду техники с указанием стоимости машино-часа, лимитов и сторон сделки.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`
+    },
+    "addMaterialLogModal": {
+      title: "Учет движения материалов рейса",
+      desc: "Фиксация объемов перевезенного грунта/щебня с привязкой к конкретному самосвалу и путевому листу.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><rect x="1" y="3" width="15" height="13" rx="2" ry="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`
+    },
+    "addSupplierAdvanceModal": {
+      title: "Выдать аванс контрагенту / поставщику",
+      desc: "Согласование платежа в казначействе Forte/Halyk. Расчет удержаний и контроль дебиторского лимита.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"/><line x1="12" y1="18" x2="12" y2="18.01"/><line x1="17" y1="8" x2="17" y2="8.01"/><path d="M2 10h20"/></svg>`
+    },
+    "addPotentialSupplierModal": {
+      title: "Заявка от потенциального поставщика",
+      desc: "Внесите ценовое предложение от нового арендодателя / поставщика запчастей для участия в закупке.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`
+    },
+    "editSiteModal": {
+      title: "Настройка строительного объекта",
+      desc: "Управление геозоной объекта, назначение ответственных ИТР и контроль текущей утилизации техники.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/></svg>`
+    },
+    "changePasswordModal": {
+      title: "Безопасность: Смена пароля",
+      desc: "Регулярно обновляйте пароль учетной записи для защиты от несанкционированного доступа к данным.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
+    },
+    "addAssetModal": {
+      title: "Постановка спецтехники на баланс как ОС",
+      desc: "Учет первоначальной стоимости, срока полезного использования и автоматическая амортизация.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"/><line x1="12" y1="18" x2="12" y2="18.01"/><line x1="17" y1="8" x2="17" y2="8.01"/><path d="M2 10h20"/></svg>`
+    },
+    "createOutgoingDocModal": {
+      title: "Создание исходящего документа",
+      desc: "Внесите официальное письмо или акт в базу с автоматическим присвоением порядкового исходящего номера.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`
+    },
+    "registerTripModal": {
+      title: "Оформление рейса перевозки спецтехники",
+      desc: "Составьте путевой лист транспортировки тралом, укажите водителя, пункт отправления, прибытия и SLA.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><rect x="1" y="3" width="15" height="13" rx="2" ry="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`
+    },
+    "editUserPermissionsModal": {
+      title: "Настройка прав и лимитов пользователя",
+      desc: "Разрешите или запретите сотруднику корректировать данные в табелях, удалять записи или согласовывать ФОТ.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
+    },
+    "editOrgNodeModal": {
+      title: "Редактирование сотрудника структуры",
+      desc: "Настройте ФИО, должность, отдел ИТР, привязку к логину и управление правами блокировки доступа.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>`
+    },
+    "addOrgNodeModal": {
+      title: "Добавление нового сотрудника",
+      desc: "Внесите сотрудника ИТР-состава в корпоративную иерархию с указанием его непосредственного руководителя.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`
+    },
+    "registerFuelRefillModal": {
+      title: "Регистрация чека заправки АЗС",
+      desc: "Сформируйте запись о заправке по фискальному чеку. Система автоматически верифицирует данные с GPS трекером.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M3 22V2h11a3 3 0 0 1 3 3v17H3z"/><path d="M17 6h4v4h-4z"/><circle cx="8.5" cy="10.5" r="2.5"/></svg>`
+    },
+    "deductSalaryModal": {
+      title: "Оформление удержания стоимости ГСМ",
+      desc: "Зафиксируйте сумму штрафа за подтвержденный слив или неоправданный перерасход топлива в ФОТ сотрудника.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
+    },
+    "registerIncomingDocModal": {
+      title: "Регистрация входящего официального документа",
+      desc: "Внесите входящее обращение от ведомств или контрагентов в реестр компании с сохранением текста обращения.",
+      icon: `<svg viewBox="0 0 24 24" style="width: 180px; height: 180px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`
+    }
+  };
+
+  document.querySelectorAll(".modal-overlay").forEach(overlay => {
+    const box = overlay.querySelector(".modal-box");
+    if (!box) return;
+
+    box.classList.add("modal-box-premium");
+
+    const header = box.querySelector(".modal-header");
+    if (header) {
+      header.classList.add("modal-header-premium");
+      header.style.borderBottom = "none";
+      header.style.paddingBottom = "0";
+    }
+
+    const body = box.querySelector(".modal-body");
+    if (body) {
+      body.classList.add("modal-body-premium");
+      body.style.padding = "10px 0 20px 0";
+
+      const config = modalThemeConfigs[overlay.id];
+      if (config && !body.querySelector(".modal-banner-premium")) {
+        const bannerDiv = document.createElement("div");
+        bannerDiv.className = "modal-banner-premium";
+        bannerDiv.innerHTML = `
+          <div class="banner-text">
+            <h2>${config.title}</h2>
+            <p>${config.desc}</p>
+          </div>
+          <div class="banner-icon">
+            ${config.icon}
+          </div>
+        `;
+        body.insertBefore(bannerDiv, body.firstChild);
+      }
+    }
+
+    const footer = box.querySelector(".modal-footer");
+    if (footer) {
+      footer.classList.add("modal-footer-premium");
+    }
+  });
 }
+
+// ============================================================================
+// ИНИЦИАЛИЗАЦИЯ И МИГРАЦИИ (KBI ERP)
+// ============================================================================
+
+function runSystemMigrations() {
+  let dirty = false;
+  if (!db.settings.activeDocFolder) {
+    db.settings.activeDocFolder = "incoming";
+    dirty = true;
+  }
+  if (!db.orgNodes) {
+    db.orgNodes = [
+      { id: "node_director", name: "Жолдасов Б. К.", role: "Генеральный директор", department: "Дирекция", parentId: null, userId: "u1", color: "var(--brand-color)", isBlocked: false },
+      { id: "node_deputy", name: "Аманжолов Б. С.", role: "Зам. генерального директора", department: "Операционное управление", parentId: "node_director", userId: "u2", color: "#E65100", isBlocked: false },
+      { id: "node_accountant", name: "Гульсим С.", role: "Главный бухгалтер", department: "Бухгалтерия / ФОТ", parentId: "node_deputy", userId: "u3", color: "#2E7D32", isBlocked: false },
+      { id: "node_economist", name: "Асель К.", role: "Экономист / Расчетчик", department: "Бухгалтерия / ФОТ", parentId: "node_accountant", userId: null, color: "#2E7D32", isBlocked: false },
+      { id: "node_dispatcher", name: "Ахметов Т. Ж.", role: "Старший диспетчер", department: "Логистика / GPS", parentId: "node_deputy", userId: "u4", color: "#1565C0", isBlocked: false },
+      { id: "node_logist", name: "Маратов Ж.", role: "Логист-координатор", department: "Логистика / GPS", parentId: "node_dispatcher", userId: null, color: "#1565C0", isBlocked: false },
+      { id: "node_mechanic", name: "Каримов Р. Д.", role: "Главный механик", department: "Ремонты / Снабжение", parentId: "node_deputy", userId: "u5", color: "#AD1457", isBlocked: false },
+      { id: "node_warehouse", name: "Сабитов А.", role: "Заведующий складом", department: "Ремонты / Снабжение", parentId: "node_mechanic", userId: null, color: "#AD1457", isBlocked: false },
+      { id: "node_hr", name: "Искаков Т. Б.", role: "HR-специалист", department: "Кадры / Безопасность", parentId: "node_deputy", userId: "u6", color: "#6A1B9A", isBlocked: false },
+      { id: "node_tb", name: "Служба ТБ", role: "Инспектор по охране труда", department: "Кадры / Безопасность", parentId: "node_hr", userId: null, color: "#6A1B9A", isBlocked: false },
+      { id: "node_linear", name: "Линейный персонал", role: "Машинисты и операторы", department: "Подразделение эксплуатации", parentId: "node_deputy", userId: null, color: "#475569", isBlocked: false }
+    ];
+    dirty = true;
+  }
+  if (!db.fuelTransactions) {
+    db.fuelTransactions = [
+      { id: "ft_1", vehicleId: "v101", driverId: "d101", liters: 120, checkNum: "Чек №8420 / QazaqOil", price: 295, cost: 35400, date: "2026-06-23" },
+      { id: "ft_2", vehicleId: "v107", driverId: "d107", liters: 250, checkNum: "Чек №1105 / Helios", price: 295, cost: 73750, date: "2026-06-24" }
+    ];
+    dirty = true;
+  }
+  if (!db.fuelShifts) {
+    db.fuelShifts = [
+      { id: "fs_1", vehicleId: "v101", driverId: "d101", vStart: 120, vEnd: 195, vFill: 120, N: 12.5, tHours: 3.5, delta: 0.5, status: "Норма", comment: "" },
+      { id: "fs_2", vehicleId: "v103", driverId: "d103", vStart: 300, vEnd: 170, vFill: 0, N: 15.0, tHours: 8.0, delta: 10.0, status: "Подозрение на слив", comment: "" },
+      { id: "fs_3", vehicleId: "v107", driverId: "d107", vStart: 450, vEnd: 460, vFill: 250, N: 28.0, tHours: 8.5, delta: 2.0, status: "Норма", comment: "" }
+    ];
+    dirty = true;
+  }
+  if (!db.incomingDocs) {
+    db.incomingDocs = [
+      { id: "in_1", inNumber: "KBI-IN-001/2026", srcNumber: "№ 04-12/105", title: "Запрос о предоставлении графиков движения спецтехники на Карабатане", date: "2026-06-18", sender: "РГУ Департамент экологии по Атырауской обл.", recipient: "Жолдасов Б. К.", type: "Письмо", status: "Получено", body: "В соответствии с экологическим кодексом РК просим предоставить подробные графики движения грузового транспорта и землеройной техники на объектах Карабатан за период май-июнь 2026 года с указанием GPS-координат стоянок." },
+      { id: "in_2", inNumber: "KBI-IN-002/2026", srcNumber: "№ NCOC-2026-942", title: "Согласованный акт выполненных работ по перевозке грузов за май", date: "2026-06-22", sender: "NCOC (North Caspian Operating Company)", recipient: "Гульсим С.", type: "Акт", status: "В архиве", body: "Подтверждаем объемы перевозок инертных материалов по маршрутам Атырау-Карабатан за отчетный период. Замечания по качеству и срокам выполнения услуг отсутствуют. Акт подписан с нашей стороны." }
+    ];
+    dirty = true;
+  }
+  if (!db.users) {
+    db.users = [
+      { id: "u1", username: "Жолдасов Б. К. (Директор)", role: "Director", password: "admin", read: true, write: true, approve: true, deleted: false },
+      { id: "u2", username: "Аманжолов Б. С. (Зам. директора)", role: "DeputyDirector", password: "deputy", read: true, write: true, approve: true, deleted: false },
+      { id: "u3", username: "Гульсим С. (Бухгалтер)", role: "Accountant", password: "acc", read: true, write: true, approve: true, deleted: false },
+      { id: "u4", username: "Ахметов Т. Ж. (Логист/Диспетчер)", role: "Dispatcher", password: "disp", read: true, write: true, approve: false, deleted: false },
+      { id: "u5", username: "Каримов Р. Д. (Механик)", role: "Mechanic", password: "mech", read: true, write: true, approve: false, deleted: false },
+      { id: "u6", username: "Искаков Т. Б. (HR)", role: "HR", password: "hr", read: true, write: true, approve: false, deleted: false }
+    ];
+    dirty = true;
+  }
+  if (!db.auditLogs) {
+    db.auditLogs = [
+      { id: "log_1", time: "2026-06-24 09:12", user: "Жолдасов Б. К.", action: "Вход в систему", module: "Авторизация", type: "info" },
+      { id: "log_2", time: "2026-06-24 10:45", user: "Гульсим С.", action: "Экспорт табеля за июнь", module: "Табель", type: "info" },
+      { id: "log_3", time: "2026-06-24 11:30", user: "Каримов Р. Д.", action: "Изменён статус техники v103 → 'На ремонте'", module: "Автопарк", type: "warning" }
+    ];
+    dirty = true;
+  }
+  if (!db.outgoingDocs) {
+    db.outgoingDocs = [
+      { id: "doc_1", outNumber: "KBI-OUT-001/2026", title: "Сопроводительное письмо о поставке масляных фильтров", date: "2026-06-20", author: "Ахметов Т. Ж.", recipient: "ТОО АтырауНефть", type: "Письмо", status: "Отправлено" },
+      { id: "doc_2", outNumber: "KBI-OUT-002/2026", title: "Акт приема-передачи бульдозера Shantui", date: "2026-06-22", author: "Каримов Р. Д.", recipient: "ТОО Каспий Спец Техника", type: "Соглашение", status: "В архиве" }
+    ];
+    dirty = true;
+  }
+  if (!db.approvalRequests) {
+    db.approvalRequests = [
+      { id: "app_1", title: "Заявка на оплату счета №45 (Helios OIL)", initiator: "Каримов Р. Д. (Механик)", type: "Платеж", amount: 1500000, status: "pending", date: "2026-06-24" },
+      { id: "app_2", title: "Согласование договора субаренды крана Grove", initiator: "Жолдасов Б. К. (Директор)", type: "Договор", amount: 1200000, status: "approved", date: "2026-06-23" }
+    ];
+    dirty = true;
+  }
+  if (!db.announcements) {
+    db.announcements = [
+      { id: "ann_1", message: "Сбор на экстренное совещание по логистике в 16:00 в кабинете директора!", time: "2026-06-24 14:10", author: "Директор" }
+    ];
+    dirty = true;
+  }
+  if (!db.fixedAssets) {
+    db.fixedAssets = [
+      { id: "os_1", name: "Автокран Zoomlion 25t", invNumber: "KBI-AC-01", purchaseDate: "2022-03-15", disposalDate: "", cost: 24000000, deprRate: 10, accumulatedDepr: 10200000, status: "В эксплуатации" },
+      { id: "os_2", name: "Гусеничный экскаватор CAT 320", invNumber: "KBI-EX-01", purchaseDate: "2023-01-10", disposalDate: "", cost: 36000000, deprRate: 10, accumulatedDepr: 12600000, status: "В эксплуатации" },
+      { id: "os_3", name: "Бытовой вагончик-бытовка", invNumber: "KBI-OS-03", purchaseDate: "2020-05-20", disposalDate: "2026-06-01", cost: 1800000, deprRate: 20, accumulatedDepr: 1800000, status: "Списано (выбытие)" }
+    ];
+    dirty = true;
+  }
+  if (!db.logisticTrips) {
+    db.logisticTrips = [
+      { id: "trip_1", vehicle: "Shacman (228 KBB 06)", carrier: "ТОО KazBildInvest", shipper: "ТОО KazBildInvest", receiver: "ТОО NCOC", pointA: "Атырау Склад", pointB: "Карабатан-2", distance: 45, volume: 18, weight: 12, status: "В пути" },
+      { id: "trip_2", vehicle: "KamAZ (945 ADA 06)", carrier: "ИП СпецТранс", shipper: "ТОО KazBildInvest", receiver: "РД Казмунайгаз", pointA: "Макат база", pointB: "Атырау Склад", distance: 120, volume: 12, weight: 8, status: "Доставлено" }
+    ];
+    dirty = true;
+  }
+  if (!db.aiTasks) {
+    db.aiTasks = [];
+    dirty = true;
+  }
+  if (!db.focusTasks) {
+    db.focusTasks = ["task_1", "task_3"];
+    dirty = true;
+  }
+  if (dirty) {
+    saveState();
+  }
+}
+
+// ============================================================================
+// ПЕРЕХВАТЧИКИ И ДЕКОРАТОРЫ ИНИЦИАЛИЗАЦИИ
+// ============================================================================
+
+const originalInitApp = initApp;
+initApp = function() {
+  runSystemMigrations();
+  originalInitApp();
+  
+  // Дополнительные инициализаторы
+  showSystemAnnouncements();
+  renderCustomTabContent(db.settings.activeRole);
+  initSystemAuditing();
+  initModalObserver();
+};
+
+function initModalObserver() {
+  const observer = new MutationObserver((mutations) => {
+    let shouldUpdate = false;
+    for (let mutation of mutations) {
+      if (mutation.type === "childList") {
+        for (let node of mutation.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            if (node.classList.contains("modal-overlay") || node.closest(".modal-overlay") || node.classList.contains("modal-body")) {
+              shouldUpdate = true;
+              break;
+            }
+          }
+        }
+      }
+      if (shouldUpdate) break;
+    }
+    if (shouldUpdate) {
+      observer.disconnect();
+      if (typeof applyPremiumStylesAndDecorators === "function") {
+        applyPremiumStylesAndDecorators();
+      }
+      startObserver();
+    }
+  });
+  function startObserver() {
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+  startObserver();
+}
+
+const originalSwitchTab = switchTab;
+switchTab = function(tabId) {
+  originalSwitchTab(tabId);
+  renderCustomTabContent(tabId);
+};
+
+// ============================================================================
+// ВСПОМОГАТЕЛЬНЫЕ UX ФУНКЦИИ (КОМБОБОКСЫ И СУБТАБЫ)
+// ============================================================================
+
+function toggleComboMode(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  
+  const select = container.querySelector("select");
+  const input = container.querySelector("input");
+  const btn = container.querySelector(".combo-toggle-btn");
+  
+  if (container.classList.contains("manual-mode")) {
+    container.classList.remove("manual-mode");
+    btn.innerText = "Вручную";
+    if (input) input.style.display = "none";
+    if (select) select.style.display = "block";
+  } else {
+    container.classList.add("manual-mode");
+    btn.innerText = "Выбрать";
+    if (input) input.style.display = "block";
+    if (select) select.style.display = "none";
+  }
+}
+
+function getComboValue(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return "";
+  
+  const select = container.querySelector("select");
+  const input = container.querySelector("input");
+  
+  if (container.classList.contains("manual-mode")) {
+    return input ? input.value.trim() : "";
+  } else {
+    return select ? select.value : "";
+  }
+}
+
+function switchAssetsSubTab(tabName) {
+  document.getElementById("btn-assets-tmz-tab").classList.remove("active");
+  document.getElementById("btn-assets-os-tab").classList.remove("active");
+  document.getElementById("assets-subtab-tmz").style.display = "none";
+  document.getElementById("assets-subtab-os").style.display = "none";
+
+  if (tabName === 'tmz') {
+    document.getElementById("btn-assets-tmz-tab").classList.add("active");
+    document.getElementById("assets-subtab-tmz").style.display = "block";
+    renderWarehouseInventory();
+    renderTmzLogs();
+  } else {
+    document.getElementById("btn-assets-os-tab").classList.add("active");
+    document.getElementById("assets-subtab-os").style.display = "block";
+    renderFixedAssetsTable();
+    updateAmortizePreview();
+  }
+}
+
+function switchCrmSubTab(tabName) {
+  document.getElementById("btn-crm-kanban-tab").classList.remove("active");
+  document.getElementById("btn-crm-sites-tab").classList.remove("active");
+  document.getElementById("crm-subtab-kanban").style.display = "none";
+  document.getElementById("crm-subtab-sites").style.display = "none";
+
+  if (tabName === 'kanban') {
+    document.getElementById("btn-crm-kanban-tab").classList.add("active");
+    document.getElementById("crm-subtab-kanban").style.display = "block";
+    renderCrmKanban();
+  } else {
+    document.getElementById("btn-crm-sites-tab").classList.add("active");
+    document.getElementById("crm-subtab-sites").style.display = "block";
+    renderCrmSitesTable();
+  }
+}
+
+function switchTasksView(view) {
+  document.getElementById("btn-tasks-view-kanban").classList.remove("active");
+  document.getElementById("btn-tasks-view-calendar").classList.remove("active");
+  document.getElementById("tasksKanbanView").style.display = "none";
+  document.getElementById("tasksCalendarView").style.display = "none";
+
+  if (view === 'kanban') {
+    document.getElementById("btn-tasks-view-kanban").classList.add("active");
+    document.getElementById("tasksKanbanView").style.display = "flex";
+    renderTasksKanban();
+  } else {
+    document.getElementById("btn-tasks-view-calendar").classList.add("active");
+    document.getElementById("tasksCalendarView").style.display = "block";
+    renderTasksCalendar();
+  }
+}
+
+// ============================================================================
+// РЕНДЕРИНГ КОНТЕНТА ВКЛАДОК (СВЯЗУЮЩЕЕ ЗВЕНО)
+// ============================================================================
+
+function renderCustomTabContent(tabId) {
+  showPersonalInstructions();
+  if (tabId === 'transport') {
+    renderTransportTripsTable();
+    populateTransportSelectors();
+  } else if (tabId === 'documents') {
+    renderDocumentsRegistry();
+    renderApprovalsList();
+  } else if (tabId === 'ai_voice') {
+    renderAiParsedTasks();
+    renderFocusTasks();
+  } else if (tabId === 'org_structure') {
+    renderOrgChart();
+  } else if (tabId === 'fuel') {
+    renderFuelTable();
+  } else if (tabId === 'assets') {
+    renderWarehouseInventory();
+    renderTmzLogs();
+    renderFixedAssetsTable();
+  } else if (tabId === 'crm') {
+    renderCrmSitesTable();
+  } else if (tabId === 'settings') {
+    renderUsersTable();
+    renderAuditLogTable();
+  } else if (tabId === 'tasks') {
+    // Fill combos when task pane is opened
+    populateTaskCombos();
+  }
+}
+
+// ============================================================================
+// ЛОГИРОВАНИЕ ДЕЙСТВИЙ (АУДИТ ДЕЙСТВИЙ)
+// ============================================================================
+
+function initSystemAuditing() {
+  // Логируем автоматический вход
+  const username = getActiveUsername();
+  logUserAction(username, "Вход в систему ERP", "Авторизация", "info");
+}
+
+function getActiveUsername() {
+  const role = db.settings.activeRole;
+  const user = db.users.find(u => u.role === role);
+  return user ? user.username.split(" ")[0] : role;
+}
+
+function logUserAction(user, action, module, type) {
+  if (!db.auditLogs) db.auditLogs = [];
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const timeStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  
+  db.auditLogs.unshift({
+    id: "log_" + (db.auditLogs.length + 1),
+    time: timeStr,
+    user: user,
+    action: action,
+    module: module,
+    type: type || "info"
+  });
+  saveState();
+  renderAuditLogTable();
+}
+
+function renderAuditLogTable() {
+  const tbody = document.getElementById("adminAuditLogBody");
+  if (!tbody || !db.auditLogs) return;
+  
+  tbody.innerHTML = db.auditLogs.slice(0, 15).map(log => {
+    let typeClass = "";
+    if (log.type === "warning") typeClass = "color: var(--status-warning); font-weight:700;";
+    else if (log.type === "danger") typeClass = "color: var(--status-danger); font-weight:700;";
+    else if (log.type === "success") typeClass = "color: var(--status-success); font-weight:700;";
+    
+    return `
+      <tr>
+        <td style="color:var(--text-secondary); font-size:10px;">${log.time}</td>
+        <td><strong>${log.user}</strong></td>
+        <td style="${typeClass}">${log.action}</td>
+        <td><span class="badge badge-neutral" style="font-size:9px;">${log.module}</span></td>
+      </tr>
+    `;
+  }).join("");
+}
+
+// ============================================================================
+// ИНСТРУКЦИИ ДЛЯ СОТРУДНИКОВ (SKILLS)
+// ============================================================================
+
+function showPersonalInstructions() {
+  const container = document.getElementById("dashboardInstructionsContainer");
+  if (!container) return; // Only renders if on dashboard
+  
+  const role = db.settings.activeRole;
+  const instructions = {
+    Director: "<strong>Инструкция Директора:</strong><br>1. Контролируйте P&L и окупаемость техники.<br>2. Согласуйте заявки в разделе «Документооборот».<br>3. Управляйте ролями пользователей в администрировании.",
+    DeputyDirector: "<strong>Инструкция Зам. Директора:</strong><br>1. Контролируйте статус выполнения SLA сделок.<br>2. Координируйте диспетчеров и механиков.<br>3. Согласуйте операционные заявки.",
+    Dispatcher: "<strong>Инструкция Логиста / Диспетчера:</strong><br>1. Отслеживайте GPS-сигналы спецтехники.<br>2. Фиксируйте новые путевые листы и контролируйте перевозки.<br>3. Ведите суточный табель утилизации парка.",
+    Mechanic: "<strong>Инструкция Механика:</strong><br>1. Фиксируйте дефект-акты и отправляйте технику в ремонт.<br>2. Оформляйте заявки ТМЦ снабженцам.<br>3. Заполняйте журнал ТО и ЧТО.",
+    HR: "<strong>Инструкция HR:</strong><br>1. Контролируйте сроки медосмотров и допусков ТБ.<br>2. Своевременно удаляйте уволенных сотрудников из базы.<br>3. Корректируйте черный список.",
+    Warehouse: "<strong>Инструкция Кладовщика:</strong><br>1. Принимайте заказы запчастей на Центральный склад.<br>2. Оформляйте приходы и списания ТМЗ.<br>3. Контролируйте лимиты бортового запаса.",
+    Purchaser: "<strong>Инструкция Закупщика:</strong><br>1. Проверяйте заявки от механиков.<br>2. Оформляйте закупки у поставщиков.<br>3. Контролируйте авансы.",
+    Accountant: "<strong>Инструкция Бухгалтера:</strong><br>1. Проводите расчет зарплаты машинистов.<br>2. Контролируйте дебиторскую задолженность.<br>3. Начисляйте износ ОС."
+  };
+
+  container.innerHTML = `
+    <div class="card" style="background: var(--pastel-info-bg); border-left: 4px solid var(--brand-color); padding: 16px; margin-bottom: 24px;">
+      <div style="font-size: 12px; color: var(--text-primary); line-height: 1.5;">
+        ${instructions[role] || "Выберите роль для отображения персональной инструкции по процессам."}
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================================
+// ИСПРАВЛЕНИЕ БАГА CRM: CRUD СТРОИТЕЛЬНЫХ ОБЪЕКТОВ
+// ============================================================================
+
+function renderCrmSitesTable() {
+  const tbody = document.getElementById("crmSitesTableBody");
+  if (!tbody) return;
+  
+  tbody.innerHTML = db.sites.map(s => `
+    <tr>
+      <td><strong>${s.name}</strong></td>
+      <td>${s.customer}</td>
+      <td>${s.manager}</td>
+      <td>${s.startDate}</td>
+      <td>${s.endDate}</td>
+      <td>
+        <button class="btn-secondary" style="font-size:10px; padding:4px 8px; margin-right:6px;" onclick="openEditSiteModal('${s.id}')">Изменить</button>
+        <button class="btn-secondary" style="font-size:10px; padding:4px 8px; color:var(--status-danger); border-color:var(--status-danger);" onclick="deleteSite('${s.id}')">Удалить</button>
+      </td>
+    </tr>
+  `).join("");
+}
+
+function openCreateSiteModal() {
+  document.getElementById("editSiteForm").reset();
+  document.getElementById("editSiteId").value = "";
+  document.getElementById("editSiteModalTitle").innerText = "Добавить строительный объект";
+  openModal("editSiteModal");
+}
+
+function openEditSiteModal(siteId) {
+  const s = db.sites.find(x => x.id === siteId);
+  if (!s) return;
+  
+  document.getElementById("editSiteId").value = s.id;
+  document.getElementById("editSiteName").value = s.name;
+  document.getElementById("editSiteCustomer").value = s.customer;
+  document.getElementById("editSiteManager").value = s.manager;
+  document.getElementById("editSiteStartDate").value = s.startDate;
+  document.getElementById("editSiteEndDate").value = s.endDate;
+  document.getElementById("editSiteModalTitle").innerText = "Редактирование объекта: " + s.name;
+  
+  openModal("editSiteModal");
+}
+
+function submitSaveSite() {
+  const id = document.getElementById("editSiteId").value;
+  const name = document.getElementById("editSiteName").value.trim();
+  const cust = document.getElementById("editSiteCustomer").value.trim();
+  const mgr = document.getElementById("editSiteManager").value.trim();
+  const start = document.getElementById("editSiteStartDate").value;
+  const end = document.getElementById("editSiteEndDate").value;
+  
+  if (!name || !cust || !mgr || !start || !end) {
+    alert("Пожалуйста, заполните все поля формы!");
+    return;
+  }
+  
+  if (id) {
+    // Edit existing
+    const s = db.sites.find(x => x.id === id);
+    if (s) {
+      s.name = name;
+      s.customer = cust;
+      s.manager = mgr;
+      s.startDate = start;
+      s.endDate = end;
+      logUserAction(getActiveUsername(), `Изменено название объекта: "${name}"`, "CRM", "info");
+    }
+  } else {
+    // Create new
+    const newId = "site_" + (db.sites.length + 1);
+    db.sites.push({
+      id: newId,
+      name: name,
+      customer: cust,
+      manager: mgr,
+      startDate: start,
+      endDate: end,
+      lat: 47.1 + (Math.random() * 0.5),
+      lng: 53.0 + (Math.random() * 0.5),
+      polygon: []
+    });
+    logUserAction(getActiveUsername(), `Создан новый объект строительства: "${name}"`, "CRM", "success");
+  }
+  
+  saveState();
+  closeModal("editSiteModal");
+  renderCrmSitesTable();
+  renderCrmKanban();
+  renderObjectsPnl();
+  showSystemNotification("Объекты строительства успешно обновлены!");
+}
+
+function deleteSite(siteId) {
+  const activeDeals = db.deals.filter(d => d.siteId === siteId);
+  if (activeDeals.length > 0) {
+    alert("Невозможно удалить объект, так как за ним закреплены активные сделки в CRM!");
+    return;
+  }
+  
+  if (!confirm("Вы действительно хотите удалить данный строительный объект из базы?")) return;
+  
+  const idx = db.sites.findIndex(s => s.id === siteId);
+  if (idx !== -1) {
+    const name = db.sites[idx].name;
+    db.sites.splice(idx, 1);
+    logUserAction(getActiveUsername(), `Удален объект строительства: "${name}"`, "CRM", "warning");
+    saveState();
+    renderCrmSitesTable();
+    renderObjectsPnl();
+    showSystemNotification("Строительный объект удален.");
+  }
+}
+
+// ============================================================================
+// УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ И ПРАВАМИ (SETTINGS)
+// ============================================================================
+
+function renderUsersTable() {
+  const tbody = document.getElementById("adminRolesTableBody");
+  if (!tbody || !db.users) return;
+  
+  const currentRole = db.settings.activeRole;
+  tbody.innerHTML = db.users.map(u => {
+    let permStr = [];
+    if (u.read) permStr.push("Чтение");
+    if (u.write) permStr.push("Запись");
+    if (u.approve) permStr.push("Утверждение");
+    
+    return `
+      <tr style="${u.role === currentRole ? 'background: rgba(211,47,47,0.06);' : ''}">
+        <td>
+          <strong>${u.username}</strong>
+          ${u.role === currentRole ? '<span class="badge badge-neutral" style="font-size:8px; margin-left:6px;">ТЕКУЩАЯ</span>' : ''}
+        </td>
+        <td><span style="font-size:11px; color:var(--text-secondary);">${u.role}</span></td>
+        <td><span style="font-size:11px; font-weight:600;">${permStr.join(", ") || "Нет прав"}</span></td>
+        <td>
+          <button class="btn-secondary" style="font-size:9px; padding:3px 6px;" onclick="openChangePasswordModal('${u.id}')">Пароль</button>
+          <button class="btn-secondary" style="font-size:9px; padding:3px 6px;" onclick="openEditPermissionsModal('${u.id}')">Права</button>
+          <button class="btn-secondary" style="font-size:9px; padding:3px 6px; color:var(--status-danger); border-color:var(--status-danger);" onclick="deleteUser('${u.id}')">Уволить</button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function openChangePasswordModal(userId) {
+  const u = db.users.find(x => x.id === userId);
+  if (!u) return;
+  
+  document.getElementById("changePasswordUserId").value = u.id;
+  document.getElementById("changePasswordUserName").value = u.username;
+  document.getElementById("changePasswordNewPass").value = "";
+  
+  openModal("changePasswordModal");
+}
+
+function submitChangePassword() {
+  const id = document.getElementById("changePasswordUserId").value;
+  const pass = document.getElementById("changePasswordNewPass").value.trim();
+  
+  if (!pass) {
+    alert("Пароль не может быть пустым!");
+    return;
+  }
+  
+  const u = db.users.find(x => x.id === id);
+  if (u) {
+    u.password = pass;
+    logUserAction(getActiveUsername(), `Изменен пароль пользователя ${u.username}`, "Администрирование", "info");
+    saveState();
+    closeModal("changePasswordModal");
+    showSystemNotification("Пароль пользователя успешно изменен.");
+  }
+}
+
+function openEditPermissionsModal(userId) {
+  const u = db.users.find(x => x.id === userId);
+  if (!u) return;
+  
+  document.getElementById("permUserId").value = u.id;
+  document.getElementById("permUserDisplayName").innerText = u.username;
+  document.getElementById("permReadCheck").checked = !!u.read;
+  document.getElementById("permWriteCheck").checked = !!u.write;
+  document.getElementById("permApproveCheck").checked = !!u.approve;
+  
+  openModal("editUserPermissionsModal");
+}
+
+function submitUserPermissions() {
+  const id = document.getElementById("permUserId").value;
+  const read = document.getElementById("permReadCheck").checked;
+  const write = document.getElementById("permWriteCheck").checked;
+  const approve = document.getElementById("permApproveCheck").checked;
+  
+  const u = db.users.find(x => x.id === id);
+  if (u) {
+    u.read = read;
+    u.write = write;
+    u.approve = approve;
+    
+    logUserAction(getActiveUsername(), `Обновлены права доступа для ${u.username}`, "Администрирование", "warning");
+    saveState();
+    closeModal("editUserPermissionsModal");
+    renderUsersTable();
+    showSystemNotification("Права пользователя сохранены.");
+  }
+}
+
+function deleteUser(userId) {
+  const u = db.users.find(x => x.id === userId);
+  if (!u) return;
+  
+  if (u.role === db.settings.activeRole) {
+    alert("Вы не можете удалить пользователя под ролью которого вы сейчас авторизованы!");
+    return;
+  }
+  
+  if (!confirm(`Вы действительно хотите уволить сотрудника и заблокировать доступ для ${u.username}?`)) return;
+  
+  const idx = db.users.findIndex(x => x.id === userId);
+  if (idx !== -1) {
+    db.users.splice(idx, 1);
+    logUserAction(getActiveUsername(), `Удален доступ (уволен): ${u.username}`, "Администрирование", "danger");
+    saveState();
+    renderUsersTable();
+    showSystemNotification(`Пользователь ${u.username} удален из базы.`);
+  }
+}
+
+// ============================================================================
+// СРОЧНЫЕ ОБЪЯВЛЕНИЯ
+// ============================================================================
+
+function showSystemAnnouncements() {
+  const banner = document.getElementById("urgentAnnouncementBanner");
+  const msgEl = document.getElementById("urgentAnnouncementMsg");
+  if (!banner || !msgEl || !db.announcements || db.announcements.length === 0) return;
+  
+  const latest = db.announcements[0];
+  msgEl.innerText = `${latest.message} (Опубликовал: ${latest.author}, ${latest.time.split(" ")[1]})`;
+  banner.style.display = "flex";
+}
+
+function postUrgentAnnouncement() {
+  const msg = prompt("Введите текст срочного объявления для всех сотрудников:");
+  if (!msg) return;
+  
+  const now = new Date();
+  const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  
+  db.announcements = [{
+    id: "ann_" + (db.announcements.length + 1),
+    message: msg,
+    time: timeStr,
+    author: db.settings.activeRole === "Director" ? "Директор" : "Руководство"
+  }];
+  
+  logUserAction(getActiveUsername(), `Опубликовано объявление: "${msg}"`, "Система", "info");
+  saveState();
+  showSystemAnnouncements();
+}
+
+// ============================================================================
+// ИИ-ВВОД И ПАРСИНГ ГОЛОСА (WEB SPEECH API)
+// ============================================================================
+
+let isAiRecording = false;
+let mediaRecorder = null;
+let speechRecognizer = null;
+
+function toggleVoiceRecording() {
+  const btn = document.getElementById("aiMicBtn");
+  const status = document.getElementById("aiRecordingStatus");
+  const waveform = document.getElementById("aiWaveform");
+  const display = document.getElementById("aiTranscriptDisplay");
+  
+  if (isAiRecording) {
+    // Stop recording
+    isAiRecording = false;
+    btn.classList.remove("recording");
+    status.innerText = "Микрофон выключен";
+    waveform.classList.remove("active");
+    
+    if (speechRecognizer) {
+      speechRecognizer.stop();
+    }
+  } else {
+    // Start recording
+    isAiRecording = true;
+    btn.classList.add("recording");
+    status.innerText = "Идет запись планерки...";
+    waveform.classList.add("active");
+    display.innerText = "Слушаю вас, говорите...";
+    
+    // Check for native speech recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      speechRecognizer = new SpeechRecognition();
+      speechRecognizer.lang = "ru-RU";
+      speechRecognizer.interimResults = false;
+      
+      speechRecognizer.onresult = function(event) {
+        const text = event.results[0][0].transcript;
+        display.innerText = `«${text}»`;
+        parseVoiceCommand(text);
+      };
+      
+      speechRecognizer.onerror = function() {
+        display.innerText = "Ошибка распознавания. Попробуйте еще раз или используйте демо-пресеты.";
+      };
+      
+      speechRecognizer.start();
+    } else {
+      // Fallback simulation
+      setTimeout(() => {
+        if (isAiRecording) {
+          const simulatedTexts = [
+            "Направить самосвал госномер двести двадцать девять в ремонт на Индер до тридцатого июня",
+            "Назначить водителя Серикова на бульдозер SD16 на Карабатан-2 до двадцать восьмого июня",
+            "Провести повторный инструктаж ТБ по летнему регламенту для водителя Даутова срочно"
+          ];
+          const randText = simulatedTexts[Math.floor(Math.random() * simulatedTexts.length)];
+          display.innerText = `[Симуляция]: «${randText}»`;
+          parseVoiceCommand(randText);
+          toggleVoiceRecording();
+        }
+      }, 3000);
+    }
+  }
+}
+
+function simulateVoiceInput(type) {
+  const display = document.getElementById("aiTranscriptDisplay");
+  let text = "";
+  if (type === 'appoint') {
+    text = "Назначить водителя Серикова на бульдозер SD16 на объект Карабатан-2 срок до 28 июня";
+  } else if (type === 'repair') {
+    text = "Направить самосвал госномер 228 в ремонт на объект Индер по вине водителя Даутова";
+  } else if (type === 'safety') {
+    text = "Провести инструктаж ТБ для Жусупова по летнему регламенту срок до 29 июня";
+  }
+  display.innerText = `«${text}»`;
+  parseVoiceCommand(text);
+}
+
+function parseVoiceCommand(text) {
+  const normText = text.toLowerCase();
+  let title = "Голосовое поручение ИИ";
+  let assignee = "d101"; // Default Serikov
+  let siteId = "karabatan";
+  let vehicleId = "v110";
+  let docType = "Акт выполненных работ";
+  
+  // Parse assignee
+  if (normText.includes("сериков")) assignee = "d101";
+  else if (normText.includes("калиев")) assignee = "d102";
+  else if (normText.includes("жусупов")) assignee = "d103";
+  else if (normText.includes("даутов")) assignee = "d107";
+  
+  // Parse site
+  if (normText.includes("карабатан-2") || normText.includes("карабатан 2")) siteId = "karabatan2";
+  else if (normText.includes("карабатан")) siteId = "karabatan";
+  else if (normText.includes("макат")) siteId = "makat";
+  else if (normText.includes("индер")) siteId = "inder";
+  
+  // Parse vehicle
+  if (normText.includes("самосвал")) {
+    vehicleId = "v107";
+    docType = "Акт выполненных работ";
+  } else if (normText.includes("бульдозер") || normText.includes("sd16")) {
+    vehicleId = "v110";
+    docType = "Акт выполненных работ";
+  } else if (normText.includes("ремонт")) {
+    docType = "Наряд-допуск на ремонт";
+  } else if (normText.includes("инструктаж") || normText.includes("тб")) {
+    docType = "Сертификат инструктажа";
+  }
+
+  // Generate task
+  const taskId = "ai_task_" + (db.aiTasks.length + 1);
+  const newTask = {
+    id: taskId,
+    title: text.length > 50 ? text.substring(0, 48) + "..." : text,
+    description: `Автоматически распознано ИИ: "${text}"`,
+    vehicleId: vehicleId,
+    siteId: siteId,
+    dueDate: "2026-06-30",
+    initiator: "ИИ-Агент",
+    assignee: assignee,
+    controller: "Служба ТБ",
+    status: "todo",
+    documentType: docType
+  };
+
+  db.aiTasks.push(newTask);
+  saveState();
+  renderAiParsedTasks();
+  showSystemNotification("ИИ распознал голосовую команду и создал проект задачи!");
+}
+
+function renderAiParsedTasks() {
+  const container = document.getElementById("aiParsedTasksContainer");
+  if (!container || !db.aiTasks) return;
+  
+  if (db.aiTasks.length === 0) {
+    container.innerHTML = `
+      <div style="font-size: 12px; color: var(--text-secondary); text-align: center; padding: 20px; font-style: italic;">
+        Задачи из голосового ввода не распознаны. Включите запись или используйте демо-пресеты.
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = db.aiTasks.map(t => {
+    const site = db.sites.find(s => s.id === t.siteId);
+    const driver = db.drivers.find(d => d.id === t.assignee);
+    return `
+      <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; border-left: 3px solid var(--brand-gold); font-size:12px; display:flex; flex-direction:column; gap:6px;">
+        <div style="font-weight: 700; color: var(--text-primary);">${t.title}</div>
+        <div style="color:var(--text-secondary); font-size:11px;">
+          Назначить на: ${driver ? driver.name : "Неизвестно"}<br>
+          Объект: ${site ? site.name : "Неизвестно"} | Документ: ${t.documentType}
+        </div>
+        <div style="display:flex; gap:6px; justify-content:flex-end; margin-top:4px;">
+          <button class="btn-secondary" style="font-size:9px; padding:3px 6px;" onclick="addAiTaskToFocus('${t.id}')">В фокус смены</button>
+          <button class="btn-primary" style="font-size:9px; padding:3px 6px; background-color:var(--status-success);" onclick="confirmAiTask('${t.id}')">Подтвердить в Kanban</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function confirmAiTask(aiTaskId) {
+  const tIdx = db.aiTasks.findIndex(x => x.id === aiTaskId);
+  if (tIdx === -1) return;
+  
+  const task = db.aiTasks[tIdx];
+  // Add to main tasks
+  task.id = "task_" + (db.tasks.length + 1);
+  db.tasks.push(task);
+  
+  // Remove from AI temporary tasks
+  db.aiTasks.splice(tIdx, 1);
+  
+  saveState();
+  renderAiParsedTasks();
+  renderTasksKanban();
+  showSystemNotification("Голосовая задача подтверждена и добавлена в рабочий Kanban!");
+}
+
+function addAiTaskToFocus(aiTaskId) {
+  const task = db.aiTasks.find(x => x.id === aiTaskId) || db.tasks.find(x => x.id === aiTaskId);
+  if (!task) return;
+  
+  if (!db.focusTasks.includes(task.id)) {
+    db.focusTasks.push(task.id);
+    saveState();
+    renderFocusTasks();
+    showSystemNotification("Задача закреплена в блоке фокусировки!");
+  }
+}
+
+function renderFocusTasks() {
+  const container = document.getElementById("focusTasksContainer");
+  if (!container || !db.focusTasks) return;
+  
+  const tasks = db.tasks.filter(t => db.focusTasks.includes(t.id));
+  const aiTasks = db.aiTasks.filter(t => db.focusTasks.includes(t.id));
+  const allFocus = [...tasks, ...aiTasks];
+  
+  if (allFocus.length === 0) {
+    container.innerHTML = `
+      <div style="font-size: 11px; color: var(--text-secondary); font-style: italic; text-align: center; padding: 10px;">
+        Нет закрепленных фокусных задач.
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = allFocus.map(t => {
+    return `
+      <div style="background: var(--bg-card); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+        <span style="font-weight: 600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:75%;">${t.title}</span>
+        <button class="btn-secondary" style="font-size:8px; padding:2px 4px; color:var(--status-danger); border-color:var(--status-danger);" onclick="removeFocusTask('${t.id}')">Снять</button>
+      </div>
+    `;
+  }).join("");
+}
+
+function removeFocusTask(taskId) {
+  const idx = db.focusTasks.indexOf(taskId);
+  if (idx !== -1) {
+    db.focusTasks.splice(idx, 1);
+    saveState();
+    renderFocusTasks();
+  }
+}
+
+// ============================================================================
+// МОДУЛЬ ДОКУМЕНТООБОРОТА (ИСХОДЯЩИЕ И СОГЛАСОВАНИЕ)
+// ============================================================================
+
+function renderOutgoingDocsTable() {
+  const tbody = document.getElementById("outgoingDocsTableBody");
+  if (!tbody || !db.outgoingDocs) return;
+  
+  tbody.innerHTML = db.outgoingDocs.map(d => `
+    <tr>
+      <td><span class="badge badge-neutral" style="font-size:10px; font-weight:700;">${d.outNumber}</span></td>
+      <td><strong>${d.title}</strong></td>
+      <td>${d.date}</td>
+      <td>${d.author}</td>
+      <td>${d.recipient}</td>
+      <td><span class="badge" style="font-size:9px;">${d.type}</span></td>
+      <td><span class="badge badge-success" style="font-size:9px;">${d.status}</span></td>
+    </tr>
+  `).join("");
+}
+
+function openCreateOutgoingDocModal() {
+  document.getElementById("createOutgoingDocForm").reset();
+  const now = new Date();
+  document.getElementById("outDocDate").value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  toggleOutDocNumInput();
+  openModal("createOutgoingDocModal");
+}
+
+function toggleOutDocNumInput() {
+  const mode = document.getElementById("outDocNumMode").value;
+  const group = document.getElementById("outDocManualNumGroup");
+  if (mode === "manual") {
+    group.style.display = "block";
+    document.getElementById("outDocManualNum").required = true;
+  } else {
+    group.style.display = "none";
+    document.getElementById("outDocManualNum").required = false;
+  }
+}
+
+function submitCreateOutgoingDoc() {
+  const mode = document.getElementById("outDocNumMode").value;
+  const manualNum = document.getElementById("outDocManualNum").value.trim();
+  const title = document.getElementById("outDocTitle").value.trim();
+  const rec = document.getElementById("outDocRecipient").value.trim();
+  const date = document.getElementById("outDocDate").value;
+  const type = document.getElementById("outDocType").value;
+  
+  if (!title || !rec || !date || (mode === "manual" && !manualNum)) {
+    alert("Пожалуйста, заполните необходимые поля!");
+    return;
+  }
+  
+  let outNumber = "";
+  if (mode === "auto") {
+    const nextIdx = db.outgoingDocs.filter(d => d.outNumber.startsWith("KBI-OUT")).length + 1;
+    outNumber = `KBI-OUT-${String(nextIdx).padStart(3, '0')}/2026`;
+  } else {
+    outNumber = manualNum;
+  }
+  
+  db.outgoingDocs.push({
+    id: "doc_" + (db.outgoingDocs.length + 1),
+    outNumber: outNumber,
+    title: title,
+    date: date,
+    author: getActiveUsername(),
+    recipient: rec,
+    type: type,
+    status: "Отправлено"
+  });
+  
+  logUserAction(getActiveUsername(), `Зарегистрирован исходящий документ: "${outNumber}"`, "Документооборот", "success");
+  saveState();
+  closeModal("createOutgoingDocModal");
+  renderOutgoingDocsTable();
+  showSystemNotification("Исходящий документ успешно зарегистрирован в реестре!");
+}
+
+function renderApprovalsList() {
+  const container = document.getElementById("approvalsListContainer");
+  if (!container || !db.approvalRequests) return;
+  
+  const pending = db.approvalRequests.filter(r => r.status === "pending");
+  if (pending.length === 0) {
+    container.innerHTML = `
+      <div style="font-size: 11px; color: var(--text-secondary); text-align: center; padding: 20px; font-style: italic;">
+        Нет заявок, ожидающих вашего согласования.
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = pending.map(r => `
+    <div class="approval-item" style="cursor: pointer;" onclick="if(!event.target.closest('button')) openViewApprovalRequestModal('${r.id}')">
+      <div class="approval-info">
+        <span class="approval-title">${r.title}</span>
+        <span class="approval-meta">Инициатор: ${r.initiator} | Дата: ${r.date}</span>
+        ${r.amount ? `<strong style="font-size: 12px; margin-top:4px;">Сумма: ${r.amount.toLocaleString()} ₸</strong>` : ""}
+      </div>
+      <div class="approval-actions">
+        <button class="btn-primary" style="font-size: 9px; padding: 4px 8px; background-color: var(--status-success);" onclick="approveRequest('${r.id}')">Да</button>
+        <button class="btn-secondary" style="font-size: 9px; padding: 4px 8px; color: var(--status-danger); border-color: var(--status-danger);" onclick="rejectRequest('${r.id}')">Нет</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function openViewApprovalRequestModal(reqId) {
+  const req = db.approvalRequests.find(r => r.id === reqId);
+  if (!req) return;
+  
+  document.getElementById("approveReqId").value = req.id;
+  document.getElementById("approveReqTitle").textContent = req.title;
+  document.getElementById("approveReqInitiator").textContent = req.initiator || "Не указан";
+  document.getElementById("approveReqDate").textContent = req.date || "Не указана";
+  document.getElementById("approveReqType").textContent = req.type || "Заявка";
+  document.getElementById("approveReqAmount").textContent = req.amount ? req.amount.toLocaleString() + " ₸" : "—";
+  document.getElementById("approveReqDesc").textContent = req.description || "Согласование документов в KazBildInvest.";
+  document.getElementById("approveReqCurrentRole").textContent = getActiveRoleName() || "Директор";
+
+  openModal("viewApprovalRequestModal");
+}
+
+function submitApproveRequestFromModal() {
+  const reqId = document.getElementById("approveReqId").value;
+  if (!reqId) return;
+  approveRequest(reqId);
+  closeModal("viewApprovalRequestModal");
+}
+
+function submitRejectRequestFromModal() {
+  const reqId = document.getElementById("approveReqId").value;
+  if (!reqId) return;
+  rejectRequest(reqId);
+  closeModal("viewApprovalRequestModal");
+}
+
+function getActiveRoleName() {
+  const role = db.settings.activeRole;
+  if (role === "Director") return "Директор (Все права)";
+  if (role === "DeputyDirector") return "Зам. директора";
+  if (role === "Accountant") return "Главный бухгалтер";
+  if (role === "Dispatcher") return "Диспетчер";
+  if (role === "Mechanic") return "Главный механик";
+  if (role === "HR") return "HR-специалист";
+  return role;
+}
+
+function approveRequest(reqId) {
+  const req = db.approvalRequests.find(r => r.id === reqId);
+  if (!req) return;
+  
+  req.status = "approved";
+  logUserAction(getActiveUsername(), `Утверждена заявка: "${req.title}"`, "Согласование", "success");
+  saveState();
+  renderApprovalsList();
+  showSystemNotification("Заявка успешно утверждена!");
+}
+
+function rejectRequest(reqId) {
+  const req = db.approvalRequests.find(r => r.id === reqId);
+  if (!req) return;
+  
+  req.status = "rejected";
+  logUserAction(getActiveUsername(), `Отклонена заявка: "${req.title}"`, "Согласование", "danger");
+  saveState();
+  renderApprovalsList();
+  showSystemNotification("Заявка отклонена.");
+}
+
+// ============================================================================
+// ЛОГИСТИКА И ПЕРЕВОЗКИ
+// ============================================================================
+
+function populateTransportSelectors() {
+  const vSelect = document.getElementById("tripVehicleSelect");
+  if (!vSelect) return;
+  vSelect.innerHTML = db.vehicles.map(v => `<option value="${v.plate}">${v.name} (${v.plate})</option>`).join("");
+}
+
+function renderTransportTripsTable() {
+  const tbody = document.getElementById("transportTripsTableBody");
+  if (!tbody || !db.logisticTrips) return;
+  
+  tbody.innerHTML = db.logisticTrips.map((t, idx) => `
+    <tr>
+      <td><strong>№ ${String(idx+1).padStart(3, '0')}</strong></td>
+      <td><strong>${t.vehicle}</strong></td>
+      <td>${t.pointA} ➔ ${t.pointB}</td>
+      <td>Вес: ${t.weight}т / Объем: ${t.volume}м³</td>
+      <td>${t.carrier}</td>
+      <td>${t.receiver}</td>
+      <td>${t.distance} км</td>
+      <td><span class="badge ${t.status === 'Доставлено' ? 'badge-success' : 'badge-warning'}" style="font-size:9px;">${t.status}</span></td>
+      <td>
+        ${t.status === 'В пути' 
+          ? `<button class="btn-secondary" style="font-size:9px; padding:3px 6px;" onclick="completeTrip('${t.id}')">Завершить</button>` 
+          : `<span style="color:var(--text-secondary); font-size:10px;">Выполнено</span>`
+        }
+      </td>
+    </tr>
+  `).join("");
+}
+
+function openRegisterTripModal() {
+  document.getElementById("registerTripForm").reset();
+  openModal("registerTripModal");
+}
+
+function submitRegisterTrip() {
+  const vehicle = getComboValue("tripVehicleCombo");
+  const carrier = document.getElementById("tripCarrier").value.trim();
+  const shipper = document.getElementById("tripShipper").value.trim();
+  const receiver = document.getElementById("tripReceiver").value.trim();
+  const pointA = document.getElementById("tripPointA").value.trim();
+  const pointB = document.getElementById("tripPointB").value.trim();
+  const vol = parseInt(document.getElementById("tripVolume").value) || 0;
+  const weight = parseInt(document.getElementById("tripWeight").value) || 0;
+  const dist = parseInt(document.getElementById("tripDistance").value) || 0;
+  
+  if (!vehicle || !carrier || !shipper || !receiver || !pointA || !pointB) {
+    alert("Пожалуйста, заполните все обязательные поля!");
+    return;
+  }
+  
+  db.logisticTrips.unshift({
+    id: "trip_" + (db.logisticTrips.length + 1),
+    vehicle: vehicle,
+    carrier: carrier,
+    shipper: shipper,
+    receiver: receiver,
+    pointA: pointA,
+    pointB: pointB,
+    distance: dist,
+    volume: vol,
+    weight: weight,
+    status: "В пути"
+  });
+  
+  logUserAction(getActiveUsername(), `Зарегистрирован рейс ${pointA} ➔ ${pointB} (${vehicle})`, "Логистика", "success");
+  saveState();
+  closeModal("registerTripModal");
+  renderTransportTripsTable();
+  
+  // Update dashboard route visual
+  document.getElementById("activeRoutePoints").innerText = `${pointA} ➔ ${pointB}`;
+  document.getElementById("activeTripVehicleInfo").innerText = vehicle;
+  
+  showSystemNotification("Рейс логистики успешно зарегистрирован и отправлен!");
+}
+
+function completeTrip(tripId) {
+  const trip = db.logisticTrips.find(t => t.id === tripId);
+  if (!trip) return;
+  
+  trip.status = "Доставлено";
+  logUserAction(getActiveUsername(), `Завершен рейс: ${trip.pointA} ➔ ${trip.pointB}`, "Логистика", "info");
+  saveState();
+  renderTransportTripsTable();
+  showSystemNotification("Рейс успешно завершен. Груз доставлен получателю.");
+}
+
+// ============================================================================
+// УЧЕТ ТМЗ & ОС (ФИНАНСЫ И АКТИВЫ)
+// ============================================================================
+
+function renderTmzLogs() {
+  const tbody = document.getElementById("tmzMovementLogBody");
+  if (!tbody || !db.materialsWriteOffs) return;
+  
+  tbody.innerHTML = db.materialsWriteOffs.map(log => `
+    <tr>
+      <td>${log.date}</td>
+      <td>
+        <span class="badge ${log.type === 'Приход' ? 'badge-success' : 'badge-danger'}" style="font-size:9px;">${log.type}</span>
+      </td>
+      <td><strong>${log.itemName}</strong></td>
+      <td>${log.qty} шт</td>
+      <td>${log.price.toLocaleString()} ₸</td>
+      <td>${log.source}</td>
+    </tr>
+  `).join("");
+}
+
+function openAddMaterialLogModal() {
+  document.getElementById("materialLogForm").reset();
+  updateMaterialSubmitButton();
+  openModal("addMaterialLogModal");
+}
+
+function submitAddMaterialLog() {
+  const type = document.getElementById("mwoType").value;
+  const name = document.getElementById("mwoItem").value.trim();
+  const qty = parseInt(document.getElementById("mwoQty").value) || 0;
+  const price = parseInt(document.getElementById("mwoPrice").value) || 0;
+  const source = document.getElementById("mwoSource").value.trim();
+  
+  if (!name || qty <= 0 || price <= 0 || !source) {
+    alert("Заполните все числовые и текстовые поля!");
+    return;
+  }
+  
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  
+  db.materialsWriteOffs.unshift({
+    id: "mwo_" + (db.materialsWriteOffs.length + 1),
+    date: dateStr,
+    type: type,
+    itemName: name,
+    qty: qty,
+    price: price,
+    source: source
+  });
+  
+  // Mutate inventory balance if it matches SKU
+  const invMatch = db.warehouses.central.find(i => i.name.toLowerCase().includes(name.toLowerCase()));
+  if (invMatch) {
+    if (type === "Приход") {
+      invMatch.balance += qty;
+    } else {
+      invMatch.balance = Math.max(0, invMatch.balance - qty);
+    }
+  }
+  
+  logUserAction(getActiveUsername(), `${type} ТМЗ: "${name}" (${qty} шт)`, "Склад", type === "Приход" ? "success" : "warning");
+  saveState();
+  closeModal("addMaterialLogModal");
+  renderTmzLogs();
+  renderWarehouseInventory();
+  showSystemNotification("Операция движения ТМЦ сохранена.");
+}
+
+function renderFixedAssetsTable() {
+  const tbody = document.getElementById("fixedAssetsTableBody");
+  if (!tbody || !db.fixedAssets) return;
+  
+  tbody.innerHTML = db.fixedAssets.map(a => {
+    const residual = a.cost - a.accumulatedDepr;
+    let badgeClass = a.status === 'В эксплуатации' ? 'badge-success' : 'badge-danger';
+    
+    return `
+      <tr>
+        <td><span class="badge badge-neutral" style="font-size:10px; font-weight:700;">${a.invNumber}</span></td>
+        <td><strong>${a.name}</strong></td>
+        <td>${a.purchaseDate}</td>
+        <td>${a.disposalDate || "—"}</td>
+        <td>${a.cost.toLocaleString()} ₸</td>
+        <td>${a.deprRate}% / год</td>
+        <td style="color:var(--status-danger);">${a.accumulatedDepr.toLocaleString()} ₸</td>
+        <td style="color:var(--status-success); font-weight:700;">${residual.toLocaleString()} ₸</td>
+        <td><span class="badge ${badgeClass}" style="font-size:9px;">${a.status}</span></td>
+        <td>
+          ${a.status === 'В эксплуатации'
+            ? `<button class="btn-secondary" style="font-size:9px; padding:3px 6px; color:var(--status-danger); border-color:var(--status-danger);" onclick="retireAsset('${a.id}')">Списать ОС</button>`
+            : `<span style="font-size:10px; color:var(--text-secondary);">Списано</span>`
+          }
+        </td>
+      </tr>
+    `;
+  }).join("");
+  
+  // Populate calculator select
+  const select = document.getElementById("amortizeAssetSelect");
+  if (select) {
+    select.innerHTML = db.fixedAssets.filter(a => a.status === 'В эксплуатации').map(a => `<option value="${a.id}">${a.name} (${a.invNumber})</option>`).join("");
+  }
+  
+  calculateAssetStats();
+}
+
+function calculateAssetStats() {
+  if (!db.fixedAssets) return;
+  
+  const active = db.fixedAssets.filter(a => a.status === 'В эксплуатации');
+  const totalCost = active.reduce((sum, a) => sum + a.cost, 0);
+  const totalDepr = active.reduce((sum, a) => sum + a.accumulatedDepr, 0);
+  const netValue = totalCost - totalDepr;
+  
+  document.getElementById("totalAssetCostDisplay").innerText = totalCost.toLocaleString() + " ₸";
+  document.getElementById("totalAssetDepreciationDisplay").innerText = totalDepr.toLocaleString() + " ₸";
+  document.getElementById("totalAssetNetDisplay").innerText = netValue.toLocaleString() + " ₸";
+  document.getElementById("ownedAssetsCountDisplay").innerText = active.length + " ед.";
+}
+
+function openAddAssetModal() {
+  document.getElementById("addAssetForm").reset();
+  const now = new Date();
+  document.getElementById("newAssetPurchaseDate").value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  openModal("addAssetModal");
+}
+
+function submitAddAsset() {
+  const name = document.getElementById("newAssetName").value.trim();
+  const inv = document.getElementById("newAssetInvNumber").value.trim();
+  const cost = parseInt(document.getElementById("newAssetCost").value) || 0;
+  const date = document.getElementById("newAssetPurchaseDate").value;
+  const rate = parseInt(document.getElementById("newAssetDeprRate").value) || 0;
+  
+  if (!name || !inv || cost <= 0 || !date || rate <= 0) {
+    alert("Заполните все поля карточки ОС!");
+    return;
+  }
+  
+  db.fixedAssets.push({
+    id: "os_" + (db.fixedAssets.length + 1),
+    name: name,
+    invNumber: inv,
+    purchaseDate: date,
+    disposalDate: "",
+    cost: cost,
+    deprRate: rate,
+    accumulatedDepr: 0,
+    status: "В эксплуатации"
+  });
+  
+  logUserAction(getActiveUsername(), `Принято к учету новое основное средство: "${name}" (${inv})`, "Финансы", "success");
+  saveState();
+  closeModal("addAssetModal");
+  renderFixedAssetsTable();
+  showSystemNotification("Основное средство зачислено на баланс компании.");
+}
+
+function retireAsset(assetId) {
+  const asset = db.fixedAssets.find(a => a.id === assetId);
+  if (!asset) return;
+  
+  if (!confirm(`Вы уверены, что хотите списать ОС "${asset.name}" с баланса?`)) return;
+  
+  const now = new Date();
+  asset.disposalDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  asset.status = "Списано (выбытие)";
+  
+  logUserAction(getActiveUsername(), `Выбытие ОС с баланса: "${asset.name}"`, "Финансы", "danger");
+  saveState();
+  renderFixedAssetsTable();
+  showSystemNotification("Основное средство успешно списано.");
+}
+
+function updateAmortizePreview() {
+  const id = document.getElementById("amortizeAssetSelect").value;
+  if (!id) return;
+  
+  const a = db.fixedAssets.find(x => x.id === id);
+  if (!a) return;
+  
+  const monthly = (a.cost * (a.deprRate / 100)) / 12;
+  const residual = a.cost - a.accumulatedDepr;
+  
+  document.getElementById("previewAssetMonthlyAmort").innerText = Math.round(monthly).toLocaleString() + " ₸";
+  document.getElementById("previewAssetAccumulated").innerText = a.accumulatedDepr.toLocaleString() + " ₸";
+  document.getElementById("previewAssetResidual").innerText = residual.toLocaleString() + " ₸";
+}
+
+function runDepreciationCalculation() {
+  const id = document.getElementById("amortizeAssetSelect").value;
+  if (!id) return;
+  
+  const a = db.fixedAssets.find(x => x.id === id);
+  if (!a) return;
+  
+  const monthly = Math.round((a.cost * (a.deprRate / 100)) / 12);
+  const maxAllowable = a.cost - a.accumulatedDepr;
+  
+  if (maxAllowable <= 0) {
+    alert("Данное основное средство уже полностью амортизировано (остаточная стоимость равна 0 ₸)!");
+    return;
+  }
+  
+  const finalAmort = Math.min(monthly, maxAllowable);
+  a.accumulatedDepr += finalAmort;
+  
+  logUserAction(getActiveUsername(), `Начислена амортизация ОС: "${a.name}" (+${finalAmort.toLocaleString()} ₸)`, "Финансы", "warning");
+  saveState();
+  renderFixedAssetsTable();
+  updateAmortizePreview();
+  showSystemNotification("Амортизационные начисления успешно проведены!");
+}
+
+// ============================================================================
+// ИНТЕРАКТИВНЫЙ КАЛЕНДАРЬ ЗАДАЧ И ДЕДЛАЙНОВ
+// ============================================================================
+
+function renderTasksCalendar() {
+  const grid = document.getElementById("tasksCalendarGrid");
+  if (!grid) return;
+  
+  // We simulate a calendar month for June 2026
+  const monthName = "Июнь 2026";
+  const daysInMonth = 30;
+  const startDayOfWeek = 0; // June 1st, 2026 is Monday (0-indexed where Monday is 0)
+  
+  let html = `
+    <div class="calendar-grid-header">
+      <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div style="color:var(--status-danger);">Сб</div><div style="color:var(--status-danger);">Вс</div>
+    </div>
+  `;
+  
+  // Render empty cells for days of previous month
+  for (let i = 0; i < startDayOfWeek; i++) {
+    html += `<div class="calendar-day-cell other-month"><span class="calendar-day-num">${31 - startDayOfWeek + i + 1}</span></div>`;
+  }
+  
+  // Render days of June
+  for (let day = 1; day <= daysInMonth; day++) {
+    const pad = n => String(n).padStart(2, '0');
+    const currentDateStr = `2026-06-${pad(day)}`;
+    
+    // Find tasks with due date matching this day
+    const dayTasks = db.tasks.filter(t => t.dueDate === currentDateStr);
+    
+    let tasksHtml = dayTasks.map(t => {
+      let statusClass = t.status || "todo";
+      return `<div class="calendar-task-event ${statusClass}" onclick="openTaskDetails('${t.id}')" title="${t.title}">${t.title}</div>`;
+    }).join("");
+    
+    const isToday = day === 24; // Simulated today is June 24th, 2026
+    const cellClass = `calendar-day-cell ${isToday ? 'today' : ''}`;
+    
+    html += `
+      <div class="${cellClass}">
+        <span class="calendar-day-num">${day}</span>
+        <div style="display:flex; flex-direction:column; gap:3px; overflow-y:auto; flex-grow:1; max-height: 80px;">
+          ${tasksHtml}
+        </div>
+      </div>
+    `;
+  }
+  
+  grid.innerHTML = html;
+}
+
+function populateTaskCombos() {
+  const vCombo = document.getElementById("newTaskVehicleSelect");
+  if (vCombo) {
+    vCombo.innerHTML = `<option value="">Без привязки к машине</option>` + db.vehicles.map(v => `<option value="${v.id}">${v.name} (${v.plate})</option>`).join("");
+  }
+  const sCombo = document.getElementById("newTaskSiteSelect");
+  if (sCombo) {
+    sCombo.innerHTML = `<option value="">Без привязки к объекту</option>` + db.sites.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+  }
+  const aCombo = document.getElementById("newTaskAssigneeSelect");
+  if (aCombo) {
+    aCombo.innerHTML = db.drivers.map(d => `<option value="${d.id}">${d.name} (${d.position})</option>`).join("");
+  }
+}
+
+// Modify createTask submit to support manual combo mode
+const originalSubmitCreateTask = submitCreateTask;
+submitCreateTask = function() {
+  const vManual = getComboValue("newTaskVehicleCombo");
+  const sManual = getComboValue("newTaskSiteCombo");
+  
+  // If user entered vehicle manually, find or mock it
+  let vId = document.getElementById("newTaskVehicleSelect").value;
+  if (document.getElementById("newTaskVehicleCombo").classList.contains("manual-mode")) {
+    vId = vManual; // Store text directly
+  }
+  
+  // If site entered manually
+  let sId = document.getElementById("newTaskSiteSelect").value;
+  if (document.getElementById("newTaskSiteCombo").classList.contains("manual-mode")) {
+    sId = sManual;
+  }
+  
+  // Intercept and handle creation
+  const title = document.getElementById("newTaskTitle").value.trim();
+  const desc = document.getElementById("newTaskDesc").value.trim();
+  const due = document.getElementById("newTaskDueDate").value;
+  const ass = document.getElementById("newTaskAssigneeSelect").value;
+  const ctrl = document.getElementById("newTaskController").value;
+  const doc = document.getElementById("newTaskDocType").value;
+  
+  if (!title || !desc || !due) {
+    alert("Заполните основные поля задачи!");
+    return;
+  }
+  
+  db.tasks.push({
+    id: "task_" + (db.tasks.length + 1),
+    title: title,
+    description: desc,
+    vehicleId: vId,
+    siteId: sId,
+    dueDate: due,
+    initiator: db.settings.activeRole,
+    assignee: ass,
+    controller: ctrl,
+    status: "todo",
+    documentType: doc
+  });
+  
+  logUserAction(getActiveUsername(), `Создана новая задача: "${title}"`, "Задачи", "success");
+  saveState();
+  closeModal("createTaskModal");
+  logUserAction(getActiveUsername(), `Создана новая задача: "${title}"`, "Задачи", "success");
+  saveState();
+  closeModal("createTaskModal");
+  renderTasksKanban();
+  renderTasksCalendar();
+  showSystemNotification("Поручение успешно добавлено!");
+};
+
+
+// ============================================================================
+// МОДУЛЬ ДИНАМИЧЕСКОЙ ОРГСТРУКТУРЫ С БЛОКИРОВКОЙ ДОСТУПА
+// ============================================================================
+
+function renderOrgChart() {
+  const container = document.getElementById("dynamicOrgTree");
+  if (!container || !db.orgNodes) return;
+  container.innerHTML = "";
+  
+  // Находим корневые узлы (у которых нет parentId или parentId не существует в списке)
+  const roots = db.orgNodes.filter(node => !node.parentId || !db.orgNodes.some(n => n.id === node.parentId));
+  
+  roots.forEach(root => {
+    container.appendChild(buildOrgNodeHtml(root));
+  });
+}
+
+function buildOrgNodeHtml(node) {
+  const wrapper = document.createElement("div");
+  wrapper.style.display = "flex";
+  wrapper.style.flexDirection = "column";
+  wrapper.style.alignItems = "center";
+  wrapper.style.margin = "0 12px";
+  wrapper.style.position = "relative";
+  
+  const card = document.createElement("div");
+  card.className = "org-node";
+  card.style.borderTopColor = node.color || "var(--brand-color)";
+  card.style.cursor = "pointer";
+  card.style.position = "relative";
+  card.style.margin = "8px 0";
+  card.onclick = () => openEditOrgNodeModal(node.id);
+  
+  card.innerHTML = `
+    <div class="org-node-title">${node.name}</div>
+    <div class="org-node-subtitle">${node.role}</div>
+    <div class="org-node-badge">${node.department}</div>
+    ${node.isBlocked ? `<div style="background:#DC2626; color:#FFF; font-size:9px; padding:2px 6px; border-radius:4px; margin-top:6px; font-weight:700; display:inline-block;">БЛОКИРОВАН</div>` : ''}
+  `;
+  wrapper.appendChild(card);
+  
+  // Находим подчиненных
+  const children = db.orgNodes.filter(n => n.parentId === node.id);
+  if (children.length > 0) {
+    const line = document.createElement("div");
+    line.style.width = "2px";
+    line.style.height = "16px";
+    line.style.background = "var(--border-color)";
+    wrapper.appendChild(line);
+    
+    const childrenWrapper = document.createElement("div");
+    childrenWrapper.style.display = "flex";
+    childrenWrapper.style.justifyContent = "center";
+    childrenWrapper.style.alignItems = "flex-start";
+    childrenWrapper.style.position = "relative";
+    
+    children.forEach((child, index) => {
+      const childContainer = buildOrgNodeHtml(child);
+      
+      if (children.length > 1) {
+        childContainer.style.borderTop = "2px solid var(--border-color)";
+        if (index === 0) {
+          childContainer.style.borderLeft = "2px solid var(--border-color)";
+          childContainer.style.borderRadius = "8px 0 0 0";
+        } else if (index === children.length - 1) {
+          childContainer.style.borderRight = "2px solid var(--border-color)";
+          childContainer.style.borderRadius = "0 8px 0 0";
+        } else {
+          childContainer.style.borderRadius = "0";
+        }
+        childContainer.style.paddingTop = "8px";
+        childContainer.style.marginTop = "-2px";
+      } else {
+        childContainer.style.paddingTop = "8px";
+      }
+      
+      childrenWrapper.appendChild(childContainer);
+    });
+    
+    wrapper.appendChild(childrenWrapper);
+  }
+  
+  return wrapper;
+}
+
+function openAddOrgNodeModal() {
+  const form = document.getElementById("addOrgNodeForm");
+  if (form) form.reset();
+  
+  const parentSelect = document.getElementById("addOrgNodeParentId");
+  if (parentSelect) {
+    parentSelect.innerHTML = `<option value="">-- Без руководителя (Корневой) --</option>` + 
+      db.orgNodes.map(n => `<option value="${n.id}">${n.name} (${n.role})</option>`).join("");
+  }
+  
+  const userSelect = document.getElementById("addOrgNodeUserId");
+  if (userSelect) {
+    userSelect.innerHTML = `<option value="">-- Не привязан к аккаунту --</option>` + 
+      db.users.filter(u => !u.deleted).map(u => `<option value="${u.id}">${u.username}</option>`).join("");
+  }
+  
+  openModal("addOrgNodeModal");
+}
+
+function submitAddOrgNode() {
+  const name = document.getElementById("addOrgNodeName").value.trim();
+  const role = document.getElementById("addOrgNodeRole").value.trim();
+  const dept = document.getElementById("addOrgNodeDepartment").value.trim();
+  const parentId = document.getElementById("addOrgNodeParentId").value || null;
+  const userId = document.getElementById("addOrgNodeUserId").value || null;
+  const color = document.getElementById("addOrgNodeColor").value;
+  
+  if (!name || !role || !dept) {
+    alert("Пожалуйста, заполните все обязательные поля!");
+    return;
+  }
+  
+  const id = "node_" + (db.orgNodes.length + 1) + "_" + Math.floor(Math.random() * 1000);
+  
+  db.orgNodes.push({
+    id: id,
+    name: name,
+    role: role,
+    department: dept,
+    parentId: parentId,
+    userId: userId,
+    color: color,
+    isBlocked: false
+  });
+  
+  logUserAction(getActiveUsername(), `Добавлен новый сотрудник в оргструктуру: ${name}`, "HR/Оргструктура", "success");
+  saveState();
+  closeModal("addOrgNodeModal");
+  renderOrgChart();
+  showSystemNotification(`Сотрудник ${name} успешно добавлен!`);
+}
+
+function openEditOrgNodeModal(nodeId) {
+  const node = db.orgNodes.find(n => n.id === nodeId);
+  if (!node) return;
+  
+  document.getElementById("editOrgNodeId").value = node.id;
+  document.getElementById("editOrgNodeName").value = node.name;
+  document.getElementById("editOrgNodeRole").value = node.role;
+  document.getElementById("editOrgNodeDepartment").value = node.department;
+  document.getElementById("editOrgNodeColor").value = node.color || "var(--brand-color)";
+  document.getElementById("editOrgNodeIsBlocked").checked = !!node.isBlocked;
+  
+  const descendants = getDescendantNodeIds(node.id);
+  const parentSelect = document.getElementById("editOrgNodeParentId");
+  if (parentSelect) {
+    parentSelect.innerHTML = `<option value="">-- Без руководителя (Корневой) --</option>` + 
+      db.orgNodes.filter(n => n.id !== node.id && !descendants.includes(n.id))
+                 .map(n => `<option value="${n.id}">${n.name} (${n.role})</option>`).join("");
+    parentSelect.value = node.parentId || "";
+  }
+  
+  const userSelect = document.getElementById("editOrgNodeUserId");
+  if (userSelect) {
+    userSelect.innerHTML = `<option value="">-- Не привязан к аккаунту --</option>` + 
+      db.users.filter(u => !u.deleted).map(u => `<option value="${u.id}">${u.username}</option>`).join("");
+    userSelect.value = node.userId || "";
+  }
+  
+  openModal("editOrgNodeModal");
+}
+
+function getDescendantNodeIds(nodeId) {
+  let list = [];
+  const children = db.orgNodes.filter(n => n.parentId === nodeId);
+  children.forEach(c => {
+    list.push(c.id);
+    list = list.concat(getDescendantNodeIds(c.id));
+  });
+  return list;
+}
+
+function submitEditOrgNode() {
+  const id = document.getElementById("editOrgNodeId").value;
+  const name = document.getElementById("editOrgNodeName").value.trim();
+  const role = document.getElementById("editOrgNodeRole").value.trim();
+  const dept = document.getElementById("editOrgNodeDepartment").value.trim();
+  const parentId = document.getElementById("editOrgNodeParentId").value || null;
+  const userId = document.getElementById("editOrgNodeUserId").value || null;
+  const color = document.getElementById("editOrgNodeColor").value;
+  const isBlocked = document.getElementById("editOrgNodeIsBlocked").checked;
+  
+  const node = db.orgNodes.find(n => n.id === id);
+  if (!node) return;
+  
+  node.name = name;
+  node.role = role;
+  node.department = dept;
+  node.parentId = parentId;
+  node.userId = userId;
+  node.color = color;
+  node.isBlocked = isBlocked;
+  
+  logUserAction(getActiveUsername(), `Обновлен сотрудник: ${name} (Блокировка: ${isBlocked})`, "HR/Оргструктура", "warning");
+  saveState();
+  closeModal("editOrgNodeModal");
+  applyRolePermissions(); 
+  renderOrgChart();
+  showSystemNotification(`Данные сотрудника ${name} изменены!`);
+}
+
+function deleteOrgNode() {
+  const id = document.getElementById("editOrgNodeId").value;
+  const node = db.orgNodes.find(n => n.id === id);
+  if (!node) return;
+  
+  if (confirm(`Вы уверены, что хотите удалить сотрудника ${node.name}? Подчиненные узлы будут переподчинены вышестоящему руководителю.`)) {
+    db.orgNodes.forEach(n => {
+      if (n.parentId === id) {
+        n.parentId = node.parentId;
+      }
+    });
+    
+    db.orgNodes = db.orgNodes.filter(n => n.id !== id);
+    
+    logUserAction(getActiveUsername(), `Удален сотрудник из оргструктуры: ${node.name}`, "HR/Оргструктура", "danger");
+    saveState();
+    closeModal("editOrgNodeModal");
+    renderOrgChart();
+    showSystemNotification(`Сотрудник ${node.name} удален из структуры.`);
+  }
+}
+
+// ============================================================================
+// МОДУЛЬ УЛУЧШЕННОГО ДОКУМЕНТООБОРОТА С ОФИЦИАЛЬНЫМИ БЛАНКАМИ
+// ============================================================================
+
+function switchDocFolder(folder) {
+  db.settings.activeDocFolder = folder;
+  
+  const inTab = document.getElementById("docTabIncoming");
+  const outTab = document.getElementById("docTabOutgoing");
+  if (inTab && outTab) {
+    inTab.classList.toggle("active", folder === "incoming");
+    inTab.style.color = folder === "incoming" ? "var(--brand-color)" : "var(--text-secondary)";
+    inTab.style.borderBottom = folder === "incoming" ? "2px solid var(--brand-color)" : "none";
+    
+    outTab.classList.toggle("active", folder === "outgoing");
+    outTab.style.color = folder === "outgoing" ? "var(--brand-color)" : "var(--text-secondary)";
+    outTab.style.borderBottom = folder === "outgoing" ? "2px solid var(--brand-color)" : "none";
+  }
+  
+  saveState();
+  renderDocumentsRegistry();
+}
+
+function renderDocumentsRegistry() {
+  const table = document.getElementById("documentsRegistryTable");
+  if (!table) return;
+  
+  const headerRow = document.getElementById("docTableHeaderRow");
+  const tbody = document.getElementById("documentsTableBody");
+  const folder = db.settings.activeDocFolder || "incoming";
+  const searchVal = (document.getElementById("docSearchInput")?.value || "").toLowerCase().trim();
+  const typeVal = document.getElementById("docTypeFilter")?.value || "all";
+  
+  if (headerRow) {
+    if (folder === "incoming") {
+      headerRow.innerHTML = `
+        <th>Входящий №</th>
+        <th>№ Отправителя</th>
+        <th>Тема / Название</th>
+        <th>Дата регистрации</th>
+        <th>Отправитель</th>
+        <th>Тип</th>
+        <th>Статус</th>
+      `;
+    } else {
+      headerRow.innerHTML = `
+        <th>Исходящий №</th>
+        <th>Тема / Название</th>
+        <th>Дата регистрации</th>
+        <th>Исполнитель</th>
+        <th>Получатель</th>
+        <th>Тип</th>
+        <th>Статус</th>
+      `;
+    }
+  }
+  
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  
+  let docs = folder === "incoming" ? (db.incomingDocs || []) : (db.outgoingDocs || []);
+  
+  if (typeVal !== "all") {
+    docs = docs.filter(d => d.type === typeVal);
+  }
+  
+  if (searchVal) {
+    docs = docs.filter(d => {
+      const num = (d.outNumber || d.inNumber || d.srcNumber || "").toLowerCase();
+      const title = (d.title || "").toLowerCase();
+      const counterpart = (d.recipient || d.sender || "").toLowerCase();
+      return num.includes(searchVal) || title.includes(searchVal) || counterpart.includes(searchVal);
+    });
+  }
+  
+  if (docs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-secondary); padding: 24px 0;">Документы не найдены</td></tr>`;
+    return;
+  }
+  
+  tbody.innerHTML = docs.map(d => {
+    const isIncoming = folder === "incoming";
+    const onClickCall = `openViewOfficialDocumentModal('${d.id}', ${isIncoming})`;
+    
+    if (isIncoming) {
+      return `
+        <tr onclick="${onClickCall}" style="cursor:pointer;" onmouseover="this.style.backgroundColor='var(--bg-secondary)'" onmouseout="this.style.backgroundColor='transparent'">
+          <td><span class="badge badge-neutral" style="font-size:10px; font-weight:700;">${d.inNumber}</span></td>
+          <td><span style="font-family:monospace; font-size:11px;">${d.srcNumber}</span></td>
+          <td><strong>${d.title}</strong></td>
+          <td>${d.date}</td>
+          <td>${d.sender}</td>
+          <td><span class="badge" style="font-size:9px;">${d.type}</span></td>
+          <td><span class="badge badge-success" style="font-size:9px;">${d.status}</span></td>
+        </tr>
+      `;
+    } else {
+      return `
+        <tr onclick="${onClickCall}" style="cursor:pointer;" onmouseover="this.style.backgroundColor='var(--bg-secondary)'" onmouseout="this.style.backgroundColor='transparent'">
+          <td><span class="badge badge-neutral" style="font-size:10px; font-weight:700;">${d.outNumber}</span></td>
+          <td><strong>${d.title}</strong></td>
+          <td>${d.date}</td>
+          <td>${d.author}</td>
+          <td>${d.recipient}</td>
+          <td><span class="badge" style="font-size:9px;">${d.type}</span></td>
+          <td><span class="badge badge-success" style="font-size:9px;">${d.status}</span></td>
+        </tr>
+      `;
+    }
+  }).join("");
+}
+
+function openCreateIncomingDocModal() {
+  const form = document.getElementById("registerIncomingDocForm");
+  if (form) form.reset();
+  
+  const now = new Date();
+  document.getElementById("inDocDate").value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  
+  openModal("registerIncomingDocModal");
+}
+
+function submitRegisterIncomingDoc() {
+  const srcNumber = document.getElementById("inDocSrcNumber").value.trim();
+  const title = document.getElementById("inDocTitle").value.trim();
+  const sender = document.getElementById("inDocSender").value.trim();
+  const type = document.getElementById("inDocType").value;
+  const body = document.getElementById("inDocBody").value.trim();
+  const date = document.getElementById("inDocDate").value;
+  
+  if (!srcNumber || !title || !sender || !body || !date) {
+    alert("Заполните все обязательные поля!");
+    return;
+  }
+  
+  const nextIdx = (db.incomingDocs || []).filter(d => d.inNumber?.startsWith("KBI-IN")).length + 1;
+  const inNumber = `KBI-IN-${String(nextIdx).padStart(3, '0')}/2026`;
+  
+  if (!db.incomingDocs) db.incomingDocs = [];
+  
+  db.incomingDocs.push({
+    id: "in_" + (db.incomingDocs.length + 1) + "_" + Math.floor(Math.random() * 100),
+    inNumber: inNumber,
+    srcNumber: srcNumber,
+    title: title,
+    sender: sender,
+    recipient: getActiveUsername(),
+    type: type,
+    status: "Получено",
+    body: body
+  });
+  
+  logUserAction(getActiveUsername(), `Зарегистрирован входящий документ ${inNumber} от ${sender}`, "Документооборот", "success");
+  saveState();
+  closeModal("registerIncomingDocModal");
+  switchDocFolder("incoming");
+  showSystemNotification(`Входящий документ ${inNumber} успешно добавлен в реестр!`);
+}
+
+function openViewOfficialDocumentModal(docId, isIncoming) {
+  let doc = null;
+  if (isIncoming) {
+    doc = db.incomingDocs.find(d => d.id === docId);
+  } else {
+    doc = db.outgoingDocs.find(d => d.id === docId);
+  }
+  if (!doc) return;
+  
+  document.getElementById("viewDocHeaderTitle").textContent = isIncoming ? "Входящий официальный документ" : "Исходящий официальный документ";
+  document.getElementById("docOfficialNumber").textContent = isIncoming ? `Вх. № ${doc.inNumber} (исх. № отправителя: ${doc.srcNumber})` : `Исх. № ${doc.outNumber}`;
+  document.getElementById("docOfficialDate").textContent = `Дата регистрации: ${doc.date} г.`;
+  document.getElementById("docOfficialRecipient").textContent = isIncoming ? `Получатель: ${doc.recipient || "Руководство"}` : `Получатель: ${doc.recipient}`;
+  document.getElementById("docOfficialTitle").textContent = doc.title;
+  
+  let defaultText = doc.body;
+  if (!defaultText) {
+    if (doc.type === "Письмо") {
+      defaultText = `Настоящим ТОО &laquo;KazBildInvest&raquo; выражает вам свое уважение и сообщает, что касательно Вашего запроса по теме "${doc.title}", нашими специалистами были подготовлены и проверены все необходимые сведения.\n\nПросим принять в работу официальную позицию компании. В случае возникновения дополнительных вопросов, просим связываться по контактам, указанным в шапке бланка.`;
+    } else if (doc.type === "Договор") {
+      defaultText = `Настоящим Стороны ТОО &laquo;KazBildInvest&raquo; и ${isIncoming ? doc.sender : doc.recipient} заключили настоящий договор о нижеследующем:\n\n1. Предметом договора является выполнение комплекса подрядных и транспортных работ на строительных участках.\n2. Общая стоимость и условия расчетов определяются согласно дополнительным спецификациям к договору.\n3. Сроки выполнения обязательств: согласно утвержденному календарному графику.`;
+    } else {
+      defaultText = `Настоящий Акт составлен о том, что в период с мая по июнь 2026 года ТОО &laquo;KazBildInvest&raquo; и ${isIncoming ? doc.sender : doc.recipient} произвели сверку взаимных расчетов и объемов оказанных услуг.\n\nВ ходе сверки разногласий не выявлено. Общая стоимость согласованных работ составляет полную сумму, указанную в сопроводительном счете. Обязательства Сторон считаются выполненными надлежащим образом.`;
+    }
+  }
+  document.getElementById("docOfficialBody").innerHTML = defaultText.replace(/\n/g, "<br>");
+  
+  const cleanTitle = doc.title.substring(0, 10);
+  const hash = sha256_mock(doc.id + doc.date + cleanTitle);
+  document.getElementById("docOfficialHash").textContent = `Хэш ЭЦП: ${hash}`;
+  
+  openModal("viewOfficialDocumentModal");
+}
+
+function sha256_mock(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return "7fa9a82c448f8c" + Math.abs(hash).toString(16) + "e06180";
+}
+
+function printOfficialDocument() {
+  const sheet = document.getElementById("officialDocumentSheet");
+  if (!sheet) return;
+  
+  const printWindow = window.open('', '', 'height=800,width=700');
+  printWindow.document.write('<html><head><title>Печать документа</title>');
+  printWindow.document.write('<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">');
+  printWindow.document.write('</head><body style="margin: 0; padding: 20px; display: flex; justify-content: center;">');
+  printWindow.document.write(sheet.outerHTML);
+  printWindow.document.write('</body></html>');
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 500);
+}
+
+
 
 
