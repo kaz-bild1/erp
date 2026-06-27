@@ -24,6 +24,13 @@ if (!db.safetyCertRequests) db.safetyCertRequests = initialData.safetyCertReques
 if (!db.materialsWriteOffs) db.materialsWriteOffs = initialData.materialsWriteOffs || [];
 if (!db.contracts) db.contracts = initialData.contracts || [];
 if (!db.debtors) db.debtors = initialData.debtors || [];
+if (!db.accountsPayable) {
+  db.accountsPayable = [
+    { id: "ap_1", supplierName: "ТОО «Каспий Спец Техника»", purpose: "Аренда крана за май", amount: 2450000, dueDate: "2026-06-25", paid: false },
+    { id: "ap_2", supplierName: "ТОО «Борусан Машинери»", purpose: "Гидроцилиндр CAT 320", amount: 1800000, dueDate: "2026-06-30", paid: false },
+    { id: "ap_3", supplierName: "ТОО «Helios OIL»", purpose: "Заправка дизельного топлива", amount: 3500000, dueDate: "2026-06-20", paid: true }
+  ];
+}
 if (!db.gpsAlerts) {
   db.gpsAlerts = [
     { id: "alert_1", vehicleId: "v101", type: "geofence", message: "Автокран Zoomlion (714 ADE 06) покинул геозону объекта Карабатан без путевого листа!", time: "12:10", status: "active" },
@@ -132,6 +139,9 @@ function switchTab(tabId) {
     renderPurchasingHub();
   } else if (tabId === 'timesheet') {
     renderTimesheetGrid();
+  } else if (tabId === 'transport') {
+    renderTransportTripsTable();
+    renderActiveTripDetails();
   } else if (tabId === 'staff') {
     renderStaffGrid();
   } else if (tabId === 'all_vehicles') {
@@ -140,8 +150,15 @@ function switchTab(tabId) {
     renderContractsRegistry();
   } else if (tabId === 'finance_treasury') {
     renderFinanceTreasury();
+  } else if (tabId === 'documents') {
+    renderDocFolders();
+    renderDocumentsRegistry();
+    renderApprovalsList();
   } else if (tabId === 'settings') {
     renderSettingsDashboard();
+  }
+  if (typeof updateErpGuideContent === "function") {
+    updateErpGuideContent();
   }
 }
 
@@ -161,6 +178,27 @@ function resetBlockedRole() {
 
 function applyRolePermissions() {
   const role = db.settings.activeRole;
+  
+  // Визуальное оформление селектора роли
+  const sel = document.getElementById("roleSelector");
+  if (sel) {
+    const colors = {
+      Director: { bg: "rgba(37,99,235,0.08)", border: "rgba(37,99,235,0.4)", text: "var(--brand-color)" },
+      DeputyDirector: { bg: "rgba(230,81,0,0.08)", border: "rgba(230,81,0,0.4)", text: "#E65100" },
+      Manager: { bg: "rgba(100,116,139,0.08)", border: "rgba(100,116,139,0.4)", text: "var(--text-primary)" },
+      Dispatcher: { bg: "rgba(21,101,192,0.08)", border: "rgba(21,101,192,0.4)", text: "#1565C0" },
+      Warehouse: { bg: "rgba(173,20,87,0.08)", border: "rgba(173,20,87,0.4)", text: "#AD1457" },
+      Mechanic: { bg: "rgba(173,20,87,0.08)", border: "rgba(173,20,87,0.4)", text: "#AD1457" },
+      HR: { bg: "rgba(106,27,154,0.08)", border: "rgba(106,27,154,0.4)", text: "#6A1B9A" },
+      Purchaser: { bg: "rgba(13,148,136,0.08)", border: "rgba(13,148,136,0.4)", text: "#0D9488" },
+      Accountant: { bg: "rgba(46,125,50,0.08)", border: "rgba(46,125,50,0.4)", text: "#2E7D32" }
+    };
+    const c = colors[role] || { bg: "var(--bg-secondary)", border: "var(--border-color)", text: "var(--text-primary)" };
+    sel.style.background = c.bg;
+    sel.style.borderColor = c.border;
+    sel.style.color = c.text;
+    sel.style.fontWeight = "700";
+  }
   
   // Проверка блокировки доступа
   const overlay = document.getElementById("accessBlockedOverlay");
@@ -1382,6 +1420,10 @@ function submitRegisterFuelRefill() {
   const cost = Math.round(liters * price);
   const refillId = "ft_" + (db.fuelTransactions.length + 1);
   
+  // Списание с банковского счета KZT при покупке топлива
+  const currentBankKzt = db.settings.bankKzt || 45200000;
+  db.settings.bankKzt = Math.max(0, currentBankKzt - cost);
+  
   // 1. Добавляем в реестр транзакций
   db.fuelTransactions.push({
     id: refillId,
@@ -2382,45 +2424,139 @@ function closeChatBotModal() {
   closeModal("chatBotModal");
 }
 
+window.waActiveChat = "group";
+var WA_CONTACTS = {
+  "group": { name: "KazBildInvest Водители", status: "Сериков, Калиев, Жусупов, ИИ-Логист", color: "#00a884", initials: "", isGroup: true },
+  "serikov": { name: "Сериков А. С.", status: "был(а) сегодня в 13:41", color: "#06cf9c", initials: "СА", isGroup: false },
+  "kaliev": { name: "Калиев М. К.", status: "был(а) сегодня в 12:20", color: "#7c5cfc", initials: "КМ", isGroup: false },
+  "zhusupov": { name: "Жусупов Б. Н.", status: "был(а) вчера в 18:45", color: "#ff6b6b", initials: "ЖБ", isGroup: false },
+  "ai": { name: "ИИ-Логист", status: "онлайн", color: "#2563eb", initials: "ИИ", isGroup: false }
+};
+
+function switchWaChat(chatId, el) {
+  window.waActiveChat = chatId;
+  document.querySelectorAll('.wa-contact-item').forEach(function(item) { item.classList.remove('active'); });
+  if (el) el.classList.add('active');
+  var c = WA_CONTACTS[chatId];
+  if (!c) return;
+  var nameEl = document.getElementById("waChatName");
+  var statusEl = document.getElementById("waChatStatus");
+  var avatarEl = document.getElementById("waChatAvatar");
+  if (nameEl) nameEl.textContent = c.name;
+  if (statusEl) statusEl.textContent = c.status;
+  if (avatarEl) {
+    if (c.isGroup) {
+      avatarEl.className = "wa-avatar wa-avatar-group";
+      avatarEl.style.background = "";
+      avatarEl.innerHTML = '<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+    } else {
+      avatarEl.className = "wa-avatar";
+      avatarEl.style.background = c.color;
+      avatarEl.innerHTML = c.initials;
+    }
+  }
+  var inp = document.getElementById("chatInputField");
+  if (inp) inp.placeholder = chatId === "group" ? "Введите сообщение" : "Написать " + c.name.split(" ")[0] + "...";
+  renderChatHistory();
+}
+
 function renderChatHistory() {
-  const container = document.getElementById("chatLogContainer");
+  var container = document.getElementById("chatLogContainer");
   if (!container) return;
   container.innerHTML = "";
-  
-  db.chatLog.forEach(log => {
-    const msg = document.createElement("div");
-    
-    // Determine the WhatsApp class based on sender
-    let messageClass = "whatsapp-message driver";
-    if (log.sender === "Менеджер") {
-      messageClass = "whatsapp-message manager";
-    } else if (log.sender === "System" || log.sender === "ИИ-Агент" || log.sender.includes("ИИ-Логист")) {
-      messageClass = "whatsapp-message bot";
+
+  var dateChip = document.createElement("div");
+  dateChip.className = "wa-date-chip";
+  dateChip.textContent = "СЕГОДНЯ";
+  container.appendChild(dateChip);
+
+  var senderColors = { "Менеджер": "#e67e22", "Сериков": "#06cf9c", "Калиев": "#7c5cfc", "Жусупов": "#ff6b6b", "System": "#00a884", "ИИ": "#00a884" };
+  function getSC(s) { for (var k in senderColors) { if (s.indexOf(k) !== -1) return senderColors[k]; } return "#1f71a3"; }
+
+  var activeChat = window.waActiveChat || "group";
+  var messages = db.chatLog;
+
+  if (activeChat !== "group") {
+    var nameMap = { "serikov": "Сериков", "kaliev": "Калиев", "zhusupov": "Жусупов", "ai": "ИИ" };
+    var fn = nameMap[activeChat];
+    if (fn) {
+      messages = db.chatLog.filter(function(log) {
+        if (log.sender.indexOf(fn) !== -1) return true;
+        if (log.sender === "Менеджер") return true;
+        if (activeChat === "ai" && (log.sender.indexOf("System") !== -1)) return true;
+        return false;
+      });
     }
-    
-    msg.className = messageClass;
-    
-    // Colored name for sender in WhatsApp group
-    let nameColor = "#35a649"; // Default green
-    if (log.sender.includes("Водитель")) {
-      nameColor = "#1f71a3"; // Blue for drivers
-    } else if (log.sender.includes("Механик")) {
-      nameColor = "#e67e22"; // Orange for mechanics
-    } else if (log.sender === "Менеджер") {
-      nameColor = "#8e44ad"; // Purple for manager
-    } else if (log.sender.includes("ИИ")) {
-      nameColor = "#e74c3c"; // Crimson red for AI agent
-    }
-    
-    msg.innerHTML = `
-      <div style="font-weight:700; font-size:10px; margin-bottom:4px; text-transform:uppercase; color: ${nameColor};">${log.sender}</div>
-      <div style="line-height: 1.4;">${log.message}</div>
-      <div class="chat-message-time" style="font-size: 9px; color: #666; margin-top: 4px; text-align: right;">${log.time}</div>
-    `;
+  }
+
+  if (messages.length === 0) {
+    var empty = document.createElement("div");
+    empty.className = "wa-date-chip";
+    empty.style.marginTop = "40px";
+    empty.textContent = "Нет сообщений в этом чате";
+    container.appendChild(empty);
+    return;
+  }
+
+  var checkSvg = '<span class="wa-msg-check"><svg viewBox="0 0 16 11"><path d="M11.071.653a.457.457 0 0 0-.304-.102.493.493 0 0 0-.381.178l-6.19 7.636-2.405-2.272a.463.463 0 0 0-.336-.146.47.47 0 0 0-.343.146l-.311.31a.445.445 0 0 0-.14.337c0 .136.047.25.14.343l2.996 2.996a.724.724 0 0 0 .26.188.553.553 0 0 0 .3.07.512.512 0 0 0 .396-.195l6.654-8.155a.458.458 0 0 0 .102-.318.458.458 0 0 0-.14-.311L11.07.653z"/><path d="M14.757.653a.457.457 0 0 0-.305-.102.493.493 0 0 0-.38.178L7.882 8.365l-.658-.658.584-.723 6.654-8.155a.458.458 0 0 0 .102-.318.458.458 0 0 0-.14-.311L14.757.653z" fill-opacity=".4"/></svg></span>';
+
+  messages.forEach(function(log) {
+    var msg = document.createElement("div");
+    var msgClass = "wa-msg wa-msg-in";
+    var showCheck = false;
+    if (log.sender === "Менеджер") { msgClass = "wa-msg wa-msg-out"; showCheck = true; }
+    else if (log.sender === "System" || log.sender.indexOf("ИИ") !== -1) { msgClass = "wa-msg wa-msg-bot"; }
+    msg.className = msgClass;
+    var sc = getSC(log.sender);
+    msg.innerHTML = '<div class="wa-msg-sender" style="color:' + sc + ';">' + log.sender + '</div><div class="wa-msg-text">' + log.message + '</div><div class="wa-msg-footer"><span class="wa-msg-time">' + log.time + '</span>' + (showCheck ? checkSvg : '') + '</div>';
     container.appendChild(msg);
   });
-  
   container.scrollTop = container.scrollHeight;
+}
+
+// === Voice Input (Web Speech API) ===
+window.waVoiceRecognition = null;
+window.waVoiceActive = false;
+
+function toggleWaVoiceInput() {
+  if (window.waVoiceActive) { stopWaVoice(); return; }
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert("Ваш браузер не поддерживает голосовой ввод. Попробуйте Google Chrome."); return; }
+  var recognition = new SR();
+  recognition.lang = "ru-RU";
+  recognition.interimResults = true;
+  recognition.continuous = true;
+  var btn = document.getElementById("waVoiceBtn");
+  var input = document.getElementById("chatInputField");
+  var savedText = input ? input.value : "";
+  recognition.onstart = function() {
+    window.waVoiceActive = true;
+    if (btn) { btn.style.background = "#ef4444"; btn.classList.add("wa-voice-recording"); }
+    if (btn && btn.querySelector("svg")) btn.querySelector("svg").style.stroke = "#fff";
+    if (input) input.placeholder = "🎙️ Говорите...";
+  };
+  recognition.onresult = function(event) {
+    var interim = "", final = "";
+    for (var i = event.resultIndex; i < event.results.length; i++) {
+      var t = event.results[i][0].transcript;
+      if (event.results[i].isFinal) final += t; else interim += t;
+    }
+    if (input) input.value = savedText + final + interim;
+  };
+  recognition.onerror = function() { stopWaVoice(); };
+  recognition.onend = function() { stopWaVoice(); };
+  recognition.start();
+  window.waVoiceRecognition = recognition;
+}
+
+function stopWaVoice() {
+  window.waVoiceActive = false;
+  if (window.waVoiceRecognition) { try { window.waVoiceRecognition.stop(); } catch(e) {} window.waVoiceRecognition = null; }
+  var btn = document.getElementById("waVoiceBtn");
+  var input = document.getElementById("chatInputField");
+  if (btn) { btn.style.background = ""; btn.classList.remove("wa-voice-recording"); }
+  if (btn && btn.querySelector("svg")) btn.querySelector("svg").style.stroke = "";
+  if (input) input.placeholder = "Введите сообщение";
 }
 
 function sendChatMessage() {
@@ -2715,12 +2851,13 @@ function renderFleetRoiTable() {
     const vDeals = db.deals.filter(d => d.vehicleIds.includes(v.id));
     const revenue = vDeals.reduce((sum, d) => sum + (d.price / d.vehicleCount), 0);
     
-    // Затраты на ТО, ремонт, страховку, налоги
-    const repairCost = db.repairs.filter(r => r.vehicleId === v.id).reduce((sum, r) => sum + r.laborCost, 0);
+    // Затраты на ТО, ремонт, страховку, налоги, ГСМ
+    const repairCost = db.repairs.filter(r => r.vehicleId === v.id).reduce((sum, r) => sum + (r.laborCost || 0) + (r.damageCost || 0), 0);
     const insuranceCost = v.insuranceCost || 0;
     const taxCost = v.taxCost || 0;
+    const fuelCost = db.fuelLogs ? db.fuelLogs.filter(f => f.vehicleId === v.id).reduce((sum, f) => sum + (f.cost || 0), 0) : 0;
     
-    const totalCosts = repairCost + insuranceCost + taxCost;
+    const totalCosts = repairCost + insuranceCost + taxCost + fuelCost;
     const profit = revenue - totalCosts;
     const roi = totalCosts > 0 ? ((profit / totalCosts) * 100).toFixed(1) + "%" : "100%";
     
@@ -4716,22 +4853,32 @@ function renderPurchasingHub() {
     if (db.supplyOrders && db.supplyOrders.length > 0) {
       db.supplyOrders.forEach(so => {
         const row = document.createElement("tr");
-        const isOrdered = so.status === "Оформлен";
+        let actionHtml = "";
+        let badgeClass = "badge-neutral";
+        
+        if (so.status === "Оформлен") {
+          badgeClass = "badge-warning";
+          actionHtml = `<span style="font-size:11px;color:var(--text-secondary);font-style:italic;">Ожидает оплаты в кассе</span>`;
+        } else if (so.status === "Оплачен") {
+          badgeClass = "badge-info";
+          actionHtml = `<button class="btn-primary" style="font-size:11px; padding:4px 8px; background-color:var(--status-success); border-color:var(--status-success);" onclick="receiveSupplyOrder('${so.id}')">Принять на склад</button>`;
+        } else {
+          badgeClass = "badge-success";
+          actionHtml = `<span style="color:var(--status-success); font-weight:600; display:inline-flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" style="width:12px; height:12px; stroke:currentColor; stroke-width:2.2; fill:none; display:inline-block;"><polyline points="20 6 9 17 4 12"></polyline></svg> Доставлено</span>`;
+        }
+        
         row.innerHTML = `
           <td><strong>${so.id}</strong><br><small style="color:var(--text-secondary);">${so.date}</small></td>
           <td>${so.partName}<br><small style="color:var(--text-secondary);">${so.partSku} (x${so.qty})</small></td>
           <td><strong>${so.total.toLocaleString()} ₸</strong></td>
           <td>${so.supplier}</td>
           <td>
-            <span class="badge ${isOrdered ? 'badge-warning' : 'badge-success'}" style="font-size:10px;">
+            <span class="badge ${badgeClass}" style="font-size:10px;">
               ${so.status}
             </span>
           </td>
           <td>
-            ${isOrdered ? 
-              `<button class="btn-primary" style="font-size:11px; padding:4px 8px;" onclick="receiveSupplyOrder('${so.id}')">Принять на склад</button>` : 
-              `<span style="color:var(--status-success); font-weight:600; display:inline-flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" style="width:12px; height:12px; stroke:currentColor; stroke-width:2.2; fill:none; display:inline-block;"><polyline points="20 6 9 17 4 12"></polyline></svg> Доставлено</span>`
-            }
+            ${actionHtml}
           </td>
         `;
         tbody.appendChild(row);
@@ -4851,6 +4998,17 @@ function submitCreateSupplyOrder() {
   
   db.supplyOrders.push(newOrder);
   
+  if (!db.accountsPayable) db.accountsPayable = [];
+  db.accountsPayable.push({
+    id: "ap_so_" + newOrder.id,
+    supplierName: supplier,
+    purpose: `Поставка: ${partName} (${qty} шт.)`,
+    amount: newOrder.total,
+    dueDate: new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0], // 7 дней отсрочка
+    paid: false,
+    orderId: newOrder.id
+  });
+  
   if (repairId) {
     const repair = db.repairs.find(r => r.id === repairId);
     if (repair && repair.partsRequested) {
@@ -4871,6 +5029,11 @@ function submitCreateSupplyOrder() {
 function receiveSupplyOrder(orderId) {
   const so = db.supplyOrders.find(o => o.id === orderId);
   if (!so) return;
+  
+  if (so.status === "Оформлен") {
+    alert("Данный заказ еще не оплачен в кассе! Приемка на склад невозможна.");
+    return;
+  }
   
   so.status = "Доставлен";
   
@@ -6091,11 +6254,20 @@ function getVehicleMonthlyRate(vehicle) {
   return 1550000;
 }
 
+function getDayStatusChar(status) {
+  if (status === "W" || status === 11 || status === "11" || status === "Я") return "Я";
+  if (status === "R" || status === "Р") return "Р";
+  if (status === "O" || status === 0 || status === "0" || status === "В") return "В";
+  if (status === "I" || status === "П") return "П";
+  if (status === "Б" || status === "B") return "Б";
+  return status; // For numbers like 8, 12, 14
+}
+
 function getDayHours(status) {
-  if (status === "W") return 11;
-  if (status === "R" || status === "O" || status === "I") return 0;
+  if (status === "W" || status === "Я" || status === 11 || status === "11") return 11;
+  if (status === "R" || status === "Р" || status === "O" || status === "В" || status === "I" || status === "П" || status === "Б" || status === "B" || status === 0 || status === "0") return 0;
   if (status === undefined || status === null) return 0;
-  const num = parseInt(status);
+  const num = parseFloat(status);
   return isNaN(num) ? 0 : num;
 }
 
@@ -6134,7 +6306,9 @@ function editTimesheetHours(tsId, day) {
       </div>
       
       <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px;">
-        <button class="ts-quick-btn" onclick="document.getElementById('tsHoursInput').value=0;updateTsPreview()" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-secondary); cursor:pointer; font-size:11px; font-weight:600; color:var(--text-secondary); transition:all 0.15s;">0 — Выходной</button>
+        <button class="ts-quick-btn" onclick="saveTsStatusDirect('${tsId}', ${day}, 'O')" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-secondary); cursor:pointer; font-size:11px; font-weight:600; color:var(--text-secondary); transition:all 0.15s;">В — Выходной</button>
+        <button class="ts-quick-btn" onclick="saveTsStatusDirect('${tsId}', ${day}, 'R')" style="padding:4px 10px; border-radius:6px; border:1px solid var(--status-danger); background:rgba(220,38,38,0.08); cursor:pointer; font-size:11px; font-weight:600; color:var(--status-danger); transition:all 0.15s;">Р — Ремонт</button>
+        <button class="ts-quick-btn" onclick="saveTsStatusDirect('${tsId}', ${day}, 'I')" style="padding:4px 10px; border-radius:6px; border:1px solid var(--status-warning); background:rgba(217,119,6,0.08); cursor:pointer; font-size:11px; font-weight:600; color:var(--status-warning); transition:all 0.15s;">П — Простой</button>
         <button class="ts-quick-btn" onclick="document.getElementById('tsHoursInput').value=8;updateTsPreview()" style="padding:4px 10px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-secondary); cursor:pointer; font-size:11px; font-weight:600; color:var(--text-secondary); transition:all 0.15s;">8ч</button>
         <button class="ts-quick-btn" onclick="document.getElementById('tsHoursInput').value=11;updateTsPreview()" style="padding:4px 10px; border-radius:6px; border:1px solid var(--brand-color); background:rgba(37,99,235,0.08); cursor:pointer; font-size:11px; font-weight:700; color:var(--brand-color); transition:all 0.15s;">11ч — Стандарт</button>
         <button class="ts-quick-btn" onclick="document.getElementById('tsHoursInput').value=12;updateTsPreview()" style="padding:4px 10px; border-radius:6px; border:1px solid var(--status-warning); background:rgba(217,119,6,0.08); cursor:pointer; font-size:11px; font-weight:600; color:var(--status-warning); transition:all 0.15s;">12ч</button>
@@ -6145,7 +6319,7 @@ function editTimesheetHours(tsId, day) {
         ${currentVal > standardShift 
           ? `<span style="color:var(--status-warning); font-weight:700;">⚡ Переработка: +${currentVal - standardShift}ч сверх нормы (${standardShift}ч)</span>` 
           : currentVal === 0 
-            ? `<span style="color:var(--text-secondary);">Выходной / Простой</span>`
+            ? `<span style="color:var(--text-secondary);">Выходной / Простой / Ремонт</span>`
             : currentVal < standardShift
               ? `<span style="color:var(--brand-color);">Неполная смена: ${standardShift - currentVal}ч меньше нормы</span>`
               : `<span style="color:var(--status-success);">✓ Стандартная смена (${standardShift}ч)</span>`
@@ -6239,6 +6413,22 @@ function saveTsHours(tsId, day) {
   } else {
     showSystemNotification(`День ${day}: часы обновлены — ${hours}ч`);
   }
+}
+
+function saveTsStatusDirect(tsId, day, status) {
+  const ts = db.timesheets.find(t => t.id === tsId);
+  if (!ts) return;
+  ts.dailyStatus[day] = status;
+  saveState();
+  const modal = document.getElementById('timesheetCellModal');
+  if (modal) modal.remove();
+  renderTimesheetGrid();
+  
+  let label = "изменение";
+  if (status === "O") label = "выходной";
+  else if (status === "R") label = "ремонт";
+  else if (status === "I") label = "простой";
+  showSystemNotification(`День ${day}: установлен статус "${label}"`);
 }
 
 function editTimesheetAdvance(tsId) {
@@ -6419,21 +6609,40 @@ function renderTimesheetGrid() {
     const netPaid = totalPaid - advance;
     
     const tr = document.createElement("tr");
+    tr.style.cursor = "pointer";
+    tr.addEventListener("click", (e) => {
+      if (e.target.classList.contains("cell-editable")) return;
+      toggleTimesheetRowDetails(v.id);
+    });
     
     let daysHtml = "";
     for (let day = 1; day <= 30; day++) {
+      const statusChar = getDayStatusChar(ts.dailyStatus[day]);
       const hrs = getDayHours(ts.dailyStatus[day]);
       const standardShift = 11;
       let cellBg, cellColor;
       
-      if (hrs === 0) {
+      if (statusChar === "П") {
+        // Простой — мягкий красный
+        cellBg = "rgba(220, 38, 38, 0.1)";
+        cellColor = "#dc2626";
+      } else if (statusChar === "Р") {
+        // Ремонт — мягкий оранжевый
+        cellBg = "rgba(217, 119, 6, 0.1)";
+        cellColor = "#d97706";
+      } else if (statusChar === "В") {
+        // Выходной — нейтральный серый
         cellBg = "rgba(241, 245, 249, 0.6)";
         cellColor = "#94a3b8";
+      } else if (statusChar === "Б") {
+        // Больничный — мягкий фиолетовый
+        cellBg = "rgba(147, 51, 234, 0.08)";
+        cellColor = "#9333ea";
       } else if (hrs > standardShift) {
-        // Переработка — оранжевый/красный
+        // Переработка — оранжевый
         cellBg = hrs >= 14 ? "rgba(220, 38, 38, 0.1)" : "rgba(217, 119, 6, 0.1)";
         cellColor = hrs >= 14 ? "#dc2626" : "#d97706";
-      } else if (hrs < standardShift) {
+      } else if (hrs < standardShift && hrs > 0) {
         // Неполная смена — синий
         cellBg = "rgba(37, 99, 235, 0.08)";
         cellColor = "#2563eb";
@@ -6443,11 +6652,17 @@ function renderTimesheetGrid() {
         cellColor = "#16a34a";
       }
       
-      const overtimeMarker = hrs > standardShift ? `title="Переработка +${(hrs - standardShift)}ч"` : hrs < standardShift && hrs > 0 ? `title="Неполная смена −${(standardShift - hrs)}ч"` : '';
+      let tooltip = "";
+      if (statusChar === "П") tooltip = 'title="Простой"';
+      else if (statusChar === "Р") tooltip = 'title="Ремонт"';
+      else if (statusChar === "В") tooltip = 'title="Выходной"';
+      else if (statusChar === "Б") tooltip = 'title="Больничный"';
+      else if (hrs > standardShift) tooltip = `title="Переработка +${(hrs - standardShift)}ч"`;
+      else if (hrs < standardShift && hrs > 0) tooltip = `title="Неполная смена −${(standardShift - hrs)}ч"`;
       
       daysHtml += `
-        <td class="cell-editable" style="background-color: ${cellBg}; color: ${cellColor}; text-align: center; font-weight:700; position:relative;" onclick="editTimesheetHours('${ts.id}', ${day})" ${overtimeMarker}>
-          ${hrs}${hrs > standardShift ? '<span style="position:absolute;top:1px;right:2px;font-size:7px;color:#d97706;">⬆</span>' : ''}
+        <td class="cell-editable" style="background-color: ${cellBg}; color: ${cellColor}; text-align: center; font-weight:700; position:relative;" onclick="cycleTimesheetDayStatus('${ts.id}', ${day})" ondblclick="editTimesheetHours('${ts.id}', ${day})" ${tooltip}>
+          ${statusChar}${hrs > standardShift ? '<span style="position:absolute;top:1px;right:2px;font-size:7px;color:#d97706;">⬆</span>' : ''}
         </td>
       `;
     }
@@ -6473,6 +6688,89 @@ function renderTimesheetGrid() {
     `;
     
     tbody.appendChild(tr);
+    
+    // Подпанель быстрого редактора и аналитики
+    const detailTr = document.createElement("tr");
+    detailTr.id = `ts-details-${v.id}`;
+    detailTr.className = "timesheet-row-details";
+    detailTr.style.display = "none";
+    detailTr.style.backgroundColor = "var(--bg-secondary)";
+    
+    let countYa = 0, countRem = 0, countVyh = 0, countProst = 0, countBol = 0;
+    for (let day = 1; day <= 30; day++) {
+      const ch = getDayStatusChar(ts.dailyStatus[day]);
+      if (ch === "Я") countYa++;
+      else if (ch === "Р") countRem++;
+      else if (ch === "В") countVyh++;
+      else if (ch === "П") countProst++;
+      else if (ch === "Б") countBol++;
+    }
+    
+    detailTr.innerHTML = `
+      <td colspan="43" style="padding: 16px !important; border-bottom: 2px solid var(--border-color);">
+        <div style="display: flex; gap: 24px; align-items: start; flex-wrap: wrap; text-align: left;">
+          <!-- Аналитика -->
+          <div style="flex: 1; min-width: 250px; background: var(--bg-card); border: 1px solid var(--border-color); padding: 14px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.01);">
+            <h4 style="margin: 0 0 10px 0; font-size: 11px; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.5px;">Сводная статистика за месяц:</h4>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 11px;">
+              <div style="padding: 6px 10px; background: rgba(34,197,94,0.08); border-radius: 6px; color:#16a34a; font-weight:700;">Явка (Я): ${countYa} дн. (${countYa * 11} ч.)</div>
+              <div style="padding: 6px 10px; background: rgba(217,119,6,0.08); border-radius: 6px; color:#d97706; font-weight:700;">Ремонт (Р): ${countRem} дн.</div>
+              <div style="padding: 6px 10px; background: rgba(241,245,249,0.8); border-radius: 6px; color:#64748b; font-weight:700;">Выходной (В): ${countVyh} дн.</div>
+              <div style="padding: 6px 10px; background: rgba(220,38,38,0.08); border-radius: 6px; color:#dc2626; font-weight:700;">Простой (П): ${countProst} дн.</div>
+              <div style="padding: 6px 10px; background: rgba(147,51,234,0.08); border-radius: 6px; color:#9333ea; font-weight:700; grid-column: span 2;">Больничный (Б): ${countBol} дн.</div>
+            </div>
+            
+            <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-color);">
+              <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; font-weight:600;">
+                <span>Нормативная выработка:</span>
+                <span>${totalHours} / 330 ч. (${Math.round((totalHours/330)*100)}%)</span>
+              </div>
+              <div style="background:var(--bg-secondary); height:6px; border-radius:3px; overflow:hidden; display:flex;">
+                <div style="background:var(--brand-color); width:${Math.min(100, (totalHours/330)*100)}%; height:100%;"></div>
+              </div>
+            </div>
+          </div>
+  
+          <!-- Быстрое редактирование смены -->
+          <div style="flex: 2; min-width: 350px; background: var(--bg-card); border: 1px solid var(--border-color); padding: 14px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.01);">
+            <h4 style="margin: 0 0 10px 0; font-size: 11px; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.5px;">Панель быстрого ввода / Редактор дня:</h4>
+            
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <span style="font-size:10px; color:var(--text-secondary); font-weight:600;">ДЕНЬ:</span>
+                <select id="quick-day-select-${v.id}" class="select-clean" style="font-size:12px; padding:6px 12px; border-radius:6px; border:1px solid var(--border-color); width:80px;" onchange="updateQuickEditorFields('${ts.id}', '${v.id}')">
+                  ${Array.from({length: 30}, (_, i) => `<option value="${i+1}">День ${i+1}</option>`).join("")}
+                </select>
+              </div>
+              
+              <div style="display:flex; flex-direction:column; gap:4px; flex: 1;">
+                <span style="font-size:10px; color:var(--text-secondary); font-weight:600;">СТАТУС ИЛИ ЧАСЫ:</span>
+                <select id="quick-status-select-${v.id}" class="select-clean" style="font-size:12px; padding:6px 12px; border-radius:6px; border:1px solid var(--border-color);" onchange="toggleQuickHoursInput('${v.id}')">
+                  <option value="Я">Я - Явка / Работа (11 часов)</option>
+                  <option value="Р">Р - Ремонт (0 часов)</option>
+                  <option value="В">В - Выходной (0 часов)</option>
+                  <option value="П">П - Простой (0 часов)</option>
+                  <option value="Б">Б - Больничный (0 часов)</option>
+                  <option value="custom">Указать другие часы...</option>
+                </select>
+              </div>
+              
+              <div id="quick-hours-group-${v.id}" style="display:none; flex-direction:column; gap:4px; width:70px;">
+                <span style="font-size:10px; color:var(--text-secondary); font-weight:600;">ЧАСЫ:</span>
+                <input type="number" id="quick-hours-input-${v.id}" min="0" max="24" value="11" class="form-control" style="font-size:12px; padding:6px 10px; text-align:center;" />
+              </div>
+              
+              <div style="display:flex; align-items:flex-end; height:100%; margin-top: 14px;">
+                <button class="btn-primary" style="font-size:11px; padding:7px 16px; border-radius:6px;" onclick="saveQuickTimesheetDay('${ts.id}', '${v.id}')">Применить</button>
+              </div>
+            </div>
+            <p style="font-size: 10px; color: var(--text-secondary); margin: 8px 0 0 0;">💡 Кликните по любой ячейке дней табеля, чтобы быстро переключить статус (Я, Р, В, П, Б), или раскройте эту панель для детального ввода.</p>
+          </div>
+        </div>
+      </td>
+    `;
+    
+    tbody.appendChild(detailTr);
   });
   
   gridTable.appendChild(tbody);
@@ -6546,8 +6844,303 @@ function updateTimesheetApprovalStatusUI(mechApp, hrApp, dirApp) {
   }
 }
 
+function toggleTimesheetRowDetails(vehicleId) {
+  const row = document.getElementById(`ts-details-${vehicleId}`);
+  if (!row) return;
+  
+  const isHidden = row.style.display === "none";
+  // Сначала закроем все остальные
+  document.querySelectorAll(".timesheet-row-details").forEach(r => {
+    r.style.display = "none";
+  });
+  
+  if (isHidden) {
+    row.style.display = "table-row";
+    // Инициализируем поля быстрого редактора
+    const ts = db.timesheets.find(t => t.month === document.getElementById("timesheetMonthSelect").value && t.vehicleId === vehicleId);
+    if (ts) {
+      updateQuickEditorFields(ts.id, vehicleId);
+    }
+  } else {
+    row.style.display = "none";
+  }
+}
+
+function updateQuickEditorFields(tsId, vehicleId) {
+  const ts = db.timesheets.find(t => t.id === tsId);
+  if (!ts) return;
+  
+  const daySelect = document.getElementById(`quick-day-select-${vehicleId}`);
+  if (!daySelect) return;
+  const day = daySelect.value;
+  const status = ts.dailyStatus[day];
+  const select = document.getElementById(`quick-status-select-${vehicleId}`);
+  const hoursInput = document.getElementById(`quick-hours-input-${vehicleId}`);
+  const hoursGroup = document.getElementById(`quick-hours-group-${vehicleId}`);
+  
+  if (!select) return;
+  
+  const char = getDayStatusChar(status);
+  if (char === "Я") {
+    select.value = "Я";
+    if (hoursGroup) hoursGroup.style.display = "none";
+  } else if (char === "Р") {
+    select.value = "Р";
+    if (hoursGroup) hoursGroup.style.display = "none";
+  } else if (char === "В") {
+    select.value = "В";
+    if (hoursGroup) hoursGroup.style.display = "none";
+  } else if (char === "П") {
+    select.value = "П";
+    if (hoursGroup) hoursGroup.style.display = "none";
+  } else if (char === "Б") {
+    select.value = "Б";
+    if (hoursGroup) hoursGroup.style.display = "none";
+  } else {
+    select.value = "custom";
+    if (hoursGroup) hoursGroup.style.display = "flex";
+    if (hoursInput) hoursInput.value = status;
+  }
+}
+
+function toggleQuickHoursInput(vehicleId) {
+  const select = document.getElementById(`quick-status-select-${vehicleId}`);
+  const hoursGroup = document.getElementById(`quick-hours-group-${vehicleId}`);
+  if (!select || !hoursGroup) return;
+  
+  if (select.value === "custom") {
+    hoursGroup.style.display = "flex";
+  } else {
+    hoursGroup.style.display = "none";
+  }
+}
+
+function saveQuickTimesheetDay(tsId, vehicleId) {
+  const ts = db.timesheets.find(t => t.id === tsId);
+  if (!ts) return;
+  
+  const day = document.getElementById(`quick-day-select-${vehicleId}`).value;
+  const select = document.getElementById(`quick-status-select-${vehicleId}`);
+  const hoursInput = document.getElementById(`quick-hours-input-${vehicleId}`);
+  
+  if (!select) return;
+  
+  let val = 11;
+  if (select.value === "Я") val = 11;
+  else if (select.value === "Р") val = "Р";
+  else if (select.value === "В") val = "В";
+  else if (select.value === "П") val = "П";
+  else if (select.value === "Б") val = "Б";
+  else if (select.value === "custom") {
+    val = parseFloat(hoursInput ? hoursInput.value : 11) || 0;
+  }
+  
+  ts.dailyStatus[day] = val;
+  saveState();
+  renderTimesheetGrid();
+  
+  // После перерисовки держим строку раскрытой!
+  setTimeout(() => {
+    const row = document.getElementById(`ts-details-${vehicleId}`);
+    if (row) {
+      row.style.display = "table-row";
+      // Восстанавливаем выбранный день в селекторе
+      const daySelect = document.getElementById(`quick-day-select-${vehicleId}`);
+      if (daySelect) {
+        daySelect.value = day;
+        updateQuickEditorFields(tsId, vehicleId);
+      }
+    }
+  }, 50);
+  
+  showSystemNotification(`День ${day} успешно обновлен!`);
+}
+
+function printOfficialTimesheet() {
+  const select = document.getElementById("timesheetMonthSelect");
+  if (!select) return;
+  const selectedMonth = select.value;
+  
+  let monthText = "июнь 2026 г.";
+  if (selectedMonth === "2026-06") monthText = "июнь 2026 г.";
+  else if (selectedMonth === "2026-05") monthText = "май 2026 г.";
+  else {
+    const parts = selectedMonth.split("-");
+    const m = parseInt(parts[1]);
+    const months = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
+    monthText = `${months[m - 1]} ${parts[0]} г.`;
+  }
+  
+  let rowsHtml = "";
+  db.vehicles.forEach((v, index) => {
+    let ts = db.timesheets.find(t => t.month === selectedMonth && t.vehicleId === v.id);
+    const driver = db.drivers.find(d => d.id === v.driverId);
+    const driverName = driver ? driver.name : "Не назначен";
+    
+    let totalHours = 0;
+    let daysCells = "";
+    
+    for (let d = 1; d <= 30; d++) {
+      let statusChar = "Я";
+      let hrs = 11;
+      if (ts) {
+        statusChar = getDayStatusChar(ts.dailyStatus[d]);
+        hrs = getDayHours(ts.dailyStatus[d]);
+      }
+      totalHours += hrs;
+      daysCells += `<td style="border: 1px solid #000; text-align:center; padding: 2px; font-size: 10px;">${statusChar}</td>`;
+    }
+    
+    const monthlyRate = getVehicleMonthlyRate(v);
+    const dailyRate = Math.round(monthlyRate / 31);
+    const hourlyRate = Math.round(dailyRate / 11);
+    const totalPaid = totalHours * hourlyRate;
+    const advance = ts ? (ts.advance || 0) : 0;
+    const netPaid = totalPaid - advance;
+    
+    rowsHtml += `
+      <tr>
+        <td style="border: 1px solid #000; text-align:center; padding: 4px;">${index + 1}</td>
+        <td style="border: 1px solid #000; padding: 4px;">${v.type} (${v.name})</td>
+        <td style="border: 1px solid #000; padding: 4px;">${driverName}</td>
+        <td style="border: 1px solid #000; text-align:center; padding: 4px;">${v.plate}</td>
+        ${daysCells}
+        <td style="border: 1px solid #000; text-align:center; font-weight:bold; padding: 4px;">${totalHours}</td>
+        <td style="border: 1px solid #000; text-align:right; padding: 4px;">${dailyRate.toLocaleString()} ₸</td>
+        <td style="border: 1px solid #000; text-align:right; padding: 4px;">${hourlyRate.toLocaleString()} ₸</td>
+        <td style="border: 1px solid #000; text-align:right; font-weight:bold; padding: 4px;">${totalPaid.toLocaleString()} ₸</td>
+        <td style="border: 1px solid #000; text-align:right; padding: 4px;">${advance.toLocaleString()} ₸</td>
+        <td style="border: 1px solid #000; text-align:right; font-weight:bold; padding: 4px;">${netPaid.toLocaleString()} ₸</td>
+      </tr>
+    `;
+  });
+  
+  let daysHeader = "";
+  for (let d = 1; d <= 30; d++) {
+    daysHeader += `<th style="border: 1px solid #000; width: 18px; font-size: 9px;">${d}</th>`;
+  }
+  
+  const printWindow = window.open('', '', 'height=900,width=1200');
+  printWindow.document.write(`
+    <html>
+    <head>
+      <title>Табель учета рабочего времени - ${monthText}</title>
+      <style>
+        body { font-family: 'Inter', 'Arial', sans-serif; margin: 20px; color: #000; background: #FFF; font-size: 11px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+        th, td { border: 1px solid #000; font-size: 9.5px; }
+        th { background: #F1F5F9; padding: 4px; text-align: center; }
+        .header-table { width: 100%; border: none; margin-bottom: 20px; }
+        .header-table td { border: none; padding: 0; }
+        .signatures-section { margin-top: 40px; display: flex; justify-content: space-between; }
+        .sig-block { width: 30%; border-top: 1px solid #000; text-align: center; padding-top: 5px; font-size: 10px; margin-top: 30px; }
+      </style>
+    </head>
+    <body>
+      <table class="header-table">
+        <tr>
+          <td style="font-weight: bold; font-size: 12px;">ТОО &laquo;KazBildInvest&raquo;</td>
+          <td style="text-align: right; vertical-align: top;">
+            <strong>УТВЕРЖДАЮ</strong><br>
+            Генеральный директор ТОО &laquo;KazBildInvest&raquo;<br>
+            ___________________ Жолдасов Б. К.<br>
+            «_____» ____________ 2026 г.
+          </td>
+        </tr>
+      </table>
+      
+      <h2 style="text-align: center; margin: 10px 0; font-size: 14px;">ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ И РАСЧЕТА ВЫРАБОТКИ</h2>
+      <h3 style="text-align: center; margin: 0 0 20px 0; font-size: 11px; font-weight: normal;">за ${monthText} (Объект: ЗКО кап ремонт, наемная спецтехника)</h3>
+      
+      <table>
+        <thead>
+          <tr>
+            <th rowspan="2" style="width: 25px;">№</th>
+            <th rowspan="2" style="min-width: 100px;">Модель спецтехники</th>
+            <th rowspan="2" style="min-width: 90px;">Водитель</th>
+            <th rowspan="2" style="width: 70px;">Гос. номер</th>
+            <th colspan="30">Числа месяца</th>
+            <th rowspan="2" style="width: 35px;">Всего ч.</th>
+            <th rowspan="2" style="width: 60px;">Ставка дня</th>
+            <th rowspan="2" style="width: 50px;">Цена ч.</th>
+            <th rowspan="2" style="width: 70px;">Итого</th>
+            <th rowspan="2" style="width: 60px;">Аванс</th>
+            <th rowspan="2" style="width: 75px;">К выплате</th>
+          </tr>
+          <tr>
+            ${daysHeader}
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+      
+      <div style="font-size: 9px; margin-top: 15px; color: #475569;">
+        <strong>Условные обозначения:</strong> Я - Явка/Работа (11ч) | Р - Ремонт | В - Выходной | П - Простой | Б - Больничный
+      </div>
+      
+      <div class="signatures-section">
+        <div style="width: 28%;">
+          <strong>Составил (Механик):</strong><br><br>
+          ___________________ Каримов Р. Д.<br>
+          «_____» ____________ 2026 г.
+        </div>
+        <div style="width: 28%;">
+          <strong>Проверил (HR-специалист):</strong><br><br>
+          ___________________ Искаков Т. Б.<br>
+          «_____» ____________ 2026 г.
+        </div>
+        <div style="width: 28%;">
+          <strong>Согласовано (Главный бухгалтер):</strong><br><br>
+          ___________________ Гульсим С.<br>
+          «_____» ____________ 2026 г.
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 500);
+}
+
 function cycleTimesheetDayStatus(timesheetId, day) {
-  editTimesheetHours(timesheetId, day);
+  const ts = db.timesheets.find(t => t.id === timesheetId);
+  if (!ts) return;
+  
+  const current = ts.dailyStatus[day];
+  let next = "W";
+  
+  // Cycle: Я ("W") -> Р ("R") -> В ("O") -> П ("I") -> Б ("B") -> Я ("W")
+  if (current === "W" || current === 11 || current === "11" || current === "Я" || (typeof current === "number" && current > 0) || (!isNaN(parseFloat(current)) && parseFloat(current) > 0)) {
+    next = "R";
+  } else if (current === "R" || current === "Р") {
+    next = "O";
+  } else if (current === "O" || current === 0 || current === "0" || current === "В") {
+    next = "I";
+  } else if (current === "I" || current === "П") {
+    next = "Б";
+  } else if (current === "Б" || current === "B") {
+    next = "W";
+  } else {
+    next = "W";
+  }
+  
+  ts.dailyStatus[day] = next;
+  saveState();
+  renderTimesheetGrid();
+  
+  let label = "изменение";
+  if (next === "W") label = "Работа (Я)";
+  else if (next === "R") label = "Ремонт (Р)";
+  else if (next === "O") label = "Выходной (В)";
+  else if (next === "I") label = "Простой (П)";
+  else if (next === "Б") label = "Больничный (Б)";
+  showSystemNotification(`День ${day}: переключен статус на "${label}"`);
 }
 
 function changeTimesheetVehicleDriver(timesheetId, driverId) {
@@ -6626,8 +7219,8 @@ function exportTimesheetToExcel() {
     if (ts) {
       for (let d = 1; d <= 30; d++) {
         const status = ts.dailyStatus[d];
-        const hrs = getDayHours(status);
-        row += `,"${hrs}"`;
+        const statusChar = getDayStatusChar(status);
+        row += `,"${statusChar}"`;
       }
     }
     csvContent += row + "\r\n";
@@ -6659,7 +7252,7 @@ function exportSubrentTimesheet() {
     let daysWorked = 0;
     if (ts) {
       for (let day in ts.dailyStatus) {
-        if (ts.dailyStatus[day] === "W") daysWorked++;
+        if (getDayHours(ts.dailyStatus[day]) > 0) daysWorked++;
       }
     }
     
@@ -8047,10 +8640,11 @@ function renderIndividualVehicleTimesheet() {
   Object.keys(timesheet.dailyStatus).forEach(day => {
     const s = timesheet.dailyStatus[day];
     const hrs = getDayHours(s);
-    if (hrs > 0) workDays++;
-    else if (s === "O") offDays++;
-    else if (s === "R") repairDays++;
-    else if (s === "I") idleDays++;
+    const statusChar = getDayStatusChar(s);
+    if (hrs > 0 || statusChar === "Я") workDays++;
+    else if (statusChar === "В") offDays++;
+    else if (statusChar === "Р") repairDays++;
+    else if (statusChar === "П") idleDays++;
     else offDays++;
   });
   
@@ -8082,11 +8676,14 @@ function renderIndividualVehicleTimesheet() {
   for (let day = 1; day <= 30; day++) {
     const activeDriverObj = timesheet.driverHistory.find(h => h.day === day) || { driverId: v.driverId };
     const currentStatus = timesheet.dailyStatus[day] || "W";
+    const statusChar = getDayStatusChar(currentStatus);
+    const hrs = getDayHours(currentStatus);
     
     let statusClass = "work";
-    if (currentStatus === "O") statusClass = "off";
-    if (currentStatus === "R") statusClass = "repair";
-    if (currentStatus === "I") statusClass = "idle";
+    if (statusChar === "В") statusClass = "off";
+    else if (statusChar === "Р") statusClass = "repair";
+    else if (statusChar === "П") statusClass = "idle";
+    else if (hrs > 0 || statusChar === "Я") statusClass = "work";
     
     const driverOptions = db.drivers.map(d => `<option value="${d.id}" ${d.id === activeDriverObj.driverId ? 'selected' : ''}>${d.name.split(" ")[0]}</option>`).join("");
     
@@ -8095,10 +8692,10 @@ function renderIndividualVehicleTimesheet() {
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span class="indiv-day-num">${day} июня</span>
           <select style="font-size:9px; padding:2px; font-weight:700;" onchange="updateIndivDayStatus('${vehicleId}', '${defaultMonth}', ${day}, this.value)">
-            <option value="W" ${currentStatus === "W" ? 'selected' : ''}>Работа (Я)</option>
-            <option value="O" ${currentStatus === "O" ? 'selected' : ''}>Выходной (В)</option>
-            <option value="R" ${currentStatus === "R" ? 'selected' : ''}>Ремонт (Р)</option>
-            <option value="I" ${currentStatus === "I" ? 'selected' : ''}>Простой (П)</option>
+            <option value="W" ${statusChar === "Я" ? 'selected' : ''}>Работа (Я)</option>
+            <option value="O" ${statusChar === "В" ? 'selected' : ''}>Выходной (В)</option>
+            <option value="R" ${statusChar === "Р" ? 'selected' : ''}>Ремонт (Р)</option>
+            <option value="I" ${statusChar === "П" ? 'selected' : ''}>Простой (П)</option>
           </select>
         </div>
         <div style="margin-top:4px;">
@@ -8200,11 +8797,93 @@ function saveIndividualVehicleTimesheet() {
 // МОДУЛЬ 13: РЕЕСТР ДОГОВОРОВ И ШАБЛОНОВ ДЛЯ МЕНЕДЖЕРА
 // ============================================================================
 
+window.contractsActiveLetter = "All";
+
 function renderContractsRegistry() {
+  // Инициализируем буквенные фильтры при открытии реестра
+  const filterContainer = document.getElementById("contractsAlphabetFilters");
+  if (filterContainer) {
+    // Собираем первые буквы имен контрагентов
+    const letters = new Set();
+    db.contracts.forEach(c => {
+      // Очищаем от кавычек типа ТОО "АтырауНефть" или ТОО «Каспий»
+      const cleanName = c.companyName.replace(/^(ТОО|ИП|АО)\s+["'«“]/, "").replace(/^["'«“]/, "");
+      if (cleanName && cleanName.length > 0) {
+        letters.add(cleanName[0].toUpperCase());
+      }
+    });
+    
+    const sortedLetters = Array.from(letters).sort();
+    
+    // Создаем кнопки
+    let buttonsHtml = `<button class="btn-secondary" style="font-size:10px; padding:3px 8px; border-radius:4px; font-weight:700; ${window.contractsActiveLetter === 'All' ? 'background:var(--brand-color); color:#FFF; border-color:var(--brand-color);' : ''}" onclick="selectContractLetter('All')">Все</button>`;
+    
+    sortedLetters.forEach(let => {
+      const isAct = window.contractsActiveLetter === let;
+      buttonsHtml += `<button class="btn-secondary" style="font-size:10px; padding:3px 8px; border-radius:4px; margin-left:3px; font-weight:700; ${isAct ? 'background:var(--brand-color); color:#FFF; border-color:var(--brand-color);' : ''}" onclick="selectContractLetter('${let}')">${let}</button>`;
+    });
+    
+    filterContainer.innerHTML = buttonsHtml;
+  }
+  
+  filterAndRenderContracts();
+}
+
+function selectContractLetter(letter) {
+  window.contractsActiveLetter = letter;
+  renderContractsRegistry();
+}
+
+function filterAndRenderContracts() {
   const tbody = document.getElementById("contractsTabTableBody");
   if (!tbody) return;
   
-  tbody.innerHTML = db.contracts.map(c => {
+  const searchInput = document.getElementById("contractsSearchInput");
+  const sortSelector = document.getElementById("contractsSortSelector");
+  
+  const q = searchInput ? searchInput.value.toLowerCase().trim() : "";
+  const sortBy = sortSelector ? sortSelector.value : "date-desc";
+  const activeLetter = window.contractsActiveLetter || "All";
+  
+  // 1. Фильтрация
+  let filtered = db.contracts.filter(c => {
+    const matchesSearch = !q || 
+      c.number.toLowerCase().includes(q) || 
+      c.companyName.toLowerCase().includes(q) || 
+      (c.vehicleType && c.vehicleType.toLowerCase().includes(q)) || 
+      (c.plateNumber && c.plateNumber.toLowerCase().includes(q));
+      
+    let matchesLetter = true;
+    if (activeLetter !== "All") {
+      const cleanName = c.companyName.replace(/^(ТОО|ИП|АО)\s+["'«“]/, "").replace(/^["'«“]/, "");
+      matchesLetter = cleanName && cleanName[0].toUpperCase() === activeLetter;
+    }
+    
+    return matchesSearch && matchesLetter;
+  });
+  
+  // 2. Сортировка
+  if (sortBy === "date-desc") {
+    filtered.sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated));
+  } else if (sortBy === "company-asc") {
+    filtered.sort((a, b) => a.companyName.localeCompare(b.companyName));
+  } else if (sortBy === "company-desc") {
+    filtered.sort((a, b) => b.companyName.localeCompare(a.companyName));
+  } else if (sortBy === "relevance") {
+    // Сортировка по количеству договоров с данным контрагентом
+    const partnerCounts = {};
+    db.contracts.forEach(c => {
+      partnerCounts[c.companyName] = (partnerCounts[c.companyName] || 0) + 1;
+    });
+    filtered.sort((a, b) => (partnerCounts[b.companyName] || 0) - (partnerCounts[a.companyName] || 0));
+  }
+  
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-secondary); padding:20px;">Ничего не найдено</td></tr>`;
+    return;
+  }
+  
+  tbody.innerHTML = filtered.map(c => {
     return `
       <tr>
         <td>
@@ -8414,14 +9093,7 @@ function renderFinanceTreasury() {
   // Кредиторка (AP)
   const apTbody = document.getElementById("finAccountsPayableTableBody");
   if (apTbody) {
-    // Выведем счета из CRM или статические обязательства
-    const apList = [
-      { id: "ap_1", supplierName: "ТОО «Каспий Спец Техника»", purpose: "Аренда крана за май", amount: 2450000, dueDate: "2026-06-25", paid: false },
-      { id: "ap_2", supplierName: "ТОО «Борусан Машинери»", purpose: "Гидроцилиндр CAT 320", amount: 1800000, dueDate: "2026-06-30", paid: false },
-      { id: "ap_3", supplierName: "ТОО «Helios OIL»", purpose: "Заправка дизельного топлива", amount: 3500000, dueDate: "2026-06-20", paid: true }
-    ];
-    
-    apTbody.innerHTML = apList.map(item => {
+    apTbody.innerHTML = db.accountsPayable.map(item => {
       return `
         <tr>
           <td><strong>${item.supplierName}</strong></td>
@@ -8564,10 +9236,24 @@ function executeHoldAction(btn) {
     }
     
     db.settings.bankKzt = balance - amount;
+    
+    // Помечаем счет как оплаченный
+    const apItem = db.accountsPayable.find(a => a.id === id);
+    if (apItem) {
+      apItem.paid = true;
+      if (apItem.orderId) {
+        const so = db.supplyOrders.find(o => o.id === apItem.orderId);
+        if (so) {
+          so.status = "Оплачен";
+        }
+      }
+    }
+    
     saveState();
     
     alert(`✓ Успешный платеж!\r\nСчет на сумму ${amount.toLocaleString()} ₸ оплачен со счета Halyk Bank.\r\nТранзакция TX-PAY-${Math.floor(Math.random()*90000+10000)} проведена.`);
     renderFinanceTreasury();
+    renderPurchasingHub(); // Обновляем снабжение
     showSystemNotification(`Счет поставщика успешно оплачен: -${amount.toLocaleString()} ₸`);
   } else if (action === "resetDemo") {
     resetDemoData();
@@ -9056,6 +9742,17 @@ function runSystemMigrations() {
     db.approvalRequests = [
       { id: "app_1", title: "Заявка на оплату счета №45 (Helios OIL)", initiator: "Каримов Р. Д. (Механик)", type: "Платеж", amount: 1500000, status: "pending", date: "2026-06-24" },
       { id: "app_2", title: "Согласование договора субаренды крана Grove", initiator: "Жолдасов Б. К. (Директор)", type: "Договор", amount: 1200000, status: "approved", date: "2026-06-23" }
+    ];
+    dirty = true;
+  }
+  if (!db.docFolders || (db.docFolders.length && typeof db.docFolders[0].icon === 'string' && !['contract','invoice','clipboard','template','mail','shield','folder','chart','lock','archive'].includes(db.docFolders[0].icon))) {
+    db.docFolders = [
+      { id: "f_contracts", name: "Договоры", icon: "contract" },
+      { id: "f_bills", name: "Счета", icon: "invoice" },
+      { id: "f_acts", name: "Акты", icon: "clipboard" },
+      { id: "f_templates", name: "Шаблоны", icon: "template" },
+      { id: "f_letters", name: "Письма", icon: "mail" },
+      { id: "f_orders", name: "Приказы", icon: "shield" }
     ];
     dirty = true;
   }
@@ -9882,6 +10579,7 @@ function openCreateOutgoingDocModal() {
   const now = new Date();
   document.getElementById("outDocDate").value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   toggleOutDocNumInput();
+  populateFolderSelects();
   openModal("createOutgoingDocModal");
 }
 
@@ -9904,6 +10602,8 @@ function submitCreateOutgoingDoc() {
   const rec = document.getElementById("outDocRecipient").value.trim();
   const date = document.getElementById("outDocDate").value;
   const type = document.getElementById("outDocType").value;
+  const folderSelect = document.getElementById("outDocFolderSelect");
+  const folderId = folderSelect ? folderSelect.value : "f_letters";
   
   if (!title || !rec || !date || (mode === "manual" && !manualNum)) {
     alert("Пожалуйста, заполните необходимые поля!");
@@ -9926,20 +10626,24 @@ function submitCreateOutgoingDoc() {
     author: getActiveUsername(),
     recipient: rec,
     type: type,
+    folderId: folderId,
     status: "Отправлено"
   });
   
   logUserAction(getActiveUsername(), `Зарегистрирован исходящий документ: "${outNumber}"`, "Документооборот", "success");
   saveState();
   closeModal("createOutgoingDocModal");
-  renderOutgoingDocsTable();
+  renderDocFolders();
+  switchDocFolder("outgoing");
   showSystemNotification("Исходящий документ успешно зарегистрирован в реестре!");
 }
 
 function renderApprovalsList() {
   const container = document.getElementById("approvalsListContainer");
+  const archiveContainer = document.getElementById("approvalsArchiveContainer");
   if (!container || !db.approvalRequests) return;
   
+  // 1. Pending approvals
   const pending = db.approvalRequests.filter(r => r.status === "pending");
   if (pending.length === 0) {
     container.innerHTML = `
@@ -9947,22 +10651,64 @@ function renderApprovalsList() {
         Нет заявок, ожидающих вашего согласования.
       </div>
     `;
-    return;
+  } else {
+    container.innerHTML = pending.map(r => `
+      <div class="approval-item" style="cursor: pointer;" onclick="if(!event.target.closest('button')) openViewApprovalRequestModal('${r.id}')">
+        <div class="approval-info">
+          <span class="approval-title">${r.title}</span>
+          <span class="approval-meta">Инициатор: ${r.initiator} | Дата: ${r.date}</span>
+          ${r.amount ? `<strong style="font-size: 12px; margin-top:4px;">Сумма: ${r.amount.toLocaleString()} ₸</strong>` : ""}
+        </div>
+        <div class="approval-actions">
+          <button class="btn-primary" style="font-size: 9px; padding: 4px 8px; background-color: var(--status-success);" onclick="approveRequest('${r.id}')">Да</button>
+          <button class="btn-secondary" style="font-size: 9px; padding: 4px 8px; color: var(--status-danger); border-color: var(--status-danger);" onclick="rejectRequest('${r.id}')">Нет</button>
+        </div>
+      </div>
+    `).join("");
   }
+
+  // 2. Archive approvals
+  if (archiveContainer) {
+    const archive = db.approvalRequests.filter(r => r.status === "approved" || r.status === "rejected");
+    if (archive.length === 0) {
+      archiveContainer.innerHTML = `
+        <div style="font-size: 10px; color: var(--text-secondary); text-align: center; padding: 10px; font-style: italic;">
+          Архив пуст
+        </div>
+      `;
+    } else {
+      archiveContainer.innerHTML = archive.map(r => `
+        <div style="background:var(--bg-secondary); padding:8px 12px; border-radius:8px; border:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; flex-direction:column; gap:2px; max-width:70%;">
+            <span style="font-size:11px; font-weight:600; color:var(--text-primary); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${r.title}</span>
+            <span style="font-size:9px; color:var(--text-secondary);">${r.date}</span>
+          </div>
+          <span class="badge ${r.status === 'approved' ? 'badge-success' : 'badge-danger'}" style="font-size:9px; padding:2px 6px;">
+            ${r.status === 'approved' ? 'Утвержден' : 'Отклонен'}
+          </span>
+        </div>
+      `).join("");
+    }
+  }
+
+  // 3. Update document stats and tab badges
+  const totalDocs = (db.incomingDocs ? db.incomingDocs.length : 0) + (db.outgoingDocs ? db.outgoingDocs.length : 0);
+  const pendingCount = pending.length;
+  const approvedCount = db.approvalRequests.filter(r => r.status === "approved").length;
   
-  container.innerHTML = pending.map(r => `
-    <div class="approval-item" style="cursor: pointer;" onclick="if(!event.target.closest('button')) openViewApprovalRequestModal('${r.id}')">
-      <div class="approval-info">
-        <span class="approval-title">${r.title}</span>
-        <span class="approval-meta">Инициатор: ${r.initiator} | Дата: ${r.date}</span>
-        ${r.amount ? `<strong style="font-size: 12px; margin-top:4px;">Сумма: ${r.amount.toLocaleString()} ₸</strong>` : ""}
-      </div>
-      <div class="approval-actions">
-        <button class="btn-primary" style="font-size: 9px; padding: 4px 8px; background-color: var(--status-success);" onclick="approveRequest('${r.id}')">Да</button>
-        <button class="btn-secondary" style="font-size: 9px; padding: 4px 8px; color: var(--status-danger); border-color: var(--status-danger);" onclick="rejectRequest('${r.id}')">Нет</button>
-      </div>
-    </div>
-  `).join("");
+  const statTotal = document.getElementById("docStatTotal");
+  const statPending = document.getElementById("docStatPending");
+  const statApproved = document.getElementById("docStatApproved");
+  
+  if (statTotal) statTotal.textContent = totalDocs;
+  if (statPending) statPending.textContent = pendingCount;
+  if (statApproved) statApproved.textContent = approvedCount;
+
+  const incomingCount = document.getElementById("docIncomingCount");
+  const outgoingCount = document.getElementById("docOutgoingCount");
+  
+  if (incomingCount) incomingCount.textContent = db.incomingDocs ? db.incomingDocs.length : 0;
+  if (outgoingCount) outgoingCount.textContent = db.outgoingDocs ? db.outgoingDocs.length : 0;
 }
 
 function openViewApprovalRequestModal(reqId) {
@@ -10042,29 +10788,137 @@ function renderTransportTripsTable() {
   const tbody = document.getElementById("transportTripsTableBody");
   if (!tbody || !db.logisticTrips) return;
   
-  tbody.innerHTML = db.logisticTrips.map((t, idx) => `
-    <tr>
-      <td><strong>№ ${String(idx+1).padStart(3, '0')}</strong></td>
-      <td><strong>${t.vehicle}</strong></td>
-      <td>${t.pointA} ➔ ${t.pointB}</td>
-      <td>Вес: ${t.weight}т / Объем: ${t.volume}м³</td>
-      <td>${t.carrier}</td>
-      <td>${t.receiver}</td>
-      <td>${t.distance} км</td>
-      <td><span class="badge ${t.status === 'Доставлено' ? 'badge-success' : 'badge-warning'}" style="font-size:9px;">${t.status}</span></td>
-      <td>
-        ${t.status === 'В пути' 
-          ? `<button class="btn-secondary" style="font-size:9px; padding:3px 6px;" onclick="completeTrip('${t.id}')">Завершить</button>` 
-          : `<span style="color:var(--text-secondary); font-size:10px;">Выполнено</span>`
-        }
-      </td>
-    </tr>
-  `).join("");
+  tbody.innerHTML = db.logisticTrips.map((t, idx) => {
+    const isSelected = window.selectedLogisticTripId === t.id || (!window.selectedLogisticTripId && idx === 0);
+    if (isSelected) window.selectedLogisticTripId = t.id;
+    return `
+      <tr class="${isSelected ? 'row-selected' : ''}" style="cursor:pointer;" onclick="selectLogisticTrip('${t.id}')">
+        <td><strong>№ ${String(idx+1).padStart(3, '0')}</strong></td>
+        <td><strong>${t.vehicle}</strong></td>
+        <td>${t.pointA} ➔ ${t.pointB}</td>
+        <td>Вес: ${t.weight}т / Объем: ${t.volume}м³</td>
+        <td>${t.carrier}</td>
+        <td>${t.receiver}</td>
+        <td>${t.distance} км</td>
+        <td><span class="badge ${t.status === 'Доставлено' ? 'badge-success' : 'badge-warning'}" style="font-size:9px;">${t.status}</span></td>
+        <td>
+          ${t.status === 'В пути' 
+            ? `<button class="btn-secondary" style="font-size:9px; padding:3px 6px;" onclick="event.stopPropagation();completeTrip('${t.id}')">Завершить</button>` 
+            : `<span style="color:var(--text-secondary); font-size:10px;">Выполнено</span>`
+          }
+        </td>
+      </tr>
+    `;
+  }).join("");
 }
 
 function openRegisterTripModal() {
   document.getElementById("registerTripForm").reset();
   openModal("registerTripModal");
+}
+
+function selectLogisticTrip(tripId) {
+  window.selectedLogisticTripId = tripId;
+  renderActiveTripDetails();
+  
+  // Highlight selected row in table
+  const rows = document.querySelectorAll("#transportTripsTableBody tr");
+  db.logisticTrips.forEach((t, idx) => {
+    const row = rows[idx];
+    if (row) {
+      if (t.id === tripId) {
+        row.classList.add("row-selected");
+      } else {
+        row.classList.remove("row-selected");
+      }
+    }
+  });
+}
+
+function renderActiveTripDetails() {
+  const activeRoute = document.getElementById("activeRoutePoints");
+  const activeVeh = document.getElementById("activeTripVehicleInfo");
+  const shipperCard = document.getElementById("shipperCardContent");
+  const carrierCard = document.getElementById("carrierCardContent");
+  const receiverCard = document.getElementById("receiverCardContent");
+  const progressFill = document.getElementById("activeTripProgressFill");
+  
+  if (!activeRoute || !activeVeh) return;
+  
+  // Ищем выбранный рейс или первый активный рейс "В пути"
+  let trip = null;
+  if (window.selectedLogisticTripId) {
+    trip = db.logisticTrips.find(t => t.id === window.selectedLogisticTripId);
+  }
+  if (!trip && db.logisticTrips) {
+    trip = db.logisticTrips.find(t => t.status === "В пути") || db.logisticTrips[0];
+  }
+  
+  if (trip) {
+    window.selectedLogisticTripId = trip.id;
+    activeRoute.innerHTML = `${trip.pointA} <span style="color:var(--brand-color);">➔</span> ${trip.pointB}`;
+    activeVeh.innerHTML = `<strong>${trip.vehicle}</strong>`;
+    
+    // SLA и статус
+    const activeRouteParent = activeRoute.parentElement;
+    if (activeRouteParent) {
+      let badge = activeRouteParent.querySelector(".badge");
+      if (!badge) {
+        badge = document.createElement("div");
+        activeRouteParent.appendChild(badge);
+      }
+      if (trip.status === "В пути") {
+        badge.className = "badge badge-warning";
+        badge.style.marginTop = "8px";
+        badge.innerText = "В пути (SLA: Соблюдено)";
+        if (progressFill) progressFill.style.width = "65%";
+      } else {
+        badge.className = "badge badge-success";
+        badge.style.marginTop = "8px";
+        badge.innerText = "Доставлено (SLA: Успешно)";
+        if (progressFill) progressFill.style.width = "100%";
+      }
+    }
+    
+    // Информация о грузе
+    const specsParent = activeVeh.parentElement;
+    if (specsParent) {
+      const rows = specsParent.querySelectorAll(".pnl-row strong");
+      if (rows.length >= 3) {
+        rows[0].innerText = trip.vehicle;
+        rows[1].innerText = `Объем: ${trip.volume} м³, Вес: ${trip.weight} тонн`;
+        rows[2].innerText = `Длина маршрута: ${trip.distance} км`;
+      }
+    }
+    
+    if (shipperCard) {
+      shipperCard.innerHTML = `
+        <strong>${trip.shipper}</strong><br>
+        <span style="font-size:10px; color:var(--text-secondary);">Официальный отправитель груза по накладной</span>
+      `;
+    }
+    
+    if (carrierCard) {
+      carrierCard.innerHTML = `
+        <strong>${trip.carrier}</strong><br>
+        <span style="font-size:10px; color:var(--text-secondary);">Транспортная компания | Техника: ${trip.vehicle}</span>
+      `;
+    }
+    
+    if (receiverCard) {
+      receiverCard.innerHTML = `
+        <strong>${trip.receiver}</strong><br>
+        <span style="font-size:10px; color:var(--text-secondary);">Получатель и ответственный за разгрузку</span>
+      `;
+    }
+  } else {
+    activeRoute.innerText = "Нет активных рейсов";
+    activeVeh.innerHTML = `<span style="color:var(--text-secondary); font-style:italic;">Транспорт не назначен</span>`;
+    if (progressFill) progressFill.style.width = "0%";
+    if (shipperCard) shipperCard.innerHTML = "—";
+    if (carrierCard) carrierCard.innerHTML = "—";
+    if (receiverCard) receiverCard.innerHTML = "—";
+  }
 }
 
 function submitRegisterTrip() {
@@ -10083,7 +10937,7 @@ function submitRegisterTrip() {
     return;
   }
   
-  db.logisticTrips.unshift({
+  const newTrip = {
     id: "trip_" + (db.logisticTrips.length + 1),
     vehicle: vehicle,
     carrier: carrier,
@@ -10095,16 +10949,28 @@ function submitRegisterTrip() {
     volume: vol,
     weight: weight,
     status: "В пути"
-  });
+  };
+  
+  db.logisticTrips.unshift(newTrip);
+  window.selectedLogisticTripId = newTrip.id;
+  
+  // Меняем статус техники в реестре на "В пути"
+  const match = vehicle.match(/\(([^)]+)\)/);
+  if (match) {
+    const plate = match[1];
+    const veh = db.vehicles.find(v => v.plate === plate);
+    if (veh) {
+      veh.status = "В пути";
+    }
+  }
   
   logUserAction(getActiveUsername(), `Зарегистрирован рейс ${pointA} ➔ ${pointB} (${vehicle})`, "Логистика", "success");
   saveState();
   closeModal("registerTripModal");
   renderTransportTripsTable();
-  
-  // Update dashboard route visual
-  document.getElementById("activeRoutePoints").innerText = `${pointA} ➔ ${pointB}`;
-  document.getElementById("activeTripVehicleInfo").innerText = vehicle;
+  renderActiveTripDetails();
+  renderAllVehicles();
+  renderGanttChart();
   
   showSystemNotification("Рейс логистики успешно зарегистрирован и отправлен!");
 }
@@ -10114,9 +10980,25 @@ function completeTrip(tripId) {
   if (!trip) return;
   
   trip.status = "Доставлено";
+  window.selectedLogisticTripId = trip.id;
+  
+  // Возвращаем технику в работу/свободное состояние
+  const match = trip.vehicle.match(/\(([^)]+)\)/);
+  if (match) {
+    const plate = match[1];
+    const veh = db.vehicles.find(v => v.plate === plate);
+    if (veh) {
+      veh.status = "Работает";
+    }
+  }
+  
   logUserAction(getActiveUsername(), `Завершен рейс: ${trip.pointA} ➔ ${trip.pointB}`, "Логистика", "info");
   saveState();
   renderTransportTripsTable();
+  renderActiveTripDetails();
+  renderAllVehicles();
+  renderGanttChart();
+  
   showSystemNotification("Рейс успешно завершен. Груз доставлен получателю.");
 }
 
@@ -10660,6 +11542,42 @@ function submitEditOrgNode() {
   node.color = color;
   node.isBlocked = isBlocked;
   
+  // Если сотрудник заблокирован, снимем его со всех машин
+  if (isBlocked) {
+    const driver = db.drivers.find(d => {
+      const cleanNodeName = node.name.replace(/\s+/g, "").toLowerCase();
+      const cleanDriverName = d.name.replace(/\s+/g, "").toLowerCase();
+      return cleanDriverName.includes(cleanNodeName) || cleanNodeName.includes(cleanDriverName);
+    });
+    
+    if (driver) {
+      let evictedCount = 0;
+      db.vehicles.forEach(veh => {
+        if (veh.driverId === driver.id) {
+          veh.driverId = ""; // Unassign
+          evictedCount++;
+        }
+      });
+      
+      // Добавим сообщение безопасности
+      if (!db.driverMessages) db.driverMessages = [];
+      db.driverMessages.push({
+        id: "msg_evt_" + Date.now(),
+        sender: "Служба Безопасности",
+        text: `КРИТИЧЕСКОЕ ПРЕДУПРЕЖДЕНИЕ: Сотрудник ${node.name} (Машинист) заблокирован! Он принудительно отстранен от управления закрепленной спецтехникой (${evictedCount} ед.).`,
+        time: new Date().toLocaleTimeString().substring(0, 5),
+        status: "unread",
+        vehicleId: ""
+      });
+      
+      logUserAction(getActiveUsername(), `Водитель ${driver.name} принудительно снят с техники (${evictedCount} ед.) из-за блокировки.`, "HR/Безопасность", "danger");
+      
+      if (evictedCount > 0) {
+        showSystemNotification(`Водитель снят с техники (${evictedCount} ед.) из-за блокировки!`, "danger");
+      }
+    }
+  }
+  
   logUserAction(getActiveUsername(), `Обновлен сотрудник: ${name} (Блокировка: ${isBlocked})`, "HR/Оргструктура", "warning");
   saveState();
   closeModal("editOrgNodeModal");
@@ -10752,6 +11670,12 @@ function renderDocumentsRegistry() {
   
   let docs = folder === "incoming" ? (db.incomingDocs || []) : (db.outgoingDocs || []);
   
+  // Фильтр по выбранной папке
+  const selectedFolder = window.selectedDocFolderId || "all";
+  if (selectedFolder !== "all") {
+    docs = docs.filter(d => getDocFolderId(d) === selectedFolder);
+  }
+  
   if (typeVal !== "all") {
     docs = docs.filter(d => d.type === typeVal);
   }
@@ -10800,6 +11724,10 @@ function renderDocumentsRegistry() {
       `;
     }
   }).join("");
+  
+  if (typeof renderApprovalsList === "function") {
+    renderApprovalsList();
+  }
 }
 
 function openCreateIncomingDocModal() {
@@ -10808,7 +11736,7 @@ function openCreateIncomingDocModal() {
   
   const now = new Date();
   document.getElementById("inDocDate").value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  
+  populateFolderSelects();
   openModal("registerIncomingDocModal");
 }
 
@@ -10819,6 +11747,8 @@ function submitRegisterIncomingDoc() {
   const type = document.getElementById("inDocType").value;
   const body = document.getElementById("inDocBody").value.trim();
   const date = document.getElementById("inDocDate").value;
+  const folderSelect = document.getElementById("inDocFolderSelect");
+  const folderId = folderSelect ? folderSelect.value : "f_letters";
   
   if (!srcNumber || !title || !sender || !body || !date) {
     alert("Заполните все обязательные поля!");
@@ -10838,6 +11768,7 @@ function submitRegisterIncomingDoc() {
     sender: sender,
     recipient: getActiveUsername(),
     type: type,
+    folderId: folderId,
     status: "Получено",
     body: body
   });
@@ -10845,8 +11776,162 @@ function submitRegisterIncomingDoc() {
   logUserAction(getActiveUsername(), `Зарегистрирован входящий документ ${inNumber} от ${sender}`, "Документооборот", "success");
   saveState();
   closeModal("registerIncomingDocModal");
+  renderDocFolders();
   switchDocFolder("incoming");
   showSystemNotification(`Входящий документ ${inNumber} успешно добавлен в реестр!`);
+}
+
+window.selectedDocFolderId = "all";
+
+function getDocFolderId(doc) {
+  if (doc.folderId) return doc.folderId;
+  const type = doc.type || "";
+  if (type.includes("Договор")) return "f_contracts";
+  if (type.includes("Акт") || type.includes("Соглашение")) return "f_acts";
+  if (type.includes("Письмо")) return "f_letters";
+  if (type.includes("Счет")) return "f_bills";
+  if (type.includes("Шаблон")) return "f_templates";
+  if (type.includes("Приказ")) return "f_orders";
+  return "f_letters"; // Default fallback
+}
+
+const DOC_FOLDER_SVG_ICONS = {
+  "all": `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
+  "contract": `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
+  "invoice": `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/><line x1="7" y1="15" x2="7.01" y2="15"/><line x1="11" y1="15" x2="17" y2="15"/></svg>`,
+  "clipboard": `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M9 14l2 2 4-4"/></svg>`,
+  "template": `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="10" y1="4" x2="10" y2="20"/></svg>`,
+  "mail": `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`,
+  "shield": `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>`,
+  "folder": `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>`,
+  "chart": `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+  "lock": `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+  "archive": `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>`
+};
+
+function getDocFolderSvg(iconKey) {
+  return DOC_FOLDER_SVG_ICONS[iconKey] || DOC_FOLDER_SVG_ICONS["folder"];
+}
+
+function renderDocFolders() {
+  const container = document.getElementById("docFoldersList");
+  if (!container || !db.docFolders) return;
+  
+  const folderCounts = {};
+  db.docFolders.forEach(f => { folderCounts[f.id] = 0; });
+  
+  const allDocs = [...(db.incomingDocs || []), ...(db.outgoingDocs || [])];
+  allDocs.forEach(d => {
+    const fId = getDocFolderId(d);
+    if (folderCounts[fId] !== undefined) folderCounts[fId]++;
+  });
+  
+  const totalCount = allDocs.length;
+  const allAct = window.selectedDocFolderId === "all";
+  
+  const folderBtnBase = `display:flex; justify-content:space-between; align-items:center; width:100%; text-align:left; font-size:11px; padding:9px 12px; border-radius:10px; margin-bottom:3px; border:1px solid transparent; transition:all 0.15s ease; cursor:pointer; background:transparent;`;
+  const folderBtnActive = `background:rgba(37,99,235,0.07); color:var(--brand-color); border-color:rgba(37,99,235,0.15); font-weight:700; box-shadow:0 2px 8px rgba(37,99,235,0.06);`;
+  const folderBtnHover = `onmouseover="if(!this.classList.contains('folder-active')){this.style.background='var(--bg-secondary)';this.style.transform='translateX(2px)';}" onmouseout="if(!this.classList.contains('folder-active')){this.style.background='transparent';this.style.transform='none';}"`;
+
+  let html = `
+    <button class="${allAct ? 'folder-active' : ''}" style="${folderBtnBase} font-weight:700; ${allAct ? folderBtnActive : ''}" onclick="selectDocFolder('all')" ${!allAct ? folderBtnHover : ''}>
+      <span style="display:flex; align-items:center; gap:8px;">
+        <span style="display:flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:${allAct ? 'rgba(37,99,235,0.12)' : 'var(--bg-secondary)'}; flex-shrink:0;">${getDocFolderSvg('all')}</span>
+        <span>Все документы</span>
+      </span>
+      <span style="min-width:22px; height:18px; display:flex; align-items:center; justify-content:center; border-radius:9px; font-size:10px; font-weight:700; background:${allAct ? 'rgba(37,99,235,0.12)' : 'var(--bg-secondary)'}; color:${allAct ? 'var(--brand-color)' : 'var(--text-secondary)'}; padding:0 6px;">${totalCount}</span>
+    </button>
+    <div style="height:1px; background:var(--border-color); margin:6px 0;"></div>
+  `;
+  
+  db.docFolders.forEach(f => {
+    const isAct = window.selectedDocFolderId === f.id;
+    const count = folderCounts[f.id] || 0;
+    const iconSvg = getDocFolderSvg(f.icon);
+    
+    const iconColors = {
+      "contract": { bg: "rgba(37,99,235,0.08)", color: "#2563eb" },
+      "invoice": { bg: "rgba(16,185,129,0.08)", color: "#10b981" },
+      "clipboard": { bg: "rgba(245,158,11,0.08)", color: "#f59e0b" },
+      "template": { bg: "rgba(139,92,246,0.08)", color: "#8b5cf6" },
+      "mail": { bg: "rgba(6,182,212,0.08)", color: "#06b6d4" },
+      "shield": { bg: "rgba(239,68,68,0.08)", color: "#ef4444" },
+      "folder": { bg: "rgba(100,116,139,0.08)", color: "#64748b" },
+      "chart": { bg: "rgba(34,197,94,0.08)", color: "#22c55e" },
+      "lock": { bg: "rgba(220,38,38,0.08)", color: "#dc2626" },
+      "archive": { bg: "rgba(107,114,128,0.08)", color: "#6b7280" }
+    };
+    const ic = iconColors[f.icon] || iconColors["folder"];
+    const activeBg = isAct ? folderBtnActive : '';
+    
+    html += `
+      <button class="${isAct ? 'folder-active' : ''}" style="${folderBtnBase} ${activeBg}" onclick="selectDocFolder('${f.id}')" ${!isAct ? folderBtnHover : ''}>
+        <span style="display:flex; align-items:center; gap:8px;">
+          <span style="display:flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:8px; background:${isAct ? 'rgba(37,99,235,0.12)' : ic.bg}; color:${isAct ? 'var(--brand-color)' : ic.color}; flex-shrink:0;">${iconSvg}</span>
+          <span style="font-weight:${isAct ? '700' : '500'};">${f.name}</span>
+        </span>
+        <span style="min-width:22px; height:18px; display:flex; align-items:center; justify-content:center; border-radius:9px; font-size:10px; font-weight:700; background:${isAct ? 'rgba(37,99,235,0.12)' : 'var(--bg-secondary)'}; color:${isAct ? 'var(--brand-color)' : 'var(--text-secondary)'}; padding:0 6px;">${count}</span>
+      </button>
+    `;
+  });
+  
+  container.innerHTML = html;
+}
+
+function selectDocFolder(fId) {
+  window.selectedDocFolderId = fId;
+  renderDocFolders();
+  renderDocumentsRegistry();
+}
+
+function openCreateFolderModal() {
+  const nameInput = document.getElementById("newDocFolderName");
+  if (nameInput) nameInput.value = "";
+  openModal("createDocFolderModal");
+}
+
+function submitCreateDocFolder() {
+  const nameInput = document.getElementById("newDocFolderName");
+  const iconInput = document.getElementById("newDocFolderIcon");
+  if (!nameInput || !nameInput.value.trim()) {
+    showSystemNotification("Введите название папки!");
+    return;
+  }
+  
+  const newFolder = {
+    id: "f_custom_" + Date.now(),
+    name: nameInput.value.trim(),
+    icon: iconInput ? iconInput.value : "folder"
+  };
+  
+  if (!db.docFolders) db.docFolders = [];
+  db.docFolders.push(newFolder);
+  
+  logUserAction(getActiveUsername(), `Создал новую папку: "${newFolder.name}"`, "Документооборот", "success");
+  saveState();
+  
+  closeModal("createDocFolderModal");
+  renderDocFolders();
+  showSystemNotification(`Папка "${newFolder.name}" успешно создана!`);
+}
+
+function populateFolderSelects() {
+  const inSelect = document.getElementById("inDocFolderSelect");
+  const outSelect = document.getElementById("outDocFolderSelect");
+  if (!db.docFolders) return;
+  
+  const iconLabels = {
+    "contract": "📄", "invoice": "💳", "clipboard": "📋", "template": "📑",
+    "mail": "✉️", "shield": "🛡️", "folder": "📁", "chart": "📊",
+    "lock": "🔒", "archive": "📦"
+  };
+  const optionsHtml = db.docFolders.map(f => {
+    const emoji = iconLabels[f.icon] || "📁";
+    return `<option value="${f.id}">${emoji} ${f.name}</option>`;
+  }).join("");
+  
+  if (inSelect) inSelect.innerHTML = optionsHtml;
+  if (outSelect) outSelect.innerHTML = optionsHtml;
 }
 
 function openViewOfficialDocumentModal(docId, isIncoming) {
@@ -10908,6 +11993,495 @@ function printOfficialDocument() {
     printWindow.print();
     printWindow.close();
   }, 500);
+}
+
+function handleGlobalSearch(query) {
+  const resultsDiv = document.getElementById("globalSearchResults");
+  if (!resultsDiv) return;
+  
+  if (!query || query.trim().length < 2) {
+    resultsDiv.style.display = "none";
+    return;
+  }
+  
+  const q = query.toLowerCase().trim();
+  let results = [];
+  
+  // 1. Поиск техники
+  db.vehicles.forEach(v => {
+    if (v.name.toLowerCase().includes(q) || v.plate.toLowerCase().includes(q) || v.invNumber.toLowerCase().includes(q)) {
+      results.push({
+        type: "vehicle",
+        title: `Техника: ${v.name}`,
+        subtitle: `${v.plate} | Инв: ${v.invNumber}`,
+        action: () => {
+          switchTab('all_vehicles');
+          const searchInput = document.getElementById("allVehiclesSearch");
+          if (searchInput) searchInput.value = v.plate;
+          renderAllVehiclesList();
+        }
+      });
+    }
+  });
+  
+  // 2. Поиск водителей
+  db.drivers.forEach(d => {
+    if (d.name.toLowerCase().includes(q) || (d.phone && d.phone.includes(q))) {
+      results.push({
+        type: "driver",
+        title: `Машинист: ${d.name}`,
+        subtitle: `Тел: ${d.phone || "—"}`,
+        action: () => {
+          switchTab('staff');
+          const searchInput = document.getElementById("staffSearchInput");
+          if (searchInput) searchInput.value = d.name;
+          renderStaffGrid();
+        }
+      });
+    }
+  });
+  
+  // 3. Поиск задач
+  db.tasks.forEach(t => {
+    if (t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)) {
+      results.push({
+        type: "task",
+        title: `Задача: ${t.title}`,
+        subtitle: `Статус: ${t.status}`,
+        action: () => {
+          switchTab('tasks');
+          openTaskDetails(t.id);
+        }
+      });
+    }
+  });
+  
+  // 4. Поиск контрагентов
+  db.companies.forEach(c => {
+    if (c.name.toLowerCase().includes(q)) {
+      results.push({
+        type: "company",
+        title: `Контрагент: ${c.name}`,
+        subtitle: `Тип: ${c.type || "Партнер"}`,
+        action: () => {
+          switchTab('companies');
+        }
+      });
+    }
+  });
+  
+  if (results.length === 0) {
+    resultsDiv.innerHTML = `<div style="padding: 10px 16px; font-size:12px; color:var(--text-secondary); text-align:center;">Ничего не найдено</div>`;
+  } else {
+    resultsDiv.innerHTML = results.map((r, i) => `
+      <div class="global-search-item" style="padding: 8px 16px; cursor: pointer; transition: background 0.15s; border-bottom: 1px solid rgba(0,0,0,0.03);" 
+           onmouseover="this.style.background='var(--bg-secondary)'" 
+           onmouseout="this.style.background='none'"
+           id="search-res-item-${i}">
+        <div style="font-weight: 600; font-size: 13px; color: var(--text-primary);">${r.title}</div>
+        <div style="font-size: 10px; color: var(--text-secondary); margin-top: 2px;">${r.subtitle}</div>
+      </div>
+    `).join("");
+    
+    // Bind click events
+    results.forEach((r, i) => {
+      const el = document.getElementById(`search-res-item-${i}`);
+      if (el) {
+        el.onclick = () => {
+          r.action();
+          resultsDiv.style.display = "none";
+          document.getElementById("globalSearchInput").value = "";
+        };
+      }
+    });
+  }
+  
+  resultsDiv.style.display = "block";
+}
+
+// Close search results on click outside
+document.addEventListener("click", (e) => {
+  const container = document.querySelector(".global-search-container");
+  const resultsDiv = document.getElementById("globalSearchResults");
+  if (resultsDiv && container && !container.contains(e.target)) {
+    resultsDiv.style.display = "none";
+  }
+});
+
+function toggleErpGuide() {
+  const panel = document.getElementById("erpGuidePanel");
+  if (!panel) return;
+  if (panel.style.right === "0px") {
+    panel.style.right = "-360px";
+  } else {
+    panel.style.right = "0px";
+    updateErpGuideContent();
+  }
+}
+
+function updateErpGuideContent() {
+  const content = document.getElementById("erpGuideContent");
+  if (!content) return;
+  
+  // Определяем активную вкладку по отображаемому элементу
+  let activeTab = "dashboard";
+  const panes = document.querySelectorAll(".tab-pane");
+  panes.forEach(pane => {
+    if (pane.classList.contains("active") || window.getComputedStyle(pane).display === "block") {
+      activeTab = pane.id.replace("tab-", "");
+    }
+  });
+  
+  let html = "";
+  
+  switch(activeTab) {
+    case "dashboard":
+      html = `
+        <h4 style="margin:0; font-size:13px; color:var(--brand-color); font-weight:700;">📊 ДАШБОРД И АНАЛИТИКА</h4>
+        <p style="font-size:12px; color:var(--text-secondary); line-height:1.5; margin:8px 0 0 0;">
+          Панель управления финансовой эффективностью компании. Здесь вы видите общую выручку, расходы и чистую прибыль.
+        </p>
+        <div style="background:var(--bg-secondary); padding:10px; border-radius:6px; font-size:11px; margin-top:10px;">
+          <strong>💡 Что протестировать:</strong>
+          <ul style="margin:5px 0 0 15px; padding:0; list-style-type: disc;">
+            <li style="margin-bottom:4px;">Нажмите на карточку «Выручка» или «Долги клиентов» для детализации.</li>
+            <li>Обратите внимание на таблицу ROI — расходы на ГСМ и ремонт теперь считаются автоматически.</li>
+          </ul>
+        </div>
+      `;
+      break;
+    case "transport":
+      html = `
+        <h4 style="margin:0; font-size:13px; color:var(--brand-color); font-weight:700;">🚚 ЛОГИСТИКА И ПЕРЕВОЗКИ</h4>
+        <p style="font-size:12px; color:var(--text-secondary); line-height:1.5; margin:8px 0 0 0;">
+          Управление доставкой грузов и отслеживанием путевых листов.
+        </p>
+        <div style="background:var(--bg-secondary); padding:10px; border-radius:6px; font-size:11px; margin-top:10px;">
+          <strong>💡 Что протестировать:</strong>
+          <ul style="margin:5px 0 0 15px; padding:0; list-style-type: disc;">
+            <li style="margin-bottom:4px;"><strong>Кликните по любой строке</strong> в таблице «Журнал рейсов» ниже.</li>
+            <li style="margin-bottom:4px;">Карточки «Маршруты» и «Участники» сверху мгновенно обновятся данными выбранного рейса, а прогресс-бар покажет состояние пути.</li>
+            <li>Зарегистрируйте новый рейс и завершите его — статус техники в автопарке изменится автоматически!</li>
+          </ul>
+        </div>
+      `;
+      break;
+    case "purchasing_hub":
+      html = `
+        <h4 style="margin:0; font-size:13px; color:var(--brand-color); font-weight:700;">📦 СНАБЖЕНИЕ И ЗАКУПКИ ТМЗ</h4>
+        <p style="font-size:12px; color:var(--text-secondary); line-height:1.5; margin:8px 0 0 0;">
+          Интегрированная закупка запчастей и материалов.
+        </p>
+        <div style="background:var(--bg-secondary); padding:10px; border-radius:6px; font-size:11px; margin-top:10px;">
+          <strong>💡 Что протестировать:</strong>
+          <ul style="margin:5px 0 0 15px; padding:0; list-style-type: disc;">
+            <li style="margin-bottom:4px;">Нажмите «Создать заказ снабжения». Статус заказа будет «Оформлен» (Ожидает оплаты).</li>
+            <li style="margin-bottom:4px;">Перейдите во вкладку «Финансы и Касса» и найдите созданный счет в кредиторской задолженности.</li>
+            <li>Оплатите счет. Вернитесь в Снабжение — статус изменится на «Оплачен», и вы сможете принять детали на склад.</li>
+          </ul>
+        </div>
+      `;
+      break;
+    case "finance_treasury":
+      html = `
+        <h4 style="margin:0; font-size:13px; color:var(--brand-color); font-weight:700;">💳 КАЗНАЧЕЙСТВО И ФИНАНСЫ</h4>
+        <p style="font-size:12px; color:var(--text-secondary); line-height:1.5; margin:8px 0 0 0;">
+          Управление кассой компании, банковскими счетами и кредиторской задолженностью.
+        </p>
+        <div style="background:var(--bg-secondary); padding:10px; border-radius:6px; font-size:11px; margin-top:10px;">
+          <strong>💡 Что протестировать:</strong>
+          <ul style="margin:5px 0 0 15px; padding:0; list-style-type: disc;">
+            <li style="margin-bottom:4px;">Счета за снабжение приходят сюда автоматически.</li>
+            <li style="margin-bottom:4px;">Зажмите кнопку <strong>«Удерживать для оплаты»</strong> на 2 секунды.</li>
+            <li>Деньги спишутся с баланса Halyk Bank, а статус связанной закупки изменится на «Оплачен».</li>
+          </ul>
+        </div>
+      `;
+      break;
+    case "contracts_registry":
+      html = `
+        <h4 style="margin:0; font-size:13px; color:var(--brand-color); font-weight:700;">📄 РЕЕСТР ДОГОВОРОВ</h4>
+        <p style="font-size:12px; color:var(--text-secondary); line-height:1.5; margin:8px 0 0 0;">
+          Юридический архив договоров аренды спецтехники с возможностью автоматической генерации печатных форм.
+        </p>
+        <div style="background:var(--bg-secondary); padding:10px; border-radius:6px; font-size:11px; margin-top:10px;">
+          <strong>💡 Новые функции быстродействия:</strong>
+          <ul style="margin:5px 0 0 15px; padding:0; list-style-type: disc;">
+            <li style="margin-bottom:4px;"><strong>Поиск:</strong> Введите часть номера, имени партнера или спецтехники в поисковую строку.</li>
+            <li style="margin-bottom:4px;"><strong>Сортировка:</strong> Выберите «По релевантности», чтобы отсортировать партнеров по количеству заключенных договоров.</li>
+            <li><strong>Буквенный фильтр:</strong> Кликните по первой букве имени контрагента сверху для мгновенной фильтрации.</li>
+          </ul>
+        </div>
+      `;
+      break;
+    case "documents":
+      html = `
+        <h4 style="margin:0; font-size:13px; color:var(--brand-color); font-weight:700;">📂 ДОКУМЕНТООБОРОТ И EDMS</h4>
+        <p style="font-size:12px; color:var(--text-secondary); line-height:1.5; margin:8px 0 0 0;">
+          Система электронного документооборота (СЭД) компании. Управляйте договорами, счетами и актами по структурированным папкам.
+        </p>
+        <div style="background:var(--bg-secondary); padding:10px; border-radius:6px; font-size:11px; margin-top:10px;">
+          <strong>💡 Что протестировать:</strong>
+          <ul style="margin:5px 0 0 15px; padding:0; list-style-type: disc;">
+            <li style="margin-bottom:4px;"><strong>Создайте папку:</strong> Нажмите «+ Папка» на левой панели, выберите название и иконку. Папка появится в списке.</li>
+            <li style="margin-bottom:4px;"><strong>Зарегистрируйте документ:</strong> Нажмите «Зарегистрировать входящий» или «Создать исходящий» и выберите созданную папку для хранения.</li>
+            <li><strong>Фильтрация:</strong> Кликайте по папкам в левой панели — список документов будет мгновенно отфильтрован, а бейджи покажут точное число файлов.</li>
+          </ul>
+        </div>
+      `;
+      break;
+    case "org":
+      html = `
+        <h4 style="margin:0; font-size:13px; color:var(--brand-color); font-weight:700;">🌳 ОРГСТРУКТУРА И КАДРЫ</h4>
+        <p style="font-size:12px; color:var(--text-secondary); line-height:1.5; margin:8px 0 0 0;">
+          Визуальное дерево подчиненности сотрудников компании.
+        </p>
+        <div style="background:var(--bg-secondary); padding:10px; border-radius:6px; font-size:11px; margin-top:10px;">
+          <strong>💡 Что протестировать:</strong>
+          <ul style="margin:5px 0 0 15px; padding:0; list-style-type: disc;">
+            <li style="margin-bottom:4px;">Нажмите на любого сотрудника (например, Искаков Т.) и выберите «Редактировать».</li>
+            <li style="margin-bottom:4px;">Поставьте галочку <strong>«Заблокирован»</strong> и сохраните.</li>
+            <li>Сотрудник будет принудительно снят со всех машин в автопарке, а в Диспетчерской появится предупреждение безопасности.</li>
+          </ul>
+        </div>
+      `;
+      break;
+    case "dispatcher_hub":
+      html = `
+        <h4 style="margin:0; font-size:13px; color:var(--brand-color); font-weight:700;">💬 ДИСПЕТЧЕРСКИЙ ХАБ</h4>
+        <p style="font-size:12px; color:var(--text-secondary); line-height:1.5; margin:8px 0 0 0;">
+          Оперативный центр общения диспетчера с водителями и контроля инцидентов.
+        </p>
+        <div style="background:var(--bg-secondary); padding:10px; border-radius:6px; font-size:11px; margin-top:10px;">
+          <strong>💡 Что протестировать:</strong>
+          <ul style="margin:5px 0 0 15px; padding:0; list-style-type: disc;">
+            <li style="margin-bottom:4px;">Сюда приходят системные алерты об увольнениях, нарушениях и блокировках.</li>
+            <li>Проверьте чат-переписку водителей.</li>
+          </ul>
+        </div>
+      `;
+      break;
+    default:
+      html = `
+        <h4 style="margin:0; font-size:13px; color:var(--brand-color); font-weight:700;">ℹ️ МОДУЛЬ: ${activeTab.toUpperCase()}</h4>
+        <p style="font-size:12px; color:var(--text-secondary); line-height:1.5; margin:8px 0 0 0;">
+          Этот модуль является важной частью единого организма ERP KazBildInvest.
+        </p>
+        <div style="background:var(--bg-secondary); padding:10px; border-radius:6px; font-size:11px; margin-top:10px;">
+          <strong>💡 Как это связано:</strong>
+          Каждое действие в табелях, закупках, ремонтах или ГСМ мгновенно пересчитывает баланс кассы и окупаемость техники на Дашборде.
+        </div>
+      `;
+  }
+  
+  content.innerHTML = html;
+}
+
+function runGuideScenario(scenario) {
+  // Закрываем все модальные окна на всякий случай
+  const openModals = document.querySelectorAll(".modal-overlay.open, .modal-overlay.show");
+  openModals.forEach(m => m.classList.remove("open", "show"));
+  
+  if (scenario === 'procurement') {
+    // Шаг 1: переходим в снабжение
+    switchTab('purchasing_hub');
+    showSystemNotification("Шаг 1: Открываем Снабжение. Создаем заказ запчасти...", "info");
+    
+    setTimeout(() => {
+      // Имитируем создание заказа снабжения напрямую
+      const newOrder = {
+        id: "so_test_" + Date.now().toString().slice(-4),
+        partSku: "SKU-TEST-99",
+        partName: "Коробка передач Shacman",
+        qty: 1,
+        price: 950000,
+        total: 950000,
+        supplier: "ТОО «Борусан Машинери»",
+        status: "Оформлен",
+        date: new Date().toISOString().split('T')[0]
+      };
+      
+      db.supplyOrders.unshift(newOrder);
+      
+      if (!db.accountsPayable) db.accountsPayable = [];
+      const newAp = {
+        id: "ap_so_" + newOrder.id,
+        supplierName: newOrder.supplier,
+        purpose: `Поставка: ${newOrder.partName} (1 шт.)`,
+        amount: newOrder.total,
+        dueDate: new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0],
+        paid: false,
+        orderId: newOrder.id
+      };
+      db.accountsPayable.unshift(newAp);
+      saveState();
+      renderPurchasingHub();
+      
+      showSystemNotification("Шаг 2: Создан счет на 950,000 ₸. Переходим в Казначейство...", "warning");
+      
+      setTimeout(() => {
+        switchTab('finance_treasury');
+        
+        setTimeout(() => {
+          // Имитируем оплату
+          const apItem = db.accountsPayable.find(a => a.id === newAp.id);
+          const balance = db.settings.bankKzt || 45200000;
+          
+          db.settings.bankKzt = Math.max(0, balance - 950000);
+          if (apItem) {
+            apItem.paid = true;
+            const so = db.supplyOrders.find(o => o.id === apItem.orderId);
+            if (so) so.status = "Оплачен";
+          }
+          saveState();
+          renderFinanceTreasury();
+          
+          showSystemNotification("Шаг 3: Счет оплачен со счета Halyk Bank (-950,000 ₸). Возвращаемся к закупкам...", "success");
+          
+          setTimeout(() => {
+            switchTab('purchasing_hub');
+            
+            setTimeout(() => {
+              // Имитируем приемку на склад
+              const so = db.supplyOrders.find(o => o.id === newOrder.id);
+              if (so) {
+                so.status = "Доставлен";
+                // Добавляем запись прихода ТМЗ
+                if (!db.materialsWriteOffs) db.materialsWriteOffs = [];
+                db.materialsWriteOffs.unshift({
+                  date: new Date().toISOString().split('T')[0],
+                  type: "Приход",
+                  itemName: so.partName,
+                  qty: so.qty,
+                  price: so.price,
+                  source: "Закупки / Центральный Склад"
+                });
+              }
+              saveState();
+              renderPurchasingHub();
+              renderTmzLogs();
+              
+              showSystemNotification("Успех! Детали поступили на Центральный Склад, остатки увеличены.", "success");
+            }, 1500);
+            
+          }, 2000);
+          
+        }, 2000);
+        
+      }, 2000);
+      
+    }, 1500);
+    
+  } else if (scenario === 'block_driver') {
+    switchTab('org');
+    showSystemNotification("Шаг 1: Открываем Оргструктуру. Блокируем сотрудника...", "info");
+    
+    setTimeout(() => {
+      // Имитируем блокировку node_hr (Искаков Т. Б. / HR)
+      const node = db.orgNodes.find(n => n.id === 'node_hr');
+      if (node) {
+        node.isBlocked = true;
+        
+        // Поиск водителя / сотрудника
+        const driver = db.drivers.find(d => {
+          const cleanNodeName = node.name.replace(/\s+/g, "").toLowerCase();
+          const cleanDriverName = d.name.replace(/\s+/g, "").toLowerCase();
+          return cleanDriverName.includes(cleanNodeName) || cleanNodeName.includes(cleanDriverName);
+        });
+        
+        let evictedCount = 0;
+        if (driver) {
+          db.vehicles.forEach(veh => {
+            if (veh.driverId === driver.id) {
+              veh.driverId = ""; // Unassign
+              evictedCount++;
+            }
+          });
+          
+          if (!db.driverMessages) db.driverMessages = [];
+          db.driverMessages.push({
+            id: "msg_evt_" + Date.now(),
+            sender: "Служба Безопасности",
+            text: `КРИТИЧЕСКОЕ ПРЕДУПРЕЖДЕНИЕ: Сотрудник ${node.name} (HR) заблокирован! Принудительно отстранен от техники (${evictedCount} ед.).`,
+            time: new Date().toLocaleTimeString().substring(0, 5),
+            status: "unread",
+            vehicleId: ""
+          });
+        }
+        
+        logUserAction(getActiveUsername(), `Сотрудник ${node.name} заблокирован службой безопасности.`, "HR/Безопасность", "danger");
+        saveState();
+        renderOrgChart();
+        
+        showSystemNotification("Шаг 2: Сотрудник заблокирован. Открываем Диспетчерскую...", "warning");
+        
+        setTimeout(() => {
+          switchTab('dispatcher_hub');
+          showSystemNotification("Критический алерт безопасности отображен в диспетчерском чате!", "danger");
+        }, 2000);
+      }
+    }, 1500);
+    
+  } else if (scenario === 'trip') {
+    switchTab('transport');
+    showSystemNotification("Шаг 1: Переходим в логистику. Создаем рейс...", "info");
+    
+    setTimeout(() => {
+      const newTrip = {
+        id: "trip_test_" + Date.now().toString().slice(-4),
+        vehicle: "KamAZ (845 ADA 06)",
+        carrier: "ТОО «KazBildInvest»",
+        shipper: "ТОО «KazBildInvest»",
+        receiver: "ИП «СпецТранс»",
+        pointA: "Центральный Склад (Атырау)",
+        pointB: "Макат база",
+        distance: 140,
+        volume: 24,
+        weight: 18,
+        status: "В пути"
+      };
+      
+      db.logisticTrips.unshift(newTrip);
+      window.selectedLogisticTripId = newTrip.id;
+      
+      // Меняем статус техники на "В пути"
+      const match = newTrip.vehicle.match(/\(([^)]+)\)/);
+      if (match) {
+        const plate = match[1];
+        const veh = db.vehicles.find(v => v.plate === plate);
+        if (veh) veh.status = "В пути";
+      }
+      
+      saveState();
+      renderTransportTripsTable();
+      renderActiveTripDetails();
+      renderAllVehicles();
+      
+      showSystemNotification("Шаг 2: Рейс в пути. Карточки сверху обновлены данными груза.", "warning");
+      
+      setTimeout(() => {
+        // Имитируем завершение рейса
+        const trip = db.logisticTrips.find(t => t.id === newTrip.id);
+        if (trip) {
+          trip.status = "Доставлено";
+          const match2 = trip.vehicle.match(/\(([^)]+)\)/);
+          if (match2) {
+            const plate = match2[1];
+            const veh = db.vehicles.find(v => v.plate === plate);
+            if (veh) veh.status = "Работает";
+          }
+        }
+        
+        saveState();
+        renderTransportTripsTable();
+        renderActiveTripDetails();
+        renderAllVehicles();
+        
+        showSystemNotification("Шаг 3: Рейс успешно завершен! Спецтехника возвращена в работу.", "success");
+      }, 3500);
+      
+    }, 1500);
+  }
 }
 
 

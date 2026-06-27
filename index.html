@@ -10,13 +10,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KazBildInvest ERP - Панель управления автопарком</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏗️</text></svg>" />
   
   <!-- Стили Leaflet.js -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
   <!-- Локальные стили -->
-  <link rel="stylesheet" href="styles.css?v=2" />
+  <link rel="stylesheet" href="styles.css?v=3" />
 </head>
 <body>
 
@@ -1140,13 +1141,46 @@
               <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             </div>
           </div>
+          
+          <!-- Панель статистики документооборота -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px;">
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 12px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+              <div style="background: rgba(37,99,235,0.08); color: var(--brand-color); width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: var(--brand-color); fill: none; stroke-width: 2.2;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+              </div>
+              <div>
+                <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Всего документов</div>
+                <div style="font-size: 18px; font-weight: 800; color: var(--text-primary); margin-top: 2px;" id="docStatTotal">0</div>
+              </div>
+            </div>
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 12px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+              <div style="background: rgba(230,81,0,0.08); color: #E65100; width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: #E65100; fill: none; stroke-width: 2.2;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <div>
+                <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Ожидает согласования</div>
+                <div style="font-size: 18px; font-weight: 800; color: var(--text-primary); margin-top: 2px;" id="docStatPending">0</div>
+              </div>
+            </div>
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 14px 18px; border-radius: 12px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+              <div style="background: rgba(46,125,50,0.08); color: #2E7D32; width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: #2E7D32; fill: none; stroke-width: 2.2;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 11 11 13 15 9"></polyline></svg>
+              </div>
+              <div>
+                <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Утверждено / Архив</div>
+                <div style="font-size: 18px; font-weight: 800; color: var(--text-primary); margin-top: 2px;" id="docStatApproved">0</div>
+              </div>
+            </div>
+          </div>
+          
           <div class="grid-container" style="gap: 20px; align-items: start;">
-            <!-- Левая колонка: Реестр документов -->
-            <div class="col-8 card">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+            <!-- Левая колонка: Реестр документов с папками -->
+            <div class="col-8 card" style="display: flex; flex-direction: column; gap: 16px;">
+              <!-- Заголовок -->
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; flex-wrap: wrap; gap: 12px;">
                 <div>
-                  <h3 class="card-title" style="margin-bottom: 0;">Официальный документооборот</h3>
-                  <p style="font-size: 11px; color: var(--text-secondary);">Кликните на любой документ для просмотра в официальном формате с гербовой печатью и ЭЦП.</p>
+                  <h3 class="card-title" style="margin: 0;">Официальный документооборот</h3>
+                  <p style="font-size: 11px; color: var(--text-secondary); margin: 4px 0 0 0;">Кликните на любой документ для просмотра в официальном формате с гербовой печатью и ЭЦП.</p>
                 </div>
                 <div style="display: flex; gap: 8px;">
                   <button class="btn-primary" onclick="openCreateOutgoingDocModal()">Создать исходящий</button>
@@ -1154,48 +1188,80 @@
                 </div>
               </div>
 
-              <!-- Поиск и фильтрация -->
-              <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
-                <input type="text" id="docSearchInput" class="form-control" placeholder="Поиск по номеру, теме или контрагенту..." style="flex-grow: 1; font-size: 12px; padding: 6px 12px;" oninput="renderDocumentsRegistry()" />
-                <select id="docTypeFilter" class="form-control" style="width: 150px; font-size: 12px; padding: 6px 12px;" onchange="renderDocumentsRegistry()">
-                  <option value="all">Все типы</option>
-                  <option value="Письмо">Официальные письма</option>
-                  <option value="Договор">Договоры</option>
-                  <option value="Акт">Акты сверки / приема</option>
-                </select>
-              </div>
+              <!-- Двухпанельный макет: Папки слева, Документы справа -->
+              <div style="display: flex; gap: 20px; align-items: stretch; min-height: 480px;">
+                <!-- Панель папок -->
+                <div style="width: 220px; border-right: 1px solid var(--border-color); padding-right: 16px; display: flex; flex-direction: column; gap: 16px; flex-shrink: 0;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Папки документов</span>
+                    <button class="btn-secondary" style="padding: 4px 8px; font-size: 10px; border-radius: 6px; display: flex; align-items: center; gap: 4px;" onclick="openCreateFolderModal()">
+                      <svg viewBox="0 0 24 24" style="width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 3;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                      + Папка
+                    </button>
+                  </div>
+                  
+                  <!-- Дерево папок -->
+                  <div id="docFoldersList" style="display: flex; flex-direction: column; gap: 4px; overflow-y: auto; flex: 1;">
+                    <!-- Заполняется динамически JS -->
+                  </div>
+                </div>
 
-              <!-- Переключатель папок (Входящие / Исходящие) -->
-              <div style="display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 16px; gap: 16px;">
-                <button id="docTabIncoming" class="tab-item active" onclick="switchDocFolder('incoming')" style="background: none; border: none; padding: 8px 12px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--brand-color); border-bottom: 2px solid var(--brand-color); outline: none;">
-                  Входящие документы
-                </button>
-                <button id="docTabOutgoing" class="tab-item" onclick="switchDocFolder('outgoing')" style="background: none; border: none; padding: 8px 12px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text-secondary); outline: none;">
-                  Исходящие документы
-                </button>
-              </div>
+                <!-- Панель документов -->
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 16px; overflow: hidden;">
+                  <!-- Поиск и фильтрация -->
+                  <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <div style="position: relative; flex: 1;">
+                      <input type="text" id="docSearchInput" class="form-control" placeholder="Поиск по номеру, теме или контрагенту..." style="width: 100%; font-size: 12px; padding: 7px 12px 7px 32px;" oninput="renderDocumentsRegistry()" />
+                      <svg viewBox="0 0 24 24" style="position: absolute; left: 10px; top: 9px; width: 13px; height: 13px; stroke: var(--text-secondary); fill: none; stroke-width: 2.2;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    </div>
+                    <select id="docTypeFilter" class="form-control" style="width: 150px; font-size: 12px; padding: 6px 12px;" onchange="renderDocumentsRegistry()">
+                      <option value="all">Все типы</option>
+                      <option value="Письмо">Официальные письма</option>
+                      <option value="Договор">Договоры</option>
+                      <option value="Акт">Акты сверки / приема</option>
+                    </select>
+                  </div>
 
-              <div class="table-wrapper">
-                <table class="clean-table" style="font-size: 12px;" id="documentsRegistryTable">
-                  <thead>
-                    <tr id="docTableHeaderRow">
-                      <!-- Меняется динамически в зависимости от Входящих/Исходящих -->
-                    </tr>
-                  </thead>
-                  <tbody id="documentsTableBody">
-                    <!-- Из JS -->
-                  </tbody>
-                </table>
+                  <!-- Переключатель папок (Входящие / Исходящие) -->
+                  <div style="display: flex; border-bottom: 1px solid var(--border-color); gap: 16px; margin-bottom: 4px;">
+                    <button id="docTabIncoming" class="tab-item active" onclick="switchDocFolder('incoming')" style="background: none; border: none; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--brand-color); border-bottom: 2px solid var(--brand-color); outline: none; display: flex; align-items: center;">
+                      Входящие документы <span id="docIncomingCount" class="badge badge-neutral" style="font-size: 10px; margin-left: 6px; padding: 2px 6px;">0</span>
+                    </button>
+                    <button id="docTabOutgoing" class="tab-item" onclick="switchDocFolder('outgoing')" style="background: none; border: none; padding: 8px 12px; font-size: 12px; font-weight: 500; cursor: pointer; color: var(--text-secondary); outline: none; display: flex; align-items: center;">
+                      Исходящие документы <span id="docOutgoingCount" class="badge badge-neutral" style="font-size: 10px; margin-left: 6px; padding: 2px 6px;">0</span>
+                    </button>
+                  </div>
+
+                  <div class="table-wrapper" style="flex: 1; overflow-y: auto;">
+                    <table class="clean-table" style="font-size: 12px;" id="documentsRegistryTable">
+                      <thead>
+                        <tr id="docTableHeaderRow">
+                          <!-- Меняется динамически в зависимости от Входящих/Исходящих -->
+                        </tr>
+                      </thead>
+                      <tbody id="documentsTableBody">
+                        <!-- Из JS -->
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
 
             <!-- Правая колонка: Модуль согласования -->
-            <div class="col-4 card">
+            <div class="col-4 card" style="display: flex; flex-direction: column; min-height: 480px;">
               <h3 class="card-title">Модуль согласования заявок</h3>
               <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 16px;">Заявки на платежи, договоры и акты, требующие утверждения руководством.</p>
               
-              <div class="approvals-list" id="approvalsListContainer">
-                <!-- Генерируется из JS -->
+              <div class="approvals-list" id="approvalsListContainer" style="flex: 1;">
+                <!-- Genuary out of JS -->
+              </div>
+              
+              <div style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                <h4 style="margin: 0 0 12px 0; font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.5px;">Архив согласований</h4>
+                <div class="approvals-list" id="approvalsArchiveContainer">
+                  <!-- JS -->
+                </div>
               </div>
             </div>
           </div>
@@ -2258,32 +2324,123 @@
     </div>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО: ИИ ЧАТ-БОТ (WHATSAPP ЭМУЛЯТОР) -->
-  <div class="modal-overlay" id="chatBotModal">
-    <div class="modal-box" style="max-width: 450px;">
-      <div class="modal-header">
-        <span class="modal-title" style="display: flex; align-items: center; gap: 6px;">
-          <svg viewBox="0 0 24 24" style="width: 15px; height: 15px; stroke: #22c55e; stroke-width: 2.2; fill: none; display: inline-block; vertical-align: middle;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-          Группа WhatsApp: Водители KazBildInvest
-        </span>
-        <button class="modal-close-btn" onclick="closeChatBotModal()">&times;</button>
-      </div>
-      <div class="modal-body" style="padding: 0;">
-        <div class="whatsapp-widget">
-          <div class="whatsapp-header">
-            <div style="width: 32px; height: 32px; border-radius: 50%; background: #FFF; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #075E54; font-weight: bold; flex-shrink: 0;">KB</div>
-            <div style="display: flex; flex-direction: column;">
-              <span style="font-size: 13px; line-height: 1.2;">KazBildInvest Водители</span>
-              <span style="font-size: 9px; opacity: 0.8; font-weight: normal;">Сериков, Калиев, Жусупов, ИИ-Агент</span>
+  <!-- МОДАЛЬНОЕ ОКНО: WHATSAPP WEB ЭМУЛЯТОР (FULLSCREEN) -->
+  <div class="modal-overlay" id="chatBotModal" style="background: rgba(0,0,0,0.85); z-index: 10000;">
+    <div class="wa-fullscreen">
+      <!-- WhatsApp Sidebar -->
+      <div class="wa-sidebar">
+        <div class="wa-sidebar-header">
+          <div class="wa-avatar wa-avatar-me">ВЫ</div>
+          <div style="flex:1;"></div>
+          <button class="wa-icon-btn" onclick="closeChatBotModal()" title="Закрыть">
+            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="wa-search-box">
+          <div class="wa-search-input-wrap">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="Поиск или новый чат" class="wa-search-input" />
+          </div>
+        </div>
+        <div class="wa-contacts-list">
+          <!-- Группа водителей — активный чат -->
+          <div class="wa-contact-item active" onclick="switchWaChat('group', this)">
+            <div class="wa-avatar wa-avatar-group">
+              <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="wa-contact-info">
+              <div class="wa-contact-name">KazBildInvest Водители</div>
+              <div class="wa-contact-preview"><span style="color:#25D366;">ИИ-Логист:</span> Смена зафиксирована...</div>
+            </div>
+            <div class="wa-contact-meta">
+              <span class="wa-contact-time">сейчас</span>
+              <span class="wa-unread-badge">3</span>
             </div>
           </div>
-          <div class="whatsapp-chat-history" id="chatLogContainer">
-            <!-- Сообщения чата -->
+          <!-- Сериков -->
+          <div class="wa-contact-item" onclick="switchWaChat('serikov', this)">
+            <div class="wa-avatar" style="background:#06cf9c;">СА</div>
+            <div class="wa-contact-info">
+              <div class="wa-contact-name">Сериков А. С.</div>
+              <div class="wa-contact-preview">Принял смену, на объекте</div>
+            </div>
+            <div class="wa-contact-meta">
+              <span class="wa-contact-time">13:41</span>
+            </div>
           </div>
-          <div class="chat-input-area">
-            <input type="text" id="chatInputField" class="form-control" placeholder="Напишите Сериков: Принял смену..." onkeydown="if(event.key==='Enter') sendChatMessage()" style="border-radius: 20px; padding: 6px 14px; background: #FFF;" />
-            <button class="btn-primary" onclick="sendChatMessage()" style="border-radius: 20px; padding: 6px 16px;">Отправить</button>
+          <!-- Калиев -->
+          <div class="wa-contact-item" onclick="switchWaChat('kaliev', this)">
+            <div class="wa-avatar" style="background:#7c5cfc;">КМ</div>
+            <div class="wa-contact-info">
+              <div class="wa-contact-name">Калиев М. К.</div>
+              <div class="wa-contact-preview">Заправил 120 литров</div>
+            </div>
+            <div class="wa-contact-meta">
+              <span class="wa-contact-time">12:20</span>
+            </div>
           </div>
+          <!-- Жусупов -->
+          <div class="wa-contact-item" onclick="switchWaChat('zhusupov', this)">
+            <div class="wa-avatar" style="background:#ff6b6b;">ЖБ</div>
+            <div class="wa-contact-info">
+              <div class="wa-contact-name">Жусупов Б. Н.</div>
+              <div class="wa-contact-preview">Сломалась стрела крана</div>
+            </div>
+            <div class="wa-contact-meta">
+              <span class="wa-contact-time">вчера</span>
+            </div>
+          </div>
+          <!-- ИИ-Логист -->
+          <div class="wa-contact-item" onclick="switchWaChat('ai', this)">
+            <div class="wa-avatar" style="background:#2563eb;">
+              <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:#fff;fill:none;stroke-width:1.8;"><path d="M12 2a7 7 0 0 1 7 7v1h1a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1.07A7.002 7.002 0 0 1 5.07 17H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h1V9a7 7 0 0 1 7-7z"/><circle cx="9" cy="12" r="1" fill="#fff" stroke="none"/><circle cx="15" cy="12" r="1" fill="#fff" stroke="none"/></svg>
+            </div>
+            <div class="wa-contact-info">
+              <div class="wa-contact-name">🤖 ИИ-Логист</div>
+              <div class="wa-contact-preview">Все данные внесены в ERP</div>
+            </div>
+            <div class="wa-contact-meta">
+              <span class="wa-contact-time">12:35</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- WhatsApp Chat Area -->
+      <div class="wa-chat-area">
+        <div class="wa-chat-header">
+          <div class="wa-avatar wa-avatar-group" id="waChatAvatar" style="width:36px;height:36px;font-size:12px;">
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div class="wa-chat-header-info">
+            <div class="wa-chat-header-name" id="waChatName">KazBildInvest Водители</div>
+            <div class="wa-chat-header-status" id="waChatStatus">Сериков, Калиев, Жусупов, ИИ-Логист</div>
+          </div>
+          <div class="wa-chat-header-actions">
+            <button class="wa-icon-btn" title="Поиск">
+              <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </button>
+            <button class="wa-icon-btn" title="Ещё">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="wa-messages-scroll" id="chatLogContainer">
+          <!-- Сообщения чата -->
+        </div>
+        <div class="wa-input-bar">
+          <button class="wa-icon-btn" title="Эмоджи">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+          </button>
+          <button class="wa-icon-btn" title="Прикрепить">
+            <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <input type="text" id="chatInputField" class="wa-chat-input" placeholder="Введите сообщение" onkeydown="if(event.key==='Enter') sendChatMessage()" />
+          <button class="wa-icon-btn wa-voice-btn" id="waVoiceBtn" onclick="toggleWaVoiceInput()" title="Голосовой ввод">
+            <svg viewBox="0 0 24 24" id="waVoiceIcon"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </button>
+          <button class="wa-send-btn" onclick="sendChatMessage()" title="Отправить">
+            <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
         </div>
       </div>
     </div>
@@ -3754,6 +3911,12 @@
               <input type="date" id="outDocDate" class="form-control" required />
             </div>
           </div>
+          <div class="form-group">
+            <label class="form-label">Папка хранения</label>
+            <select id="outDocFolderSelect" class="form-control">
+              <!-- Заполняется из JS -->
+            </select>
+          </div>
         </form>
       </div>
       <div class="modal-footer">
@@ -4203,6 +4366,12 @@
             <label class="form-label">Дата регистрации:</label>
             <input type="date" id="inDocDate" class="form-control" required />
           </div>
+          <div class="form-group">
+            <label class="form-label">Папка хранения:</label>
+            <select id="inDocFolderSelect" class="form-control">
+              <!-- Заполняется из JS -->
+            </select>
+          </div>
         </form>
       </div>
       <div class="modal-footer">
@@ -4284,8 +4453,43 @@
     </div>
   </div>
 
+  <!-- МОДАЛЬНОЕ ОКНО: СОЗДАНИЕ ПАПКИ -->
+  <div class="modal-overlay" id="createDocFolderModal">
+    <div class="modal-box" style="max-width: 400px;">
+      <div class="modal-header">
+        <span class="modal-title">Создать новую папку</span>
+        <button class="modal-close-btn" onclick="closeModal('createDocFolderModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Название папки</label>
+          <input type="text" id="newDocFolderName" class="form-control" placeholder="Напр. Бухгалтерия 2026" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Иконка папки</label>
+          <select id="newDocFolderIcon" class="form-control">
+            <option value="folder">📁 Обычная папка</option>
+            <option value="contract">📄 Документы / Договоры</option>
+            <option value="invoice">💳 Счета и платежи</option>
+            <option value="chart">📊 Отчеты</option>
+            <option value="lock">🔒 Конфиденциально</option>
+            <option value="template">📑 Шаблоны</option>
+            <option value="mail">✉️ Переписка</option>
+            <option value="clipboard">📋 Акты / Заявки</option>
+            <option value="shield">🛡️ Приказы</option>
+            <option value="archive">📦 Архив</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeModal('createDocFolderModal')">Отмена</button>
+        <button class="btn-primary" onclick="submitCreateDocFolder()">Создать</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Базовые скрипты -->
-  <script src="mockData.js?v=2"></script>
-  <script src="app.js?v=2"></script>
+  <script src="mockData.js?v=3"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
